@@ -1,8 +1,0 @@
-[EasyNAS_Beta]
-enabled=0
-autorefresh=1
-baseurl=https://repo.easynas.org/testing/RPMS/
-type=rpm-md
-gpgcheck=1
-gpgkey=https://repo.easynas.org/EASYNAS-GPG-KEY.gpg
-keeppackages=0
