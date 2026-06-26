@@ -27,12 +27,13 @@ SYSTEM DISK (built with devicepersistency=by-label)
  ├─ ESP            label: e.g. EFI
  ├─ root           label: <ROOT_LABEL>      <- REWRITTEN on recovery
  ├─ swap
- └─ config         label: config            <- PRESERVED on recovery
+ └─ config         label: CONFIG            <- PRESERVED on recovery
 DATA DISKS (separate)                        <- never touched
 ```
 
-`config` is the KIWI `spare_part` (name `config`). Recovery finds partitions by
-label, so it never depends on device names (`/dev/sda` vs `nvme…`).
+`config` is a KIWI custom `<partition name="config">` (label uppercased →
+`CONFIG`). Recovery finds partitions by label, so it never depends on device
+names (`/dev/sda` vs `nvme…`).
 
 ---
 
@@ -62,11 +63,11 @@ default install/deploy path.
 Run by `recover.sh` in the ISO's install environment:
 
 ```
-1. SAFETY: find a partition labelled "config".
+1. SAFETY: find a partition labelled "CONFIG".
    - none found -> ABORT with a message: "No existing EasyNAS install;
      use Install (erase disk) instead." (never silently wipe)
 
-2. Identify the ROOT partition on the SAME disk as "config" (by label).
+2. Identify the ROOT partition on the SAME disk as "CONFIG" (by label).
 
 3. Confirm with the user (show disk, root part, config part). Require explicit
    yes before writing anything.
@@ -80,7 +81,7 @@ Run by `recover.sh` in the ISO's install environment:
    - DO NOT touch the config or data partitions.
 
 6. Fix up the new root's /etc/fstab:
-   - ensure the "config" mount entry exists (by LABEL=config -> /config).
+   - ensure the config mount entry exists (by LABEL=CONFIG -> /config).
    - data-pool mounts are managed by EasyNAS at runtime; leave them.
 
 7. Reinstall GRUB to the disk ESP, pointing at the recovered root.
@@ -92,6 +93,33 @@ After reboot, `firstboot.sh` runs, sees `config` already populated, and leaves
 it as-is → **settings preserved**. A fresh `config` (full install) is seeded
 from defaults → **settings reset**. Same script, opposite outcome — exactly the
 two behaviours we want.
+
+---
+
+## Alternative: KIWI native recovery (`oem-recovery`)
+
+KIWI has a built-in recovery system (confirmed in this build's schema):
+
+| Element | Effect |
+|---------|--------|
+| `<oem-recovery>true</oem-recovery>` | create a recovery archive of the system |
+| `<oem-inplace-recovery>true` | build the archive at install time (not stored in the image) |
+| `<oem-recovery-part-size>` | size of the on-disk recovery partition (MB) |
+| `<oem-recoveryID>` | recovery partition ID (default 83) |
+
+This creates an **on-disk recovery partition** holding a factory archive of the
+**root** system; a boot-time recovery restores root from it. Combined with the
+separate `config` partition (not part of the root archive), it restores the OS
+and **leaves settings intact** — the same outcome as the custom script, but:
+
+- **Pro:** native/maintained by KIWI; recovers from the local disk (no ISO
+  needed if root is bootable-enough to reach the recovery entry).
+- **Con:** recovery archive lives on the disk, so it can't help if the whole
+  disk is lost; for a *fully* dead disk you still boot the ISO.
+
+**Recommendation:** use `oem-recovery` as the primary recovery path (on-disk,
+no media), and keep the ISO `recover.sh` as the fallback for a disk that won't
+boot at all. Decide before wiring the boot menu.
 
 ---
 

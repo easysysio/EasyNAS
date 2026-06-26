@@ -12,12 +12,13 @@ mechanism without the `/etc/easynas` shadowing/seeding work. See
 
 ## What was changed
 
-- `EasyNAS-build/config/EasyNAS.kiwi`, **Testing.x86_64** profile: a `spare_part`
-  config partition (512 MB, ext4) mounted at `/config`.
+- `EasyNAS-build/config/EasyNAS.kiwi`, **Testing.x86_64** profile: a custom
+  `<partitions>` entry — a 512 MB ext4 `config` partition mounted at `/config`.
 
-> ⚠️ The `spare_part*` element names are the KIWI NG syntax. If the build errors
-> on them, check your `kiwi-ng` version's schema and adjust — this is the first
-> thing to validate.
+> KIWI NG custom-partition syntax (`<partitions><partition .../></partitions>`
+> at the `<type>` level). The legacy `spare_part` form is NOT in current KIWI.
+> The filesystem label is the partition name uppercased → **`CONFIG`**.
+> Note: `spare` is a reserved partition name and cannot be used.
 
 ## Key idea
 
@@ -77,11 +78,11 @@ install. Next steps are the real integration — mount the config partition at t
 actual Layer 2 locations and seed them (immutable-design §8.2–8.3), and adopt
 `transactional-update dup` as the official upgrade path (§9.2).
 
-## If `spare_part` isn't supported / doesn't persist
+## If the config partition doesn't persist
 
-Fallbacks to try, in order:
-1. Confirm KIWI version supports `spare_part*`; adjust element names.
-2. If the OEM installer wipes the spare part on *upgrade* too, the upgrade must
-   be in-place (it should be — see the table), not an ISO reinstall.
-3. Longer term, a dedicated partition declared in the disk layout, or the
-   btrfs-subvolume approach used by the RPi profile.
+1. Confirm the `<partitions>` entry produced a `CONFIG`-labelled partition on
+   the installed disk (`blkid`, `lsblk`).
+2. If the OEM installer wipes it on *recovery* too, recovery must rewrite only
+   the root partition (see iso-recovery-design.md), not repartition the disk.
+3. Longer term, the btrfs-subvolume approach used by the RPi profile, or KIWI's
+   native `oem-recovery` archive (restores root, leaves `config` intact).
