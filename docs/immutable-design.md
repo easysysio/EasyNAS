@@ -191,10 +191,12 @@ Strategy: store these under the `config` partition (e.g.
 `/etc/easynas/persist/...`) and **bind-mount** each onto its real location via
 early-ordered `systemd` mount/`.conf` units, before the consumers start.
 
-> **Open decision — system accounts.** `/etc/passwd` & `/etc/shadow` are read
-> extremely early. Bind-mounting them from `config` works but is fragile.
-> Longer term, moving NAS users into a dedicated user DB on `config` (and out
-> of the system files) is cleaner. Pick one before implementing 8.3.
+> **Resolved — system accounts.** Rather than bind-mounting `/etc/passwd` &
+> `/etc/shadow` (fragile, read very early), EasyNAS drops local accounts in
+> favour of a local **Samba AD DC** consumed via **SSSD** (NSS + PAM). The
+> directory database (`/var/lib/samba`) becomes the Layer 2 account state on the
+> config partition; the scattered `/etc/passwd`-family files are no longer
+> Layer 2. See [identity-design.md](identity-design.md).
 
 ### 8.4 Caveat — what "survives an upgrade" requires
 
@@ -273,7 +275,7 @@ re-applied one of two ways:
 - [x] Fix Conflict #2 — cron seeded on the config layer at first boot.
 - [x] Fix Conflict #3 — cert generation via first-boot service.
 - [x] Relocate static `sshd_config` out of `/etc/easynas` → `/easynas/conf` (§8.2).
-- [ ] Decide system-accounts strategy (§8.3 open decision).
+- [x] Decide system-accounts strategy → Samba AD DC + SSSD (see identity-design.md).
 - [ ] KIWI: add `spare_part` config partition to the x86_64 profiles (§8.1).
 - [ ] Bind-mount the scattered Layer 2 paths from `config` (§8.3).
 - [ ] Adopt in-place `transactional-update dup` for online OS updates (§8.4, §9.2).
