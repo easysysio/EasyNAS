@@ -214,7 +214,60 @@ installs (requirement #1); the online OS update path must be in-place
 
 ---
 
-## 9. Task checklist
+## 9. Addon persistence across upgrades
+
+Addons (`easynas-fs-ssh`, `easynas-fs-samba`, `easynas-mm-plex`, …) are optional
+RPMs the user installs *after* the base image is built. They drop files into the
+**OS tree** (`/easynas/lib`, `/easynas/templates`, `/easynas/lang`,
+`/easynas/addons`, `/usr/lib/systemd/system`) as well as config
+(`/etc/easynas/...`). Because they live in the OS part, whether they survive an
+upgrade depends entirely on **how the upgrade applies**.
+
+### 9.1 The deciding fork
+
+| Upgrade mechanism | What happens to addons |
+|-------------------|------------------------|
+| **In-place** (`zypper` / `transactional-update dup` from the repo) | Addons are packages that **carry forward** — base + addons update together. **No special home needed.** Only their *config* lives on the config partition. |
+| **Image swap / re-flash** (new root image replaces old) | The new image lacks the post-install addon RPMs → they **vanish**. Must be preserved + re-applied. |
+
+### 9.2 Recommendation — in-place updates
+
+Make the online OS update an **in-place `transactional-update dup`** from
+`repo.easynas.org`, and treat "replace the OS" as new-snapshot semantics rather
+than a literal wipe. Then addon persistence is automatic: addons are RPMs that
+update alongside the base, and the only addon state on the config partition is
+their config files (`sshd_config`, samba shares, etc.), already handled by §8.
+
+This is the chosen approach — it reuses the existing RPM repo and needs no extra
+machinery for addons.
+
+### 9.3 Fallback for literal image-swap
+
+If a literal image-swap upgrade is ever adopted, addons must be preserved on a
+**persistent partition** (config partition or a dedicated `addons` subvolume),
+re-applied one of two ways:
+
+1. **Record + reinstall (preferred).** The installed-addon list already exists
+   as `/etc/easynas/addons/easynas.addons` (config layer). A first-boot step
+   after a swap runs `zypper install` for each recorded addon from the repo, so
+   addons always match the new OS version. Needs network at upgrade; brief gap
+   until reinstalled.
+2. **systemd-sysext overlay.** Ship each addon as a versioned sysext extension
+   image in `/var/lib/extensions` on the persistent partition; systemd merges it
+   read-only into `/usr` (extended to `/easynas`) at boot. Survives swaps with no
+   reinstall, works offline. Cost: addons must be built as sysext images
+   (`extension-release` versioned), not plain RPMs.
+
+### 9.4 Net answer to "where do addons go?"
+
+- **Config** (sshd_config, shares, etc.) → config partition (already planned).
+- **Code / RPMs** → no separate home needed under in-place updates (§9.2); or
+  recorded on the config partition and reinstalled (§9.3.1), or as sysext images
+  on the persistent partition (§9.3.2) under image-swap.
+
+---
+
+## 10. Task checklist
 
 - [x] Fix Conflict #1 — listen port off the systemd unit (`easynas.conf`).
 - [x] Fix Conflict #2 — cron seeded on the config layer at first boot.
@@ -223,6 +276,6 @@ installs (requirement #1); the online OS update path must be in-place
 - [ ] Decide system-accounts strategy (§8.3 open decision).
 - [ ] KIWI: add `spare_part` config partition to the x86_64 profiles (§8.1).
 - [ ] Bind-mount the scattered Layer 2 paths from `config` (§8.3).
-- [ ] Define the in-place online OS update path (§8.4).
+- [ ] Adopt in-place `transactional-update dup` for online OS updates (§8.4, §9.2).
 - [ ] Rework factory reset to reset the `config` partition.
 - [ ] Validate on a real build (§8.5).
