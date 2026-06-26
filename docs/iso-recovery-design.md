@@ -8,8 +8,8 @@ Author: Yariv Hakim
 The install ISO offers two operations:
 
 1. **Install (erase disk)** — full install, wipes everything (existing behaviour).
-2. **Recover (keep settings)** — reinstall the OS when it fails, **preserving the
-   `config` partition and data disks**.
+2. **Recover (keep settings)** — rewrite the OS from the ISO image, **preserving
+   the `config` partition and data disks**.
 
 There is **no online upgrade**. Recovery is the offline path for a broken OS.
 Settings survive because recovery never repartitions — it rewrites only the
@@ -17,6 +17,42 @@ root partition and leaves `config` + data untouched.
 
 Relies on the persistent `config` partition from
 [poc-test.md](poc-test.md) / [immutable-design.md](immutable-design.md).
+
+## Recovery *is* the offline upgrade
+
+The ISO-based recovery rewrites root from **whatever image is on the booted
+ISO**. So it is one operation that serves two purposes, distinguished only by
+the ISO version:
+
+| Boot this ISO | Result |
+|---------------|--------|
+| **same** version | recovery — repair root to the current version |
+| **newer** version | **offline upgrade** — new OS + baked-in easynas, settings kept |
+
+So we do **not** need a separate upgrade path. "Recover (keep settings)" with a
+newer ISO *is* the offline upgrade.
+
+> Note: this applies to the **ISO-based** `recover.sh` only. KIWI's native
+> `oem-recovery` (below) restores a disk-local archive frozen at install time —
+> it always restores the **original** version and can **never** upgrade.
+
+### Preconditions for "settings kept" to actually hold
+
+Rewriting root only preserves what physically lives **off** root. Until these
+are done, recovery keeps a near-empty `/config` and resets everything else:
+
+1. **immutable-design §8** — Layer 2 (accounts, `/etc/easynas`, `/etc/fstab`
+   data mounts, samba) must live on `/config`. Anything still on root (`/etc`)
+   is wiped by recovery.
+2. **immutable-design §9** — addon persistence. Addons not baked into the ISO
+   are lost when root is replaced; record-and-reinstall or include them.
+
+### Upgrade-only caveat — config migration
+
+Recovery to the *same* version never hits this, but an **upgrade** (newer ISO)
+might: a newer easynas may expect a changed config format. `firstboot.sh` only
+seeds when config is **absent**, so it will not migrate an existing `/config`.
+Cross-version upgrades may need an explicit migration step.
 
 ---
 
@@ -142,13 +178,22 @@ boot at all. Decide before wiring the boot menu.
 - [ ] Exact `<ROOT_LABEL>` KIWI assigns to the root partition.
 - [ ] GRUB reinstall command set for this firmware (efi) layout.
 - [ ] Confirm `config` survives `mkfs` of root (it must — different partition).
+- [ ] Config migration step for cross-version upgrades (newer-ISO recovery).
 
 ---
 
 ## Test (extends poc-test.md)
 
+**Recovery (same version):**
 1. Full install; set a marker on `/config`.
 2. Break the OS (e.g. `rm` a critical bit, or just simulate).
 3. Boot ISO → **Recover (keep settings)**.
 4. After reboot: OS is fresh **and** `/config/marker` survived → recovery works.
 5. Boot ISO → **Install (erase disk)**; confirm `/config/marker` is gone.
+
+**Upgrade (newer version, same operation):**
+1. From the install above, note `/etc/ImageVersion` and the marker.
+2. Build a **newer** ISO (bump version / easynas RPM).
+3. Boot the newer ISO → **Recover (keep settings)**.
+4. After reboot: `/etc/ImageVersion` **changed** (new OS) **and** the marker
+   survived → recovery doubled as an offline upgrade.
