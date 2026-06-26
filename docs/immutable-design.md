@@ -142,13 +142,87 @@ In the immutable model, factory reset = **reset the `config` layer to defaults**
 
 ---
 
-## 8. Task checklist
+## 8. KIWI implementation — separate config partition (chosen approach)
 
-- [ ] Carve Layer 2 onto a persistent partition/subvolume; bind-mount paths.
-- [ ] Fix Conflict #1 — systemd port drop-in.
-- [ ] Fix Conflict #2 — relocate cron to `config`, seed at first boot.
-- [ ] Fix Conflict #3 — cert generation via first-boot service.
-- [ ] KIWI: read-only btrfs root + snapshot layout + persistent `config` volume.
-- [ ] Build pipeline: produce install ISO (full) + OS update (published online).
-- [ ] Firmware module: "Upgrade" calls `transactional-update dup`.
-- [ ] Rework factory reset to reset the `config` layer.
+Decision: a **separate persistent `config` partition** on the system disk
+(not full read-only/transactional root). Upgrade replaces the root; `config`
+and the data disks are left untouched.
+
+### 8.1 Partition mechanism
+
+Add a spare partition to each x86_64 profile via `oemconfig`:
+
+```xml
+<oemconfig>
+    ...
+    <spare_part mountpoint="/etc/easynas">512</spare_part>
+</oemconfig>
+```
+
+KIWI creates one extra partition on the install target and mounts it at the
+given path (recorded in `/etc/fstab` of the installed system).
+
+### 8.2 The mount-shadowing problem
+
+`/etc/easynas` currently holds a mix:
+
+| File | Layer | Action |
+|------|-------|--------|
+| `easynas.conf`, `easynas.lang`, `easynas.updates`, `easynas.cert/key`, `addons/*.addon`, `addons/easynas.addons` | config | belong on the partition — seed via firstboot |
+| `sshd_config` | **image (static)** | mounting the partition over `/etc/easynas` would **shadow** it → SSH breaks |
+
+So before mounting `config` at `/etc/easynas`, the static `sshd_config` must
+move out (e.g. to `/easynas/conf/sshd_config`, referenced by the
+`easynas-sshd.service` `ExecStart`). After that, `/etc/easynas` is purely
+config-layer and safe to back with the partition. `firstboot.sh` already seeds
+the config files if absent.
+
+### 8.3 Layer 2 that lives outside /etc/easynas
+
+A single partition at `/etc/easynas` does **not** capture the rest of Layer 2:
+
+- `/etc/passwd`, `/etc/shadow`, `/etc/group` — NAS accounts (needed very early at boot)
+- `/etc/fstab` — data-pool mounts
+- `/etc/hostname`, `/etc/hosts`
+- `/etc/NetworkManager/system-connections/`
+- `/var/lib/samba/` — SMB passdb
+
+Strategy: store these under the `config` partition (e.g.
+`/etc/easynas/persist/...`) and **bind-mount** each onto its real location via
+early-ordered `systemd` mount/`.conf` units, before the consumers start.
+
+> **Open decision — system accounts.** `/etc/passwd` & `/etc/shadow` are read
+> extremely early. Bind-mounting them from `config` works but is fragile.
+> Longer term, moving NAS users into a dedicated user DB on `config` (and out
+> of the system files) is cleaner. Pick one before implementing 8.3.
+
+### 8.4 Caveat — what "survives an upgrade" requires
+
+KIWI's OEM install-from-ISO **repartitions the whole disk**, which would wipe
+`config`. So "upgrade replaces OS only, settings survive" only holds if the
+**upgrade is in-place** (zypper/RPM from the repo, or an A/B root swap) — *not*
+a fresh OEM reinstall from the ISO. The ISO is for full (wipe-everything)
+installs (requirement #1); the online OS update path must be in-place
+(requirement #2/#3).
+
+### 8.5 Validation (must run on a real build)
+
+1. Build the ISO; install to a VM.
+2. Set a custom port, create a NAS user, create a filesystem.
+3. Apply an in-place OS update from the repo.
+4. Confirm port, user, and fstab/data mounts all survived.
+
+---
+
+## 9. Task checklist
+
+- [x] Fix Conflict #1 — listen port off the systemd unit (`easynas.conf`).
+- [x] Fix Conflict #2 — cron seeded on the config layer at first boot.
+- [x] Fix Conflict #3 — cert generation via first-boot service.
+- [ ] Relocate static `sshd_config` out of `/etc/easynas` (§8.2).
+- [ ] Decide system-accounts strategy (§8.3 open decision).
+- [ ] KIWI: add `spare_part` config partition to the x86_64 profiles (§8.1).
+- [ ] Bind-mount the scattered Layer 2 paths from `config` (§8.3).
+- [ ] Define the in-place online OS update path (§8.4).
+- [ ] Rework factory reset to reset the `config` partition.
+- [ ] Validate on a real build (§8.5).
