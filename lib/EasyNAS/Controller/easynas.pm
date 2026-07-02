@@ -31,8 +31,8 @@ our @EXPORT_OK = qw();
 our @EXPORT    = qw( get_mount_dir get_conf_cron get_addons_file get_update_file get_categories mounted 
                      get_group_default get_conf_webui get_conf_hosts  get_lang_list get_addons_update_dir 
 		     get_lang_text get_service_status get_menu get_addons get_addon_info 
-		     write_log easynas_info addons_info fs_info vol_info users_info groups_info 
-                     disk_info health_info networks_info);
+		     write_log easynas_info addons_info fs_info vol_info users_info groups_info
+                     disk_info health_info networks_info cpu_info memory_info);
 
 ############# Declarations #####################
 my $authentication_enable = 1;
@@ -78,6 +78,105 @@ sub easynas_info
  $easynas{'arc'}=$arc;
  $easynas{'serial'}=$serial;
  return(%easynas);
+}
+
+
+######## cpu_info #######
+sub cpu_info
+{
+ my %cpu;
+ my $model;
+ my $cores;
+ my $load1;
+ my $load5;
+ my $load15;
+ my $usage=0;
+ my @stat1;
+ my @stat2;
+ my $total1=0;
+ my $total2=0;
+ my $idle1;
+ my $idle2;
+
+ $model=`/usr/bin/grep -m1 'model name' /proc/cpuinfo | /usr/bin/cut -d: -f2`;
+ $model =~ s/^\s+|\s+$//g;
+ if ($model eq "") {
+  $model=`/usr/bin/uname -m`;
+  chomp($model);
+ }
+ $cores=`/usr/bin/grep -c ^processor /proc/cpuinfo`;
+ chomp($cores);
+ ($load1,$load5,$load15)=split(" ",`/usr/bin/cat /proc/loadavg`);
+
+ ### usage from two /proc/stat samples 0.25s apart:
+ ### fields after the cpu label are user nice system idle iowait irq ...
+ @stat1=split(" ",`/usr/bin/grep -m1 '^cpu ' /proc/stat`);
+ select(undef,undef,undef,0.25);
+ @stat2=split(" ",`/usr/bin/grep -m1 '^cpu ' /proc/stat`);
+ shift(@stat1);
+ shift(@stat2);
+ $total1 += $_ foreach @stat1;
+ $total2 += $_ foreach @stat2;
+ $idle1=$stat1[3]+($stat1[4] || 0);
+ $idle2=$stat2[3]+($stat2[4] || 0);
+ if (($total2-$total1) > 0) {
+  $usage=int(100*(($total2-$total1)-($idle2-$idle1))/($total2-$total1));
+ }
+
+ $cpu{'model'}=$model;
+ $cpu{'cores'}=$cores;
+ $cpu{'load1'}=$load1;
+ $cpu{'load5'}=$load5;
+ $cpu{'load15'}=$load15;
+ $cpu{'usage'}=$usage;
+ return(%cpu);
+}
+
+
+######## memory_info #######
+sub memory_info
+{
+ my %memory;
+ my $total=0;
+ my $available=0;
+ my $swap_total=0;
+ my $swap_free=0;
+ my $used;
+ my @meminfo=`/usr/bin/cat /proc/meminfo`;
+
+ ### /proc/meminfo values are in kB
+ foreach (@meminfo)
+ {
+  if ($_ =~ /^MemTotal:/) {
+   (undef,$total)=split(" ",$_);
+  }
+  if ($_ =~ /^MemAvailable:/) {
+   (undef,$available)=split(" ",$_);
+  }
+  if ($_ =~ /^SwapTotal:/) {
+   (undef,$swap_total)=split(" ",$_);
+  }
+  if ($_ =~ /^SwapFree:/) {
+   (undef,$swap_free)=split(" ",$_);
+  }
+ }
+ $used=$total-$available;
+ $memory{'total'}=format_bytes($total*1024);
+ $memory{'used'}=format_bytes($used*1024);
+ $memory{'available'}=format_bytes($available*1024);
+ $memory{'percentage'}=0;
+ if ($total > 0) {
+  $memory{'percentage'}=int($used/$total*100);
+ }
+ $memory{'has_swap'}=0;
+ $memory{'swap_percentage'}=0;
+ if ($swap_total > 0) {
+  $memory{'has_swap'}=1;
+  $memory{'swap_total'}=format_bytes($swap_total*1024);
+  $memory{'swap_used'}=format_bytes(($swap_total-$swap_free)*1024);
+  $memory{'swap_percentage'}=int(($swap_total-$swap_free)/$swap_total*100);
+ }
+ return(%memory);
 }
 
 

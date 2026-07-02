@@ -18,6 +18,8 @@ sub view ($self) {
   my %disks  = disk_info();
   my %vol    = vol_info();
   my %users  = users_info();
+  my %cpu    = cpu_info();
+  my %memory = memory_info();
   my $updates= get_update_file();
   my $missing_update;
   my $dom;
@@ -43,6 +45,8 @@ sub view ($self) {
 		addons =>\%addons,
 		filesystems => \%fs,
 		disks => \%disks,
+		cpu => \%cpu,
+		memory => \%memory,
 		fs_number => scalar(keys %fs ),
 		disk_number => scalar(keys %disks),
 		vol_number => scalar(keys %vol),

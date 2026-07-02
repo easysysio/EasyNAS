@@ -67,6 +67,12 @@ $TEXT{'dashboard_good'} = "Good";
 $TEXT{'dashboard_degreded'} = "Degraded";
 $TEXT{'dashboard_update_available'} = "New updates available";
 $TEXT{'dashboard_click_here'} = " click here to update";
+$TEXT{'dashboard_cpu'} = "CPU";
+$TEXT{'dashboard_cores'} = "cores";
+$TEXT{'dashboard_load'} = "Load";
+$TEXT{'dashboard_memory'} = "Memory";
+$TEXT{'dashboard_memory_available'} = "Available";
+$TEXT{'dashboard_swap'} = "Swap";
 
 #### Search ####
 $TEXT{'search'} = "Search";

@@ -14,6 +14,29 @@
 <div class="row"><div class="col-xs-3"><i class="fa fa-users fa-5x"></i></div><div class="col-xs-9 text-right"><div class="huge"><%= $user_number %></div><div><%= ($TEXT->{'dashboard_users'}) %></div></div></div></div><a href="<%= ($addons->{'users'}->{program}) %>"><div class="panel-footer"><span class="pull-left"><%= ($TEXT->{'dashboard_view_details'}) %></span><span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span><div class="clearfix"></div></div></a></div></div>
 
 
+<div class="col-lg-6"><div class="panel panel-default"><div class="panel-heading"><div class="row"><div class="col-xs-3"><%= ($TEXT->{'dashboard_cpu'}) %></div><div class="panel-body">
+<i class="fa fa-microchip fa-3x" style="color:<%= $cpu->{usage} > 90 ? "red" : "green" %>"></i>
+&nbsp;<%= $cpu->{model} %> (<%= $cpu->{cores} %> <%= ($TEXT->{'dashboard_cores'}) %>)
+<div class="progress" role="progressbar" aria-label="cpu usage" aria-valuenow="<%= $cpu->{usage} %>" aria-valuemin="0" aria-valuemax="100">
+ <%= $cpu->{usage} %>%<div class="progress-bar<%= $cpu->{usage} > 90 ? " progress-bar-danger" : "" %>" style="width: <%= $cpu->{usage} %>%"></div>
+</div>
+<%= ($TEXT->{'dashboard_load'}) %>: <%= $cpu->{load1} %> / <%= $cpu->{load5} %> / <%= $cpu->{load15} %>
+</div></div></div><div class="panel-footer"><span class="pull-left"><%= ($TEXT->{'dashboard_load'}) %>&nbsp;1/5/15&nbsp;min</span><div class="clearfix"></div></div></div></div>
+
+<div class="col-lg-6"><div class="panel panel-default"><div class="panel-heading"><div class="row"><div class="col-xs-3"><%= ($TEXT->{'dashboard_memory'}) %></div><div class="panel-body">
+<i class="fa fa-memory fa-3x" style="color:<%= $memory->{percentage} > 90 ? "red" : "green" %>"></i>
+&nbsp;<%= $memory->{used} %> / <%= $memory->{total} %>
+<div class="progress" role="progressbar" aria-label="memory usage" aria-valuenow="<%= $memory->{percentage} %>" aria-valuemin="0" aria-valuemax="100">
+ <%= $memory->{percentage} %>%<div class="progress-bar<%= $memory->{percentage} > 90 ? " progress-bar-danger" : "" %>" style="width: <%= $memory->{percentage} %>%"></div>
+</div>
+% if ($memory->{has_swap}) {
+<%= ($TEXT->{'dashboard_swap'}) %>: <%= $memory->{swap_used} %> / <%= $memory->{swap_total} %>
+<div class="progress" role="progressbar" aria-label="swap usage" aria-valuenow="<%= $memory->{swap_percentage} %>" aria-valuemin="0" aria-valuemax="100">
+ <%= $memory->{swap_percentage} %>%<div class="progress-bar" style="width: <%= $memory->{swap_percentage} %>%"></div>
+</div>
+% }
+</div></div></div><div class="panel-footer"><span class="pull-left"><%= ($TEXT->{'dashboard_memory_available'}) %>:&nbsp;<%= $memory->{available} %></span><div class="clearfix"></div></div></div></div>
+
 <div class="col-lg-6"><div class="panel panel-default"><div class="panel-heading"><div class="row"><div class="col-xs-3">Disk</div><div class="panel-body">
 <table>
 <tr>
@@ -55,9 +78,12 @@
 </tr><tr>
 % foreach my $fs (keys (%$filesystems)) {
  <td>
-  <div class="progress" role="progressbar" aria-label="Basic example" aria-valuenow="<%= $filesystems->{$fs}[5] %>" aria-valuemin="0" aria-valuemax="100">
+  <div class="progress" role="progressbar" aria-label="filesystem usage" aria-valuenow="<%= $filesystems->{$fs}[5] %>" aria-valuemin="0" aria-valuemax="100">
    <%= $filesystems->{$fs}[5] %>%<div class="progress-bar" style="width: <%= $filesystems->{$fs}[5] %>%"></div>
   </div>
+  % if ($filesystems->{$fs}[8] eq "Mounted") {
+  <%= $filesystems->{$fs}[3] %> / <%= $filesystems->{$fs}[2] %>
+  % }
  </td>
 %}
 </tr>
