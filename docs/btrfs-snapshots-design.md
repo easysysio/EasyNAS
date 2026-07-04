@@ -1,0 +1,135 @@
+# btrfs Snapshots — Bootable Upgrade Rollback
+
+Status: **Planned** (do after the ext4 build is validated end-to-end)
+Author: Yariv Hakim
+
+Give every OS upgrade an automatic, bootable safety net: a snapshot is taken
+before the upgrade, and if it goes wrong you reboot and pick the previous
+snapshot from GRUB. This is openSUSE's native update-safety model — no custom
+tooling.
+
+---
+
+## 1. Scope: Level 1 (read-write root + snapshots)
+
+Two levels exist; we take the lighter one.
+
+| | Level 1 (chosen) | Level 2 (not now) |
+|---|---|---|
+| root | normal read-write btrfs | read-only + transactional-update |
+| snapshots | before/after every zypper transaction | per atomic update |
+| rollback | boot a snapshot from GRUB | + auto-rollback on boot failure |
+| immutability conflicts | **none to solve** | must solve §8 conflicts |
+
+Level 1 delivers "snapshot before upgrade, boot to it anytime" with minimal
+disruption. Level 2 (MicroOS model) is a later option if auto-rollback is
+wanted; it depends on the immutable-design §8 conflict fixes.
+
+---
+
+## 2. Mechanism (all stock openSUSE)
+
+| Package | Role |
+|---------|------|
+| `snapper` | snapshot management |
+| `snapper-zypp-plugin` | auto-snapshot **before + after every zypper transaction** |
+| `grub2-snapper-plugin` | GRUB "Boot from snapshot" submenu |
+| `btrfsprogs`, `btrfsmaintenance` | already present |
+
+Flow: `zypper up easynas` → pre-snapshot → upgrade → post-snapshot. Bad result
+→ reboot → GRUB → *Start bootloader from a read-only snapshot* → previous OS.
+
+---
+
+## 3. Subvolume layout
+
+Root (`@`) is snapshotted; everything that must **not** roll back with the OS
+lives on an excluded subvolume.
+
+| Path | In root snapshot? | Why |
+|------|-------------------|-----|
+| `/` incl. `/usr`, `/etc`, **`/easynas`** (app) | **yes** | OS + app + base config roll back together — no version skew |
+| `/var` (cow=false) → incl. **`/var/log/easynas`** | no (excluded) | logs must survive a rollback |
+| `/home`, `/tmp`, `/opt`, `/srv`, `/usr/local` | no (excluded) | openSUSE defaults |
+| `/.snapshots` | n/a | snapshot storage |
+
+> **Correction vs. the old RPi profile:** it put `/easynas` (the app) on its own
+> subvolume *outside* root snapshots — a rollback would have reverted the OS but
+> not the app, desyncing them. Here `/easynas` stays **inside** root so
+> app+OS+config revert as one unit.
+
+### `/etc/easynas` placement
+
+- **Bootstrap (no data pool yet):** on root → inside the snapshot, so a rollback
+  reverts settings with the OS. Acceptable (fresh box, little to lose).
+- **After first pool:** `/etc/easynas` is bind-mounted from the **data pool**
+  (see identity/reinstall design) → physically **outside** the btrfs root, so
+  snapshots/rollback don't touch it at all. This is the steady state and it
+  resolves the exclusion question for free.
+
+So we do **not** need a special excluded subvolume for `/etc/easynas`: root
+during bootstrap, data pool thereafter.
+
+---
+
+## 4. KIWI changes (per profile)
+
+Apply uniformly to all five profiles (one payload principle):
+
+- `<type filesystem="btrfs" ... btrfs_root_is_snapshot="true">`
+  (replaces `filesystem="ext4"`). This lays root out as
+  `@/.snapshots/1/snapshot`, snapper-compatible.
+- `<systemdisk>` with the excluded volumes:
+  ```xml
+  <systemdisk>
+    <volume name="home"/>
+    <volume name="opt"/>
+    <volume name="srv"/>
+    <volume name="tmp"/>
+    <volume name="usr/local"/>
+    <volume name="var" copy_on_write="false"/>
+  </systemdisk>
+  ```
+  (No `easynas` volume — deliberately.)
+- Add `snapper`, `snapper-zypp-plugin`, `grub2-snapper-plugin` to the shared
+  package list.
+- Keep the `CONFIG` custom partition as-is (orthogonal to snapshots).
+- x86: keep `eficsm="false"`; aarch64/RPi: btrfs already worked there before.
+
+---
+
+## 5. How it fits the rest
+
+Two orthogonal safety mechanisms, both kept:
+
+| Event | Mechanism | Scope |
+|-------|-----------|-------|
+| **Bad upgrade** | btrfs snapshot → boot previous snapshot | system disk, local |
+| **Reinstall** (full ISO) | data-pool records + disk rediscovery | snapshots are wiped with the disk |
+
+Snapshots protect *upgrades*; they do **not** survive a full reinstall (they're
+on the system disk). Reinstall survival still relies on the data pool.
+
+And the in-place upgrade requirement ("update root but not `/etc/easynas`,
+`/etc/fstab`, `/var/log/easynas`") is satisfied by the package upgrade itself —
+snapshots are the *rollback* net on top of it.
+
+---
+
+## 6. Sequencing & validation
+
+1. **First:** validate the current **ext4** ISO end-to-end (boot, console, NFS).
+2. Switch profiles to btrfs + snapper as one change; rebuild all.
+3. Validate: `snapper list` shows pre/post snapshots after a `zypper up`; the
+   GRUB "boot from snapshot" entry appears and boots the old root; `/var/log`
+   and data survive a rollback.
+4. Confirm cross-arch btrfs build works under emulation (ext4 was proven; btrfs
+   uses a different disk-builder path — re-test the container build).
+
+## 7. Open items
+
+- [ ] Snapshot cleanup policy (`snapper` timeline/number limits) tuned for a
+      small appliance disk.
+- [ ] Confirm GRUB snapshot submenu renders with the EasyNAS theme.
+- [ ] Decide whether firstboot/console exposes a "rollback" hint to users.
+- [ ] Re-validate the container cross-arch build with btrfs root.
