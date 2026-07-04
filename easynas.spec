@@ -84,10 +84,10 @@ cat > %{buildroot}/etc/zypp/repos.d/EasyNAS.repo << 'EOF'
 [EasyNAS]
 enabled=1
 autorefresh=1
-baseurl=https://repo.easynas.org/easynas2/RPMS/
+baseurl=https://repo.easysys.io/easynas/stable
 type=rpm-md
 gpgcheck=1
-gpgkey=https://repo.easynas.org/EASYNAS-GPG-KEY.gpg
+gpgkey=https://repo.easysys.io/EASYNAS-GPG-KEY.gpg
 keeppackages=0
 EOF
 
@@ -95,10 +95,10 @@ cat > %{buildroot}/etc/zypp/repos.d/EasyNAS_Beta.repo << 'EOF'
 [EasyNAS_Beta]
 enabled=0
 autorefresh=1
-baseurl=https://repo.easynas.org/testing/RPMS/
+baseurl=https://repo.easysys.io/easynas/testing
 type=rpm-md
 gpgcheck=1
-gpgkey=https://repo.easynas.org/EASYNAS-GPG-KEY.gpg
+gpgkey=https://repo.easysys.io/EASYNAS-GPG-KEY.gpg
 keeppackages=0
 EOF
 
