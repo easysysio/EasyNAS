@@ -39,6 +39,28 @@ wanted; it depends on the immutable-design §8 conflict fixes.
 Flow: `zypper up easynas` → pre-snapshot → upgrade → post-snapshot. Bad result
 → reboot → GRUB → *Start bootloader from a read-only snapshot* → previous OS.
 
+### Version-labeled snapshots + "keep last 3"
+
+Rather than rely on the zypp-plugin's generic auto-snapshots, EasyNAS takes an
+**explicit, version-labeled snapshot before each upgrade**, in the update flow
+(console "Check for updates" / "Reinstall", and the Firmware page):
+
+```bash
+snapper create --cleanup number \
+  --description "EasyNAS $(rpm -q --qf '%{VERSION}-%{RELEASE}' easynas)" \
+  --userdata "easynas=upgrade"
+```
+
+The description appears in `snapper list` **and the GRUB rollback menu**, so the
+user picks a rollback point by version — "EasyNAS 1.99-3" — not by date/number.
+
+**Retention: keep the last 3 upgrades.** The snapshots are tagged
+`userdata easynas=upgrade`; after creating a new one, prune EasyNAS's own tagged
+snapshots to the newest 3 (self-managed, so it's exactly "last 3 EasyNAS
+upgrades" regardless of any other snapshot activity). To avoid noise, quiet the
+`snapper-zypp-plugin` auto-pairs so the version-labeled ones are the only
+upgrade snapshots the user sees.
+
 ---
 
 ## 3. Subvolume layout
@@ -128,8 +150,9 @@ snapshots are the *rollback* net on top of it.
 
 ## 7. Open items
 
-- [ ] Snapshot cleanup policy (`snapper` timeline/number limits) tuned for a
-      small appliance disk.
-- [ ] Confirm GRUB snapshot submenu renders with the EasyNAS theme.
+- [ ] Confirm GRUB snapshot submenu renders with the EasyNAS theme and shows
+      the version-labeled descriptions.
 - [ ] Decide whether firstboot/console exposes a "rollback" hint to users.
 - [ ] Re-validate the container cross-arch build with btrfs root.
+- [ ] Wire the pre-upgrade `snapper create` + prune-to-3 into the update flow
+      (firmware.pm and console options 5/6); quiet the zypp-plugin auto-pairs.
