@@ -87,7 +87,7 @@ autorefresh=1
 baseurl=https://repo.easysys.io/easynas/stable
 type=rpm-md
 gpgcheck=1
-gpgkey=https://repo.easysys.io/EASYNAS-GPG-KEY.gpg
+gpgkey=https://repo.easysys.io/easysys.gpg
 keeppackages=0
 EOF
 
@@ -98,7 +98,7 @@ autorefresh=1
 baseurl=https://repo.easysys.io/easynas/testing
 type=rpm-md
 gpgcheck=1
-gpgkey=https://repo.easysys.io/EASYNAS-GPG-KEY.gpg
+gpgkey=https://repo.easysys.io/easysys.gpg
 keeppackages=0
 EOF
 
