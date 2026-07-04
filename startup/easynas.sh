@@ -42,11 +42,12 @@ while [[ true ]] ; do
     echo " 3. Restart network"
     echo " 4. Reset to default settings"
     echo " 5. Check for EasyNAS updates"
-    echo " 6. Restart"
-    echo " 7. Shutdown"
-    echo " 8. Shell"
+    echo " 6. Reinstall EasyNAS"
+    echo " 7. Restart"
+    echo " 8. Shutdown"
+    echo " 9. Shell"
     echo ""
-    echo "Selection (1-8) :" 
+    echo "Selection (1-9) :"
     read CHOOSE
 
     case "$CHOOSE" in
@@ -98,16 +99,26 @@ while [[ true ]] ; do
 
 
 	"6" )
+	    echo "Reinstalling EasyNAS ..."
+	    echo "(configuration and storage are preserved)"
+	    PKGS=$(/usr/bin/rpm -qa --qf '%{NAME} ' 'easynas*')
+	    sudo /usr/bin/zypper --non-interactive refresh
+	    sudo /usr/bin/zypper --non-interactive install --force $PKGS
+	    sudo /usr/bin/systemctl restart easynas.service
+	    read -p "Press Enter key to continue ..."
+	;;
+
+	"7" )
 	    read -p "Press Enter key to restart EasyNAS ..."
 	    sudo /usr/bin/systemctl reboot
 	;;
 
-	"7" )
+	"8" )
 	    read -p "Press Enter key to shutdown EasyNAS ..."
 	    sudo /usr/bin/systemctl poweroff
 	;;
 
-	"8" )
+	"9" )
 	    /bin/bash
 	;;
 
