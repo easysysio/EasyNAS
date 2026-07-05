@@ -178,7 +178,12 @@ EOF
     # samba-tool version, getent will fail below and the spike reports it.)
     samba-tool group addunixattrs "Domain Users" "$GID_BASE" \
         || echo "[WARN] could not set Domain Users gidNumber -- getent may not resolve the primary group"
-    samba-tool group add "$TESTGROUP" --gid-number="$GID_STAFF" 2>/dev/null
+    # A group only resolves via NSS once it has a gidNumber. 'group add
+    # --gid-number' does not reliably set it, but 'group addunixattrs' does
+    # (same as Domain Users above). Finding: groups.pm's ad-dc creategroup must
+    # do group add + addunixattrs, not group add --gid-number.
+    samba-tool group add "$TESTGROUP" 2>/dev/null            # create (may exist)
+    samba-tool group addunixattrs "$TESTGROUP" "$GID_STAFF" 2>/dev/null
     samba-tool user create "$TESTUSER" "$TESTPASS" \
         --given-name=Test --surname=User \
         --uid-number="$UID_BASE" --gid-number="$GID_BASE" \
