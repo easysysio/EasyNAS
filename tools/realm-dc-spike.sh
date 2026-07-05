@@ -65,11 +65,20 @@ provision() {
     # zypper returns non-zero informational codes (e.g. when everything is
     # already installed / "nothing to do"), so don't trust its exit status --
     # attempt the install, then verify the tools we actually need are present.
+    # python3-cryptography is a samba-tool runtime dep that samba-ad-dc does not
+    # pull in on this openSUSE build -- without it 'samba-tool domain provision'
+    # dies with ModuleNotFoundError. (Finding: the appliance package list needs
+    # it too, or user management via samba-tool won't work.)
     zypper --non-interactive install \
-        samba samba-ad-dc samba-client samba-winbind krb5-client bind-utils
+        samba samba-ad-dc samba-client samba-winbind krb5-client bind-utils \
+        python3-cryptography
     for c in samba-tool wbinfo smbclient net host ; do
         command -v "$c" >/dev/null || die "required command '$c' missing after install"
     done
+    # samba-tool imports its Python deps lazily; confirm they load before we
+    # provision, so a missing module is a clear message rather than a traceback.
+    samba-tool domain provision --help >/dev/null 2>&1 \
+        || die "samba-tool cannot load its Python modules (missing dep, e.g. python3-cryptography)"
 
     step "Stand down standalone Samba units (conflict with the DC)"
     systemctl disable --now smb nmb winbind 2>/dev/null
