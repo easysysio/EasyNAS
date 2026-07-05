@@ -353,5 +353,6 @@ Standing up the DC on a clean image needs all of them.
 - winbind NSS resolves directory users/groups; **uid is the RFC2307 number**
   (stable ownership, not dynamic idmap).
 - Authentication works via winbind (`wbinfo -a`) and SMB (`smbclient`).
-- [ ] **pending:** DNS + winbind survive a reboot with NetworkManager
-      (`--validate-only` after `reboot`).
+- [x] **DNS + winbind survive a reboot** with NetworkManager — `--validate-only`
+      after `reboot` passed 11/11 (Samba 4.24, openSUSE Tumbleweed). The
+      local-DC topology's top risk is closed.
