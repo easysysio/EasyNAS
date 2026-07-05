@@ -84,6 +84,15 @@ provision() {
     systemctl disable --now smb nmb winbind 2>/dev/null
     rm -f "$SMB_CONF"          # let provisioning write a fresh DC smb.conf
 
+    step "Set a DC hostname (must differ from the NetBIOS domain)"
+    # Samba refuses to provision when the short hostname equals the NetBIOS
+    # domain. Give the DC its own name. (Finding: the appliance's realm addon
+    # must ensure hostname != domain when hosting a DC.)
+    DC_HOSTNAME="${DC_HOSTNAME:-dc1}"
+    hostnamectl set-hostname "$DC_HOSTNAME" 2>/dev/null || hostname "$DC_HOSTNAME"
+    grep -q "[[:space:]]$DC_HOSTNAME\b" /etc/hosts \
+        || echo "127.0.0.2 $DC_HOSTNAME.$REALM_LC $DC_HOSTNAME" >> /etc/hosts
+
     step "Provision the domain ($REALM / $DOMAIN) with RFC2307"
     samba-tool domain provision \
         --use-rfc2307 \
