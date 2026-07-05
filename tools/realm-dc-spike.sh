@@ -146,10 +146,15 @@ EOF
         # The DC is up and now serves DNS -- point the box at it.
         printf 'search %s\nnameserver 127.0.0.1\n' "$REALM_LC" > /etc/resolv.conf
     else
-        echo "[WARN] $UNIT is not active -- diagnostics:"
-        systemctl --no-pager --full status "$UNIT" 2>&1 | tail -20
-        echo "---- journal ----"
-        journalctl -u "$UNIT" --no-pager -n 40 2>&1 | tail -40
+        echo "[WARN] $UNIT is not active -- capturing samba's own startup error:"
+        # The service exits too fast to log usefully to the journal, and the
+        # KDC error is on samba's own stream. Run it in the foreground briefly
+        # (filtering the apparmor ExecStartPre noise) to see the real cause.
+        systemctl stop "$UNIT" 2>/dev/null
+        timeout 20 /usr/sbin/samba --foreground --no-process-group --debug-stdout -d1 2>&1 \
+            | grep -viE 'update-samba-security|apparmor|selinux' | tail -45
+        echo "---- /var/log/samba/log.samba ----"
+        tail -25 /var/log/samba/log.samba 2>/dev/null
         echo "[INFO] leaving resolv.conf on the forwarder ($FORWARDER) so DNS still works"
     fi
 
