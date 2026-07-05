@@ -69,15 +69,21 @@ my $update_file = $conf_dir."/easynas.updates";
 ######## easynas_info #######
 sub easynas_info
 {
- my $imageversion=`/usr/bin/cat /etc/ImageVersion`;
  my $arc=`/usr/bin/uname -m`;
  my $version;
  my %easynas;
  my $uuid;
  my $serial;
- # /etc/ImageVersion is "EasyNAS-<version>-<release>"; split on the first dash
- # only so the release (build number) stays part of the displayed version.
- (undef,$version)=split("-",$imageversion,2);
+ # Display the installed easynas package's version-release -- this always
+ # includes the build number (the RPM release) and is accurate even if
+ # /etc/ImageVersion is stale. Fall back to parsing /etc/ImageVersion
+ # ("EasyNAS-<version>-<release>") when the package isn't queryable, e.g. when
+ # running from a source checkout.
+ $version=`/usr/bin/rpm -q --qf '%{VERSION}-%{RELEASE}' easynas 2>/dev/null`;
+ if ($? != 0 || $version eq "" || $version =~ /not installed/) {
+   my $imageversion=`/usr/bin/cat /etc/ImageVersion 2>/dev/null`;
+   (undef,$version)=split("-",$imageversion,2);
+ }
  chomp($version);
  $uuid=`/usr/sbin/dmidecode | grep UUID`;
  (undef,$serial)=split(" ",$uuid);
