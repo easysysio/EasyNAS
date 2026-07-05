@@ -47,9 +47,17 @@ my $uuid=`/usr/sbin/dmidecode 2>/dev/null | grep UUID`;
 `curl -s --connect-timeout 5 --max-time 10 https://repo.easysys.io/api/stats.pl -H "Content-Type: application/x-www-form-urlencoded" -d "arc=$arc&ver=$version&ip=$ip&serial=$serial"`;
 
 ####### Refresh Repo #######
+# EasyNAS ships two channel repos -- EasyNAS (stable) and EasyNAS_Beta
+# (testing) -- with only the active channel enabled. Query updates from
+# whichever is enabled instead of hardcoding the stable alias, so the check
+# also works on testing images (where EasyNAS is disabled).
+my $repo="EasyNAS";
+foreach (`/usr/bin/sudo /usr/bin/zypper --quiet lr -E 2>/dev/null`) {
+  if (/\bEasyNAS_Beta\b/) { $repo="EasyNAS_Beta"; last; }
+}
 `/usr/bin/sudo /usr/bin/zypper --quiet --gpg-auto-import-keys refresh`;
 `/usr/bin/sudo /usr/bin/zypper --quiet --xmlout search easynas | /usr/bin/sudo /usr/bin/tee /etc/easynas/addons/easynas.addons`;
-`/usr/bin/sudo /usr/bin/zypper --quiet --xmlout lu -a --repo EasyNAS | /usr/bin/sudo /usr/bin/tee  /etc/easynas/easynas.updates`;
+`/usr/bin/sudo /usr/bin/zypper --quiet --xmlout lu -a --repo $repo | /usr/bin/sudo /usr/bin/tee  /etc/easynas/easynas.updates`;
 if (-e $addons) {
   open my $fh, '<', $addons;
   binmode $fh; # drop all PerlIO layers possibly created by a use open pragma
