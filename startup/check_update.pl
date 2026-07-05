@@ -35,14 +35,16 @@ my $timestamp=localtime();
  close $fh;
 
 ##### Capture Stats ######
+# All external calls are bounded by timeouts so a slow or unreachable endpoint
+# can never hang the update check.
 my $version=`cat /etc/ImageVersion`;
-my $ip=`curl -s ifconfig.io/ip`;
+my $ip=`curl -s --connect-timeout 5 --max-time 10 https://ifconfig.io/ip`;
 chop($ip);
 my $arc=`/usr/bin/uname -m`;
 chop($arc);
-my $uuid=`/usr/sbin/dmidecode | grep UUID`;
+my $uuid=`/usr/sbin/dmidecode 2>/dev/null | grep UUID`;
 (undef,$serial)=split(" ",$uuid);
-`curl -s https://repo.easynas.org/api/stats.pl -H "Content-Type: application/x-www-form-urlencoded" -d "arc=$arc&ver=$version&ip=$ip&serial=$serial"`;
+`curl -s --connect-timeout 5 --max-time 10 https://repo.easysys.io/api/stats.pl -H "Content-Type: application/x-www-form-urlencoded" -d "arc=$arc&ver=$version&ip=$ip&serial=$serial"`;
 
 ####### Refresh Repo #######
 `/usr/bin/sudo /usr/bin/zypper --quiet --gpg-auto-import-keys refresh`;
