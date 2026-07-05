@@ -89,7 +89,15 @@ provision() {
 
     step "Stand down standalone Samba units (conflict with the DC)"
     systemctl disable --now smb nmb winbind 2>/dev/null
-    rm -f "$SMB_CONF"          # let provisioning write a fresh DC smb.conf
+
+    # openSUSE's MIT KDC binary lives under /usr/lib/mit/sbin, not samba's
+    # default /usr/sbin/krb5kdc -- without pointing samba at it the DC dies with
+    # "mitkdc: /usr/sbin/krb5kdc: Failed to exec child". (Appliance finding.)
+    KDC_BIN=/usr/lib/mit/sbin/krb5kdc
+    for p in /usr/lib/mit/sbin/krb5kdc /usr/sbin/krb5kdc /usr/lib/krb5/krb5kdc ; do
+        [ -x "$p" ] && KDC_BIN="$p" && break
+    done
+    echo "[INFO] MIT KDC binary: $KDC_BIN"
 
     step "Set a DC hostname (must differ from the NetBIOS domain)"
     # Samba refuses to provision when the short hostname equals the NetBIOS
@@ -103,7 +111,12 @@ provision() {
     step "Provision the domain ($REALM / $DOMAIN) with RFC2307"
     if [ -f /var/lib/samba/private/sam.ldb ] ; then
         echo "[INFO] already provisioned -- reusing the existing domain"
+        # ensure the reused smb.conf points at the right MIT KDC binary
+        if [ -f "$SMB_CONF" ] && ! grep -q 'mit kdc command' "$SMB_CONF" ; then
+            sed -i "/^\[global\]/a\\	mit kdc command = $KDC_BIN" "$SMB_CONF"
+        fi
     else
+        rm -f "$SMB_CONF"      # fresh provision writes a new DC smb.conf
         samba-tool domain provision \
             --use-rfc2307 \
             --realm="$REALM" \
@@ -112,6 +125,7 @@ provision() {
             --dns-backend=SAMBA_INTERNAL \
             --adminpass="$ADMINPASS" \
             --option="dns forwarder = $FORWARDER" \
+            --option="mit kdc command = $KDC_BIN" \
             || die "domain provision failed"
     fi
 
