@@ -304,3 +304,54 @@ credentials, as they do on every NAS.
 
 Optional future integrations: **RADIUS → LDAP** and **rsyncd → over-SSH** are the
 only self-auth addons worth wiring to the realm, and only on request.
+
+---
+
+## 10. Spike findings — AD local DC on openSUSE
+
+Validated by `tools/realm-dc-spike.sh` on openSUSE Tumbleweed (Samba 4.24):
+the local-DC backend works, but only after these non-obvious requirements.
+Standing up the DC on a clean image needs all of them.
+
+### Base image package list (KIWI)
+- [ ] `samba-ad-dc` (already present) + `samba-winbind`
+- [ ] `python3-cryptography` — samba-tool runtime dep, **not** pulled in by
+      samba-ad-dc; without it `samba-tool` dies with `ModuleNotFoundError`.
+- [ ] `krb5-server` — openSUSE builds Samba AD DC against **MIT Kerberos**, so
+      the DC spawns the MIT KDC (`krb5kdc`); without it the DC exits with
+      `mitkdc child process exited`.
+- [ ] `diffutils` — the samba apparmor ExecStartPre needs `diff` (non-fatal).
+- [ ] confirm all of the above install on the **aarch64** repos.
+
+### Realm addon — local-DC provisioning steps (in order)
+- [ ] **hostname ≠ NetBIOS domain** — provision refuses when the short hostname
+      equals the domain; set/keep a distinct DC hostname.
+- [ ] **DNS ordering** — keep `resolv.conf` on an upstream forwarder during
+      install/provision; only switch it to `127.0.0.1` **after** the DC is
+      confirmed active (else the box has no DNS and nothing resolves).
+- [ ] **NetworkManager `dns=none`** — drop a conf.d snippet so NM stops managing
+      `resolv.conf`, or the DC-DNS choice is overwritten.
+- [ ] **`mit kdc command`** — pass the real MIT KDC path
+      (`/usr/lib/mit/sbin/krb5kdc` or `/usr/sbin/krb5kdc`) to provision /
+      smb.conf; samba's default path is wrong on openSUSE.
+- [ ] **nsswitch** — openSUSE keeps the vendor default in `/usr/etc`; seed
+      `/etc/nsswitch.conf` from there before adding `winbind`.
+- [ ] **Kerberos** — copy `/var/lib/samba/private/krb5.conf` to `/etc/krb5.conf`
+      (do not symlink).
+- [ ] provision with `--use-rfc2307`; persist `/var/lib/samba` on the config
+      partition.
+
+### App (user/group management)
+- [x] **groups: `group add` + `group addunixattrs <gid>`**, not
+      `group add --gid-number` — the latter does not set an NSS-visible
+      gidNumber, so the group never resolves via `getent`. (Fixed in groups.pm.)
+- [ ] users: `user create --uid-number/--gid-number` works and yields a stable
+      RFC2307 uid (confirmed: `getent passwd` returns the assigned number).
+
+### Validated behaviours
+- DC service active; internal DNS serves SRV records and forwards upstream.
+- winbind NSS resolves directory users/groups; **uid is the RFC2307 number**
+  (stable ownership, not dynamic idmap).
+- Authentication works via winbind (`wbinfo -a`) and SMB (`smbclient`).
+- [ ] **pending:** DNS + winbind survive a reboot with NetworkManager
+      (`--validate-only` after `reboot`).
