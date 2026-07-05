@@ -336,6 +336,21 @@ sub mount($self)
  my $fs = $self->param("fs");
  my $rc;
  my $mount_dir=get_mount_dir();
+
+ # The mountpoint may not exist (fresh /mnt after an OS reinstall).
+ if ( !-d "$mount_dir/$fs") {
+  system("/usr/bin/sudo /bin/mkdir -p $mount_dir/$fs > /dev/null");
+ }
+
+ # `mount <mountpoint>` needs an /etc/fstab entry to know the device. After a
+ # reinstall (system disk wiped) -- or for a pool imported from another box --
+ # there is none, so add one by btrfs label (the label equals the filesystem
+ # name; see mkfs.btrfs -L in createfs) so it mounts now and at every boot.
+ my $in_fstab = `/usr/bin/sudo /usr/bin/grep " $mount_dir/$fs " /etc/fstab 2>/dev/null`;
+ if (!$in_fstab) {
+  `/bin/echo "LABEL=$fs $mount_dir/$fs btrfs defaults 0 0" | /usr/bin/sudo /usr/bin/tee -a /etc/fstab > /dev/null`;
+ }
+
  $rc = system("/usr/bin/sudo /usr/bin/mount  $mount_dir/$fs > /dev/null");
     if ($rc ne 0)
     {
