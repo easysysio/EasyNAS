@@ -65,13 +65,16 @@ provision() {
     # zypper returns non-zero informational codes (e.g. when everything is
     # already installed / "nothing to do"), so don't trust its exit status --
     # attempt the install, then verify the tools we actually need are present.
-    # python3-cryptography is a samba-tool runtime dep that samba-ad-dc does not
-    # pull in on this openSUSE build -- without it 'samba-tool domain provision'
-    # dies with ModuleNotFoundError. (Finding: the appliance package list needs
-    # it too, or user management via samba-tool won't work.)
+    # Package findings for the appliance build:
+    #  - python3-cryptography: samba-tool runtime dep, not pulled in by
+    #    samba-ad-dc; without it 'domain provision' dies with ModuleNotFoundError.
+    #  - krb5-server: openSUSE builds Samba AD DC against MIT Kerberos, so the DC
+    #    spawns the MIT KDC (krb5kdc) as a child; without krb5-server it exits
+    #    immediately ("mitkdc child process exited") and samba-ad-dc.service fails.
+    #  - diffutils: the samba apparmor ExecStartPre needs 'diff' (non-fatal).
     zypper --non-interactive install \
-        samba samba-ad-dc samba-client samba-winbind krb5-client bind-utils \
-        python3-cryptography
+        samba samba-ad-dc samba-client samba-winbind krb5-client krb5-server \
+        bind-utils python3-cryptography diffutils
     for c in samba-tool wbinfo smbclient net host ; do
         command -v "$c" >/dev/null || die "required command '$c' missing after install"
     done
