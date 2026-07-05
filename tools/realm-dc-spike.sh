@@ -72,6 +72,10 @@ provision() {
     #    spawns the MIT KDC (krb5kdc) as a child; without krb5-server it exits
     #    immediately ("mitkdc child process exited") and samba-ad-dc.service fails.
     #  - diffutils: the samba apparmor ExecStartPre needs 'diff' (non-fatal).
+    # A prior run may have pointed resolv.conf at the (not-yet-running) DC,
+    # leaving the box with no DNS. Use the forwarder until the DC is confirmed
+    # up, or zypper can't resolve its mirrors.
+    printf 'nameserver %s\n' "$FORWARDER" > /etc/resolv.conf
     zypper --non-interactive install \
         samba samba-ad-dc samba-client samba-winbind krb5-client krb5-server \
         bind-utils python3-cryptography diffutils
@@ -114,20 +118,17 @@ provision() {
     step "Kerberos config"
     cp -f /var/lib/samba/private/krb5.conf /etc/krb5.conf
 
-    step "Internal DNS + NetworkManager (the coexistence risk)"
-    # Tell NetworkManager to keep its hands off resolv.conf, then point the box
-    # at the DC's own internal DNS with the realm as the search domain.
+    step "NetworkManager: stop managing resolv.conf"
+    # Keep NM's hands off resolv.conf so our DNS choice sticks. We only point the
+    # box at the DC (127.0.0.1) AFTER it is confirmed up (see the start step);
+    # until then resolv.conf stays on the forwarder so DNS keeps working -- this
+    # is the coexistence order the appliance must follow too.
     mkdir -p /etc/NetworkManager/conf.d
     cat > /etc/NetworkManager/conf.d/90-easynas-dns.conf <<EOF
 [main]
 dns=none
 EOF
     systemctl reload NetworkManager 2>/dev/null
-    rm -f /etc/resolv.conf
-    cat > /etc/resolv.conf <<EOF
-search $REALM_LC
-nameserver 127.0.0.1
-EOF
 
     step "nsswitch: resolve users/groups through winbind"
     # openSUSE ships the vendor default under /usr/etc; /etc holds the override.
@@ -141,11 +142,15 @@ EOF
     systemctl enable "$UNIT" >/dev/null 2>&1
     systemctl restart "$UNIT" 2>&1
     sleep 5
-    if ! systemctl is-active --quiet "$UNIT" ; then
+    if systemctl is-active --quiet "$UNIT" ; then
+        # The DC is up and now serves DNS -- point the box at it.
+        printf 'search %s\nnameserver 127.0.0.1\n' "$REALM_LC" > /etc/resolv.conf
+    else
         echo "[WARN] $UNIT is not active -- diagnostics:"
         systemctl --no-pager --full status "$UNIT" 2>&1 | tail -20
         echo "---- journal ----"
         journalctl -u "$UNIT" --no-pager -n 40 2>&1 | tail -40
+        echo "[INFO] leaving resolv.conf on the forwarder ($FORWARDER) so DNS still works"
     fi
 
     step "Seed RFC2307 test accounts"
