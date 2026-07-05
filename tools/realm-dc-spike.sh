@@ -62,7 +62,7 @@ UNIT="$(dc_unit)"
 ### ===== PROVISION =====
 provision() {
     step "Install packages"
-    zypper --non-interactive install -y \
+    zypper --non-interactive install \
         samba samba-ad-dc samba-client samba-winbind krb5-client bind-utils \
         || die "package install failed"
 
@@ -108,9 +108,11 @@ EOF
     sleep 3
 
     step "Seed RFC2307 test accounts"
-    # Domain Users needs a gidNumber so a user's primary group resolves.
-    samba-tool group addunixattrs "Domain Users" "$GID_BASE" 2>/dev/null \
-        || samba-tool group add "Domain Users" --gid-number="$GID_BASE" 2>/dev/null
+    # Domain Users needs a gidNumber so a user's primary group resolves via NSS.
+    # (addunixattrs sets Unix attrs on an existing group; if it's missing on this
+    # samba-tool version, getent will fail below and the spike reports it.)
+    samba-tool group addunixattrs "Domain Users" "$GID_BASE" \
+        || echo "[WARN] could not set Domain Users gidNumber -- getent may not resolve the primary group"
     samba-tool group add "$TESTGROUP" --gid-number="$GID_STAFF" 2>/dev/null
     samba-tool user create "$TESTUSER" "$TESTPASS" \
         --given-name=Test --surname=User \
