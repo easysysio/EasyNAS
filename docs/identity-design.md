@@ -252,3 +252,45 @@ it sidesteps NFS uid-matching and is simple to reason about.)
 7. **Persistence + migration + validation matrix:** config-partition stores;
    local-account migration; every protocol authenticates a directory user on a
    real build (x86_64 + ARM), for each backend.
+
+---
+
+## 9. Per-addon integration
+
+Realm support is not automatic — it depends on how each addon authenticates.
+The rule (§3) is: an addon that speaks **PAM + NSS** (or Samba's native passdb)
+consumes any backend for free; an addon with its own credential store does not.
+Three categories:
+
+- **Realm-backed** — authenticate the human accessing a share, through PAM+NSS
+  or native SMB. These support **all** backends (Local / AD / OpenLDAP)
+  identically, with no per-addon code beyond pointing their PAM stack at the
+  realm. This is the set that matters for "who can access my shares."
+- **Ownership-only** — no per-user auth of their own, but they rely on stable
+  NSS numbers for file ownership.
+- **Self-authenticating** — their own credential store (or no auth); the realm
+  is irrelevant. Some *could* be wired in later, marked "optional" below.
+
+| Addon | Auth mechanism | Category | Notes |
+|-------|----------------|----------|-------|
+| **Samba (SMB)** | native (winbind / passdb) | Realm-backed | uses the active backend directly |
+| **SSH** | PAM + NSS | Realm-backed | free from any backend |
+| **FTP** (pure-ftpd) | PAM + NSS | Realm-backed | point its PAM service at the realm |
+| **AFP** (netatalk) | PAM + NSS | Realm-backed | point its PAM service at the realm |
+| **NFS** | numeric uid/gid via NSS | Ownership-only | export/host based; per-user needs NFSv4 + krb5 |
+| **rsyncd** | own `rsyncd.secrets` / over SSH | Self-auth (optional) | realm-backed only if run over SSH |
+| **RADIUS** (freeradius) | own user store | Self-auth (optional) | freeradius LDAP module = future per-addon work |
+| **TFTP** | none (anonymous) | Self-auth | no user auth |
+| **DLNA** (minidlna) | none (serves everyone) | Self-auth | no per-user auth |
+| **Plex** | Plex accounts | Self-auth | own identity system; not domain-integrable |
+| **MariaDB** | SQL user table | Self-auth | own users |
+| **iSCSI** | CHAP secrets in target config | Self-auth | own credentials |
+| **LXC** | container mgmt, not user auth | N/A | — |
+
+**The realistic promise:** the realm is one user store for the human
+file-access protocols — **SMB, SSH, FTP, AFP** (plus NFS ownership) — across all
+backends. App-level services (Plex, MariaDB, RADIUS, iSCSI, …) keep their own
+credentials, as they do on every NAS.
+
+Optional future integrations: **RADIUS → LDAP** and **rsyncd → over-SSH** are the
+only self-auth addons worth wiring to the realm, and only on request.
