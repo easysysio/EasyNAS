@@ -16,204 +16,239 @@ EasyNAS separates identity into **two independent planes**:
 | | Management plane | Service plane |
 |--|------------------|---------------|
 | **Who** | one `admin` | share / service users |
-| **Stored in** | a hashed **credentials file** on the config partition | a **Realm** (local Samba AD Domain Controller) |
-| **Auth path** | app-level only (`login.pm`) | winbind (SMB native) + `pam_winbind` / NSS |
-| **Exists when** | always | only after a realm is created |
+| **Stored in** | a hashed **credentials file** on the config partition | the active **directory backend** (see below) |
+| **Auth path** | app-level only (`login.pm`) | NSS + PAM (backend-specific) |
+| **Exists when** | always | only after a **realm** is configured |
 | **Purpose** | manage the NAS | access SMB / NFS / SSH / FTP |
-| **Local OS account** | none | none |
-
-Neither plane uses local system accounts (`/etc/passwd`, `/etc/shadow`,
-`/etc/group`, `smbpasswd`) as a source of truth.
 
 - The **admin** logs into the web UI against a single hashed credential in a
-  file. No directory, no PAM, no local account — the box is always manageable,
-  even before a realm exists or if the realm is broken.
-- **Service users** exist only after the administrator **creates a realm** (the
-  `realm` addon provisions a local Samba AD DC). Every service then consumes
-  that one directory.
+  file — never a local or directory account. The box is always manageable, even
+  before a realm exists or if the realm is broken.
+- **Service users** exist only after the administrator **configures a realm**.
+  The realm is a **pluggable directory backend**, and it is **switchable**:
 
-This supersedes the earlier "provision an AD DC at first boot and route
-everything through SSSD" proposal. Two things changed:
+  1. **Local (via Samba)** — self-contained; accounts stored on the appliance,
+     no external server.
+  2. **Active Directory** — either *host a local Samba DC* (be your own domain)
+     or *join an existing external AD*.
+  3. **OpenLDAP (external)** — bind to a 3rd-party LDAP directory.
 
-1. **The realm is on-demand, not a boot dependency.** The AD DC's heavy parts
-   (internal DNS, Kerberos KDC) only come online when the operator opts in.
-2. **On a box that *is* the DC, the NSS/PAM glue is winbind, not SSSD.** SSSD is
-   for domain *members* joining an external AD; the DC ships its own winbind.
-   (SSSD stays a future option only if EasyNAS later joins an existing AD.)
+Every backend is consumed through the same two OS interfaces — **NSS**
+(identity/numbers) and **PAM** (auth) — plus a **Samba passdb** setting for SMB.
+The services, the ownership model (§4), and `users_info`/`getent` are therefore
+**backend-agnostic**; only the `realm` addon knows the difference.
 
-### Why Samba AD DC for the service plane (over OpenLDAP + ldapsam)
+### Owned vs consumer
 
-- `samba-ad-dc` is already available and one daemon is simultaneously LDAP +
-  Kerberos KDC + SMB authority.
-- `samba-tool user create` sets POSIX attrs, Kerberos keys, **and** the NT hash
-  in one operation — no POSIX-password / NT-hash sync to maintain. Today's
-  triple-write (`useradd` + `chpasswd` + `smbpasswd`, `users.pm`) collapses to a
-  single command.
-- OpenLDAP + `ldapsam` is lighter (no KDC/DNS) but forces a dual-write on every
-  password change and hand-maintained schema.
+The three families split into two behaviours that shape the UI:
 
-Trade-off accepted: an AD DC is heavier on a single box (internal DNS + KDC) —
-mitigated by making it opt-in.
+- **EasyNAS-owned** (Local, AD-local-DC) → EasyNAS is the authority →
+  Users/Groups pages are **fully editable** (create/delete/password).
+- **Consumer** (AD-join-external, OpenLDAP) → the directory lives elsewhere →
+  EasyNAS **browses** users/groups and assigns them to shares, but does **not**
+  create/delete them (that happens on the 3rd-party system).
+
+### Why this shape
+
+- One NSS/PAM abstraction covers all three, so services and ownership are written
+  once. Adding a backend is configuration, not new service code.
+- The **Local** backend maps today's `useradd` + `smbpasswd` model, so existing
+  installs become `backend = local` and nothing breaks.
+- The **AD-local-DC** backend collapses today's triple-write (`useradd` +
+  `chpasswd` + `smbpasswd`) into a single `samba-tool user create`.
 
 ---
 
 ## 2. Management plane — the admin
 
-### Credential file
+*(Implemented — Phase 1.)*
 
-- `/etc/easynas/admin.conf` (on the config partition, so it survives OS
-  upgrade/reinstall), mode `0600`, owned by the `easynas` service user.
-- Contains a single SHA-512 crypt string (`$6$…`) — reuses the `crypt()` call
-  already in `login.pm`, so no new Perl dependency.
-
-### login.pm
-
-Replace the current logic — which reads `/etc/shadow`, `grep`s for the supplied
-username, and accepts **any** non-root local account — with: read the one line
-from `admin.conf`, recompute `crypt($pass, $stored)`, constant-time compare.
-
-This also closes two defects in the current code:
-- **Shell injection:** the username form field is interpolated into a
-  `` `... grep $user` `` backtick.
-- **Over-broad auth:** any account with an `/etc/shadow` entry (e.g. the
-  `easynas` service user, or an addon-created account) can log into the web UI.
-
-### Setting the password
-
-- **First boot** prompts for the admin password and writes `admin.conf`
-  (`startup/firstboot.sh` / `easynas-firstboot.service`). No default password
-  ever exists on the appliance.
-- Changed afterward from a Settings page (writes the same file).
-
-The console menu / autologin (`easynas` user → `easynas.sh`) is unaffected — it
-is gated by physical access, not this credential.
+- `/etc/easynas/admin.conf` (config partition), mode `0600`, owned by the
+  `easynas` service user: one line, `admin:<$6$ SHA-512 crypt hash>`.
+- `login.pm` reads it, recomputes `crypt($pass, $stored)`, constant-time
+  compares. Replaced reading `/etc/shadow` + `grep $user` (shell-injection) +
+  accepting any non-root local account.
+- **First boot** prompts for the password on the console (`easynas.sh` when
+  `admin.conf` is absent); no default password ever exists. Changed later from
+  the console menu / a Settings page.
+- Backend-independent — identical regardless of which realm is active.
 
 ---
 
-## 3. Service plane — the realm
+## 3. Service plane — the realm backends
 
-### Architecture
+### Consumption (backend-agnostic)
 
 ```
-        (created on demand via the "realm" addon)
-                ┌─────────────────────────────┐
-                │   Samba AD DC (directory)   │   data: /var/lib/samba
-                │   LDAP + Kerberos + SMB      │   --> CONFIG PARTITION
-                │   + winbindd (bundled)       │
-                └─────────────┬───────────────┘
-                              │
-             NSS (winbind) + PAM (pam_winbind)
-            ┌─────────────┬───────────────┬─────────────┐
-          SSH / FTP /   NFS            EasyNAS app     Samba file server
-          login         (uid/gid       (samba-tool     (native SMB auth,
-          (PAM+NSS)      via RFC2307)   locally)        served ON the DC)
+                 realm backend (one of, switchable)
+   Local (Samba)      AD: local DC      AD: join external    OpenLDAP (ext)
+   local accounts     this box IS DC    member of corp AD    3rd-party LDAP
+        │                  │                  │                  │
+        └──────────────────┴────────┬─────────┴──────────────────┘
+                        NSS + PAM (per backend)
+        ┌─────────────┬───────────────┬─────────────┐
+      SSH / FTP /   NFS            EasyNAS app     Samba file server
+      login         (uid/gid)      (CRUD if owned) (SMB auth)
 ```
 
-**The rule:** every non-SMB protocol consumes the directory through **NSS
-(winbind)** for identity and **PAM (`pam_winbind`)** for auth. Samba is the
-exception — it authenticates SMB natively because it *is* the DC. Any future
-addon that speaks PAM + NSS gets users for free, no per-addon code.
+### Backend matrix
 
-### Realm lifecycle (the `realm` addon)
+| Backend | Samba role (`security` / `passdb`) | NSS / PAM | EasyNAS CRUD | uid/gid source | External server |
+|---------|-----------------------------------|-----------|--------------|----------------|-----------------|
+| **Local (Samba)** | `security=user`, `tdbsam` | files / `pam_unix` | **Yes** | local uids | none |
+| **AD — local DC** | DC (`samba.service`) | winbind / `pam_winbind` | **Yes** (`samba-tool`) | RFC2307 `uidNumber` (ours) | none |
+| **AD — join external** | member (`security=ads`) | winbind / `pam_winbind` | **No** (read-only) | RFC2307 / idmap (upstream) | AD domain |
+| **OpenLDAP — external** | member via SSSD / `ldapsam` | SSSD(ldap) / `pam_sss` | read-only (RW only if bind allows) | posixAccount `uidNumber` (upstream) | LDAP server |
 
-- **Create** — `samba-tool domain provision --use-rfc2307` (internal DNS,
-  database under `/var/lib/samba` on the config partition), then switch Samba to
-  `samba.service` and enable winbind NSS + `pam_winbind`. Realm parameters
-  (realm/domain/admin password) come from the addon form.
-- **Status** — report whether a realm exists and its realm/domain.
-- **Destroy** — tear the realm down (later phase).
+> On a box that *is* the DC, the glue is the DC's **winbind** (not SSSD). SSSD is
+> the glue for the **external** backends (join-AD, OpenLDAP).
 
-Users/Groups pages **gate on realm presence**: before a realm exists they show
-"Create a realm first"; after, they manage directory accounts.
+### Realm lifecycle (the `realm` addon), switchable
+
+States: **not configured → configured (local | ad-dc | ad-member | ldap) →
+running**, with **leave/destroy → reconfigure** so the backend can be switched.
+
+- **Local:** enable Samba `tdbsam`; manage accounts locally.
+- **AD local DC:** `samba-tool domain provision --use-rfc2307` (internal DNS, DB
+  on the config partition), switch to `samba.service`, enable winbind.
+- **AD join:** `net ads join` / `realm join`, configure winbind as a member.
+- **OpenLDAP:** configure SSSD against the LDAP server; Samba via `ldapsam` or an
+  SSSD-backed member.
+- **Status / leave:** report the active backend; tear down to *not configured*.
+
+`/etc/easynas/realm.conf` (config partition) records the backend and parameters.
+
+> **Switching is a re-permission event.** uid/gid numbers differ between
+> backends, so switching re-numbers on-disk ownership — existing share group
+> assignments must be reapplied (a guided re-ACL step). The UI warns on switch.
+
+### Persistence note per backend
+
+- **Local:** the account store (Samba `tdbsam` + the POSIX passwd/group data)
+  **must live on the config partition** so accounts survive an OS reinstall —
+  this is the immutable-design §8.3 concern, now scoped to just this backend.
+- **AD local DC:** `/var/lib/samba` → config partition.
+- **AD join / OpenLDAP:** nothing to persist locally (directory is upstream);
+  the winbind/SSSD cache is ephemeral.
 
 ### Per-protocol notes
 
 | Protocol | Identity (NSS) | Auth | Notes |
 |----------|----------------|------|-------|
-| **SSH** | winbind | `pam_winbind` | works once a realm exists |
-| **FTP** (pure-ftpd) | winbind | `pam_winbind` | PAM service config |
-| **login / console** | winbind | `pam_winbind` | |
-| **Samba (SMB)** | winbind | **native** (DC) | NT hash from the directory |
-| **NFS** | winbind | host/export based | needs **stable uid/gid** — RFC2307 `uidNumber`/`gidNumber`. NFSv4 + `sec=krb5` can do per-user auth against the KDC later |
-| **future addons** | winbind | `pam_winbind` | no work if PAM+NSS aware |
+| **SSH / FTP / login** | backend NSS | backend PAM | works once a realm is configured |
+| **Samba (SMB)** | backend NSS | native / passdb | NT hash from the backend |
+| **NFS** | backend NSS | export based | **NFSv4 + idmap** (or squash to the share group). NFSv3 per-user numeric matching across clients is unreliable |
+| **future addons** | backend NSS | backend PAM | no work if PAM+NSS aware |
 
 ---
 
-## 4. What this changes
+## 4. Ownership model
+
+A POSIX filesystem **always** stores ownership as a **numeric uid/gid**, never a
+name. Choosing a backend only changes who resolves that number to a name (local
+`/etc/passwd`, or winbind/SSSD reading the directory).
+
+### Stable numbers
+
+Ownership must survive a reboot and an OS reinstall.
+
+- **Directory backends** (AD, LDAP): use **RFC2307 / posixAccount** explicit
+  `uidNumber`/`gidNumber`, **not** dynamic winbind idmap (which allocates
+  per-box and can differ after a rebuild → orphaned files). On the **local DC**
+  EasyNAS owns the pool — allocated from a fixed base (e.g. 10000+) and recorded
+  — so recreate/migrate yields the same number.
+- **Local backend**: uids come from local allocation and are stable **as long as
+  the account store persists** (see §3 persistence note).
+
+### Per-share (group) ownership
+
+A share is a directory on a volume, **owned by a directory group** (its
+`gidNumber`), with **setgid + `force group` + ACLs** so everything written there
+belongs to that group regardless of which member wrote it. Access = group
+membership. **The owner of a volume is the group assigned to the share on it.**
+(Per-user ownership can be layered on later; per-group is the v1 default because
+it sidesteps NFS uid-matching and is simple to reason about.)
+
+- **Before a realm is configured:** a volume is just storage — top dir
+  `root:root`. It gains a group owner when a share is assigned.
+- **Guest / "everyone" shares:** map to `nobody`, no directory user needed.
+- **In the UI:** resolve ownership via `getent`; if unresolved, show the raw
+  uid/gid rather than a fake name.
+- **On backend switch:** reapply share group assignments (a guided re-ACL step).
+
+---
+
+## 5. What this changes
 
 ### Base image (OS layer)
-- Ensure `samba-ad-dc` and the winbind NSS/PAM tooling are present on **both
-  x86_64 and aarch64** package lists (realm supported on x86_64 + ARM).
-- Only client/daemon config lives in the image; the directory **data** does not.
-
-### First boot
-- Prompt for the **admin password** → write `/etc/easynas/admin.conf`
-  (idempotent, seed-if-absent, same model as the TLS cert).
-- Do **not** auto-provision a realm. That is an explicit operator action later.
+- `samba` + `samba-ad-dc` + winbind **and** SSSD (`sssd-ad`, `sssd-ldap`) present
+  on **x86_64 and aarch64** — the backends need different glue.
+- Only client/daemon config lives in the image; directory **data** does not.
 
 ### Application
-- `login.pm` → file-based admin auth (§2).
-- `users.pm` / `groups.pm` → `samba-tool user|group …`; gate on realm presence.
-- `users_info` / `groups_info` (`easynas.pm`) → read `getent passwd|group`
-  through winbind NSS (filtered by the RFC2307 uid/gid range) instead of parsing
-  `/etc/passwd`. Stays protocol-agnostic.
-- `realm.pl` (realm addon) → provision / status / destroy.
-- `samba.pm` → controls `samba.service` (not `smb.service`); share sections
-  still written to `smb.conf`, now served by the DC.
+- `login.pm` → file-based admin auth (done).
+- `users.pm` / `groups.pm` → editable via the backend's tool when **owned**
+  (`samba-tool` for AD-DC, `smbpasswd`/`pdbedit`+posix for Local); read-only
+  pickers when **consumer**; gated on realm presence.
+- `users_info` / `groups_info` (`easynas.pm`) → `getent passwd|group` through
+  NSS (filtered by the uid/gid range) — backend-agnostic.
+- `realm.pl` (realm addon) → configure / status / leave for all backends.
+- `samba.pm` → correct service per backend; shares carry `force group` + setgid.
 
 ### Config partition (Layer 2)
-- `/etc/easynas/admin.conf` → persistent.
-- `/var/lib/samba` (the AD database) → persistent.
-- winbind cache → ephemeral (rebuilds from the DC).
+- `/etc/easynas/admin.conf`, `/etc/easynas/realm.conf` → persistent.
+- Local account store / `/var/lib/samba` (owned backends) → persistent.
+- winbind / SSSD cache → ephemeral.
 
 ### Immutable-design impact
-- Supersedes §8.3 (bind-mount of `/etc/passwd`). The scattered account files are
-  no longer Layer 2 — the admin credential file and the directory database are,
-  and both sit cleanly on the config partition.
+- Supersedes §8.3: Layer 2 is the admin credential file + realm config + the
+  active owned backend's account store, all on the config partition.
 
 ---
 
-## 5. Resolved decisions
+## 6. Resolved decisions
 
-- **Management auth:** single file-based admin (`admin.conf`), not a directory
-  or local account.
-- **Admin initial password:** set by the first-boot prompt; no default.
-- **NSS/PAM glue:** winbind + `pam_winbind` (the box is the DC), not SSSD.
-- **NFS uid/gid stability:** RFC2307 explicit `uidNumber`/`gidNumber` from a
-  fixed base (e.g. 10000+); winbind reads RFC2307, giving stable ownership.
-- **App → directory:** `samba-tool` run locally as root (no LDAP bind creds).
-- **File serving:** shares run on the DC (single-box appliance) via
-  `samba.service` — upstream discourages DC + file server on one host, accepted
-  for the appliance.
+- **Management auth:** single file-based admin, never a local/directory account.
+- **Admin initial password:** first-boot console prompt; no default.
+- **Realm = pluggable backend:** **Local (Samba)**, **AD** (local DC or join
+  external), **OpenLDAP (external)**; **switchable**.
+- **Glue:** winbind for local-DC / AD-member; SSSD for OpenLDAP; `pam_unix` +
+  files for Local.
+- **uid/gid stability:** RFC2307 / posixAccount explicit numbers for directory
+  backends (EasyNAS owns the pool on a local DC); persisted local store for Local.
+- **Ownership:** per-share **group** ownership (setgid + `force group` + ACLs);
+  pre-realm volumes `root:root`; guest shares map to `nobody`.
+- **Owned vs consumer:** Users/Groups editable for Local + AD-local-DC,
+  read-only for AD-join + OpenLDAP.
 - **Architecture:** realm supported on x86_64 **and** aarch64.
 
-## 6. Open items
+## 7. Open items
 
-- [ ] Internal DNS coexistence with NetworkManager (resolver → `127.0.0.1` +
-      forwarders; NM must not overwrite `/etc/resolv.conf`) — the top risk;
-      validate in the Phase-2 spike.
-- [ ] Confirm `samba-ad-dc` + winbind are actually installable on the aarch64
-      repos used by the RPi/ARM64 profiles.
-- [ ] Migration/import for installs that already have local EasyNAS accounts
-      (recreate usernames + uids in the realm; reset passwords — hashes are not
-      portable).
+- [ ] Internal DNS coexistence with NetworkManager on a **local DC** — the top
+      risk; validate in the Phase-2 spike.
+- [ ] Persist the **Local** backend's account store on the config partition
+      (the §8.3 concern, scoped to this backend).
+- [ ] Confirm samba/winbind/SSSD packages install on the aarch64 repos.
+- [ ] Backend **switch** flow: reapply share group ownership after a re-number.
+- [ ] NFS version policy: standardize on **NFSv4 + idmap** (or squash to group).
+- [ ] Migration for pre-existing local accounts into a chosen owned backend.
+- [ ] OpenLDAP: schema assumptions (posixAccount/posixGroup), TLS, bind identity.
 
 ---
 
-## 7. Phased plan
+## 8. Phased plan
 
-1. **Admin credential file + `login.pm` rewrite.** Small, independent, security-
-   positive; ships without any Samba work. First-boot writes `admin.conf`.
-2. **Realm addon: provision / status / destroy a Samba AD DC.** Validate first
-   on a throwaway VM — prove one SMB user + one SSH login + `getent passwd` all
-   resolve the same directory account, and that internal DNS survives a reboot
-   with NetworkManager. If this spike is painful, that is the signal to
-   reconsider scope — before the app rewrite.
-3. **Gate Users/Groups on realm presence; rewrite to `samba-tool`;**
-   `users_info`/`groups_info` via `getent`.
-4. **samba.pm → `samba.service`,** shares served on the DC.
-5. **Per-protocol PAM/NSS** (ssh, ftp) + **NFS RFC2307** mapping.
-6. **Persistence + migration:** `/var/lib/samba` and `admin.conf` on the config
-   partition; optional import for pre-existing local accounts; a validation
-   matrix (every protocol authenticates a directory user on a real build, x86_64
-   and ARM).
+1. **Admin credential file + `login.pm`** — done (Phase 1).
+2. **Realm addon skeleton + backend config** (`realm.conf`, status) + **VM spike
+   (AD local DC)** — the richest owned backend; validates winbind, RFC2307 and
+   the DNS/NetworkManager risk that the other backends don't have. If this spike
+   is painful, reconsider scope before the app rewrite.
+3. **Owned-backend user/group CRUD** (Local + AD-local-DC); `users_info` via
+   `getent`; gate the pages on realm presence.
+4. **Ownership:** per-share group ownership in `samba.pm`; pre-realm volumes
+   `root:root`; UI resolves via `getent`.
+5. **Consumer backends:** join external AD, then OpenLDAP — read-only pickers.
+6. **Backend switching** (leave/rejoin) + the guided re-ACL after a re-number.
+7. **Persistence + migration + validation matrix:** config-partition stores;
+   local-account migration; every protocol authenticates a directory user on a
+   real build (x86_64 + ARM), for each backend.
