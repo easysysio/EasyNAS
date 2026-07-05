@@ -94,15 +94,19 @@ provision() {
         || echo "127.0.0.2 $DC_HOSTNAME.$REALM_LC $DC_HOSTNAME" >> /etc/hosts
 
     step "Provision the domain ($REALM / $DOMAIN) with RFC2307"
-    samba-tool domain provision \
-        --use-rfc2307 \
-        --realm="$REALM" \
-        --domain="$DOMAIN" \
-        --server-role=dc \
-        --dns-backend=SAMBA_INTERNAL \
-        --adminpass="$ADMINPASS" \
-        --option="dns forwarder = $FORWARDER" \
-        || die "domain provision failed"
+    if [ -f /var/lib/samba/private/sam.ldb ] ; then
+        echo "[INFO] already provisioned -- reusing the existing domain"
+    else
+        samba-tool domain provision \
+            --use-rfc2307 \
+            --realm="$REALM" \
+            --domain="$DOMAIN" \
+            --server-role=dc \
+            --dns-backend=SAMBA_INTERNAL \
+            --adminpass="$ADMINPASS" \
+            --option="dns forwarder = $FORWARDER" \
+            || die "domain provision failed"
+    fi
 
     step "Kerberos config"
     cp -f /var/lib/samba/private/krb5.conf /etc/krb5.conf
@@ -123,12 +127,23 @@ nameserver 127.0.0.1
 EOF
 
     step "nsswitch: resolve users/groups through winbind"
+    # openSUSE ships the vendor default under /usr/etc; /etc holds the override.
+    # Seed /etc from /usr/etc if it isn't there yet, then wire winbind.
+    [ -f /etc/nsswitch.conf ] || cp /usr/etc/nsswitch.conf /etc/nsswitch.conf 2>/dev/null
     sed -i -E 's/^(passwd:).*/\1 files winbind/' /etc/nsswitch.conf
     sed -i -E 's/^(group:).*/\1 files winbind/'  /etc/nsswitch.conf
+    grep -E '^(passwd|group):' /etc/nsswitch.conf 2>/dev/null
 
     step "Enable + start the DC ($UNIT)"
-    systemctl enable --now "$UNIT" || die "could not start $UNIT"
-    sleep 3
+    systemctl enable "$UNIT" >/dev/null 2>&1
+    systemctl restart "$UNIT" 2>&1
+    sleep 5
+    if ! systemctl is-active --quiet "$UNIT" ; then
+        echo "[WARN] $UNIT is not active -- diagnostics:"
+        systemctl --no-pager --full status "$UNIT" 2>&1 | tail -20
+        echo "---- journal ----"
+        journalctl -u "$UNIT" --no-pager -n 40 2>&1 | tail -40
+    fi
 
     step "Seed RFC2307 test accounts"
     # Domain Users needs a gidNumber so a user's primary group resolves via NSS.
