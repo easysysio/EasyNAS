@@ -20,6 +20,40 @@
 
 CHOOSE=""
 
+# The web administrator's credential lives in a file on the config layer, not a
+# local account (see docs/identity-design.md). Runs as the easynas user, which
+# owns /etc/easynas, so no sudo is needed to write it.
+ADMIN_CONF=/etc/easynas/admin.conf
+
+set_admin_password() {
+    local p1 p2
+    while true ; do
+        read -r -s -p "New admin password: " p1 ; echo
+        read -r -s -p "Confirm password:   " p2 ; echo
+        if [ -z "$p1" ] ; then echo "Password cannot be empty." ; continue ; fi
+        if [ "$p1" != "$p2" ] ; then echo "Passwords do not match, try again." ; continue ; fi
+        break
+    done
+    ( umask 077 ; printf 'admin:%s\n' "$(openssl passwd -6 "$p1")" > "$ADMIN_CONF" )
+    chmod 600 "$ADMIN_CONF" 2>/dev/null
+    unset p1 p2
+    echo "Admin password updated."
+}
+
+# First boot: no web-admin credential yet -- require the operator to set one
+# before the console menu (and thus before the web UI can be used).
+if [ ! -f "$ADMIN_CONF" ] ; then
+    clear
+    echo "#########################################"
+    echo " EasyNAS first-time setup"
+    echo "#########################################"
+    echo
+    echo "Set the password for the web administrator (user: admin)."
+    echo
+    set_admin_password
+    read -p "Press Enter key to continue ..."
+fi
+
 while [[ true ]] ; do
     IP_ADDR=$(/usr/sbin/ip address | grep " inet " | cut -d'/' -f1 | awk '{print $2}' | grep -m 1 -v 127.0.0.1)
     PORT=$(/bin/grep '^EASYNAS_PORT=' /etc/easynas/easynas.conf 2>/dev/null | cut -d= -f2)
@@ -53,12 +87,7 @@ while [[ true ]] ; do
     case "$CHOOSE" in
 
 	"1" )
-
-	    read -s -p "Enter new password: " PASSWORD
-	    echo admin:$PASSWORD | /usr/bin/sudo /usr/sbin/chpasswd
-	    if [[ -f /usr/bin/smbpasswd ]]; then
-		/usr/bin/printf "$PASSWORD\n$PASSWORD\n" | /usr/bin/sudo /usr/bin/smbpasswd -a -s admin 
-	    fi
+	    set_admin_password
 	    read -p "Press Enter key to continue ..."
 	;;
 
