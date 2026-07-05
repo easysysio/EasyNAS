@@ -358,6 +358,9 @@ sub mount($self)
      $msg=$TEXT{"fs_failed_mounting"};
      return;
     }
+ # Re-apply any NFS/Samba shares recorded inside the volumes of this pool
+ # (their in-volume markers survive a reinstall; see rediscover_shares).
+ rediscover_shares();
  $result="success";
  $msg=$TEXT{'fs_mounted'};
 }

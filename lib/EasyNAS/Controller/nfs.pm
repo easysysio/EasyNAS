@@ -57,7 +57,9 @@ sub view ($self) {
    $msg=$TEXT{'nfs_exists'};
   }
   else {
-   `/bin/echo "$mount_dir/$vol *($per,sync,no_subtree_check)" | /usr/bin/sudo /usr/bin/tee -a $addon->{config}`;
+   my $export="$mount_dir/$vol *($per,sync,no_subtree_check)";
+   `/bin/echo "$export" | /usr/bin/sudo /usr/bin/tee -a $addon->{config}`;
+   write_share_marker("$mount_dir/$vol","nfs",$export);
    $rc=system("/usr/bin/sudo /usr/sbin/exportfs -a >/dev/null");
    if (get_service_status($service)) {
     $rc=system("/usr/bin/sudo /usr/bin/systemctl restart $service >/dev/null");
@@ -72,6 +74,7 @@ sub view ($self) {
   my $fs=$self->param("fs");
   my $cmount_dir=substr($mount_dir,1);
   $rc=system("/usr/bin/sudo /usr/bin/sed -i '/.$cmount_dir.$fs.$vol /d' $addon->{config}");
+  remove_share_marker("$mount_dir/$fs/$vol","nfs");
   `/usr/bin/sudo /usr/sbin/exportfs -a`;
   if (get_service_status($service)) {
    `/usr/bin/sudo /usr/bin/systemctl reload $service`;

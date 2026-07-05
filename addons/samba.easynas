@@ -1,12 +1,11 @@
 <addon>
  <name>samba</name>
- <enable>false</enable>
  <description>samba</description>
- <version>1.0.0</version>
+ <version>1.2.0</version>
  <author>Yariv Hakim</author>
  <type>sharing</type>
- <program>samba.pl</program>
+ <program>samba</program>
  <icon>fa-brands fa-windows</icon>
- <config>/etc/easynas/smb.conf</config>
- <service>easynas-smb.service</service>
+ <config>/etc/samba/smb.conf</config>
+ <service>smb.service</service>
 </addon>

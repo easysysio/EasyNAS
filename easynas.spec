@@ -400,6 +400,8 @@ SAMBA addon for EasyNAS
 
 %files fs-samba
 /easynas/addons/samba.easynas
+/easynas/lib/EasyNAS/Controller/samba.pm
+/easynas/templates/easynas/samba*
 /easynas/lang/en-en/lang_english_samba.pl
 /easynas/lang/de-de/lang_german_samba.pl
 /easynas/lang/pt-br/lang_brazilian_portuguese_samba.pl

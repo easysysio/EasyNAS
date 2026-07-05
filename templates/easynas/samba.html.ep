@@ -1,0 +1,49 @@
+% layout 'default';
+
+% if ($result eq "fail") {
+<div class="alert alert-danger alert-dismissable">
+<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button><%= $msg %></div>
+% }
+<div class="row">
+ <div class="col-lg-8">
+  <div class="panel panel-default">
+   <div class="panel-heading">
+    <%= ($TEXT->{$addon->{'description'}}) %>
+   </div>
+   <div class="panel-body">
+    <ul class="nav nav-tabs">
+     <li class="active"><a href="#tabs-1" data-toggle="tab"><%= ($TEXT->{'samba_on_off'}) %></a></li>
+     <li><a href="#tabs-2" data-toggle="tab"><%= ($TEXT->{'samba_shared_vol'}) %></a></li>
+    </ul>
+   <div class="tab-content">
+    <div class="tab-pane fade in active" id="tabs-1">
+    <br><br><br>
+    <label><%= ($TEXT->{$addon->{'description'}}) %></label>
+    <br>
+    %if ($service_active) {
+     <a href="?&action=sambaoff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
+    %}
+    %else {
+     <a href="?&action=sambaon"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
+    %}
+</div><!-- end of #tab1 -->
+<div class="tab-pane fade" id="tabs-2">
+<table class="table table-bordered table-striped">
+ <thead>
+  <tr><th><%= ($TEXT->{'samba_share_name'}) %></th><th><%= ($TEXT->{'samba_path'}) %></th><th><%= ($TEXT->{'samba_delete'}) %></th></tr>
+ </thead>
+ <tbody>
+% foreach my $share (@$shares) {
+  <tr>
+   <td><%= $share->{name} %></td>
+   <td><%= $share->{path} %></td>
+   <td><a onclick="return confirm('<%= ($TEXT->{'samba_delete_share'}) %>')" href="?action=delete&share=<%= $share->{name} %>&vol=<%= $share->{vol} %>"><i class="fa fa-trash" title="<%= ($TEXT->{'samba_delete'}) %>"></i></a></td>
+  </tr>
+% }
+ </tbody>
+</table>
+<br>
+<a href="?action=create">[<%= ($TEXT->{'samba_add_smb'}) %>]</a>
+</div><!-- end of #tab2 -->
+ </div><!-- end of .tab_container -->
+ </div></div></div></div>

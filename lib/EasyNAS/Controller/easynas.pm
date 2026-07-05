@@ -32,7 +32,8 @@ our @EXPORT    = qw( get_mount_dir get_conf_cron get_addons_file get_update_file
                      get_group_default get_conf_webui get_conf_hosts  get_lang_list get_addons_update_dir 
 		     get_lang_text get_service_status get_menu get_addons get_addon_info 
 		     write_log easynas_info addons_info fs_info vol_info users_info groups_info
-                     disk_info health_info networks_info cpu_info memory_info);
+                     disk_info health_info networks_info cpu_info memory_info
+                     write_share_marker remove_share_marker rediscover_shares);
 
 ############# Declarations #####################
 my $authentication_enable = 1;
@@ -1052,6 +1053,72 @@ sub fs_info
        $filesystems{$fs}=[$uuid,$health,$size,$used,$free,$percentage,$devices,$path,$mounted,$raid,get_compress_status($fs)];
     }
     return (%filesystems);
+}
+
+
+######## Share markers ########
+# A shared volume records its share definition INSIDE itself
+# (<vol>/.easynas/<type>.share) so shares survive an OS reinstall and travel
+# with the data. rediscover_shares() rebuilds the live server config from the
+# markers of the currently-mounted volumes -- no external backup needed.
+
+sub write_share_marker
+{
+ my ($vol_path,$type,$content)=@_;
+ return unless (-d $vol_path);
+ `/usr/bin/sudo /bin/mkdir -p $vol_path/.easynas`;
+ open(my $fh,'|-','/usr/bin/sudo /usr/bin/tee '.$vol_path.'/.easynas/'.$type.'.share > /dev/null') or return;
+ print $fh $content;
+ close($fh);
+}
+
+sub remove_share_marker
+{
+ my ($vol_path,$type)=@_;
+ `/usr/bin/sudo /bin/rm -f $vol_path/.easynas/$type.share`;
+}
+
+sub rediscover_shares
+{
+ my %vol=vol_info();
+ my $mount_dir=get_mount_dir();
+ my $v;
+ my $path;
+ my $marker;
+ my $content;
+ my $name;
+ foreach $v (keys %vol)
+ {
+  $path="$mount_dir/$v";
+
+  ### Samba: the marker is the smb.conf section (#### name #### ... )
+  $marker="$path/.easynas/smb.share";
+  if (-e $marker)
+  {
+   $content=`/bin/cat $marker`;
+   ($name)=$content =~ /^#### (.+) ####/;
+   if ($name && !`/usr/bin/sudo /usr/bin/grep "#### $name ####" /etc/samba/smb.conf 2>/dev/null`)
+   {
+    open(my $fh,'|-','/usr/bin/sudo /usr/bin/tee -a /etc/samba/smb.conf > /dev/null');
+    print $fh $content;
+    close($fh);
+   }
+  }
+
+  ### NFS: the marker is the /etc/exports line
+  $marker="$path/.easynas/nfs.share";
+  if (-e $marker)
+  {
+   $content=`/bin/cat $marker`;
+   chomp($content);
+   if ($content ne "" && !`/usr/bin/sudo /usr/bin/grep -F "$content" /etc/exports 2>/dev/null`)
+   {
+    `/bin/echo "$content" | /usr/bin/sudo /usr/bin/tee -a /etc/exports > /dev/null`;
+   }
+  }
+ }
+ `/usr/bin/sudo /usr/sbin/exportfs -a 2>/dev/null`;
+ `/usr/bin/sudo /usr/bin/systemctl reload smb.service 2>/dev/null`;
 }
 
 
