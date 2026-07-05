@@ -72,7 +72,10 @@ sub easynas_info
  my %easynas;
  my $uuid;
  my $serial;
- (undef,$version)=split("-",$imageversion);	
+ # /etc/ImageVersion is "EasyNAS-<version>-<release>"; split on the first dash
+ # only so the release (build number) stays part of the displayed version.
+ (undef,$version)=split("-",$imageversion,2);
+ chomp($version);
  $uuid=`/usr/sbin/dmidecode | grep UUID`;
  (undef,$serial)=split(" ",$uuid);
  $easynas{'version'}=$version;

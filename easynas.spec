@@ -142,7 +142,7 @@ touch %{buildroot}/var/log/easynas/easynas.log
 # ImageVersion identifies the OS build and is read from /etc/ImageVersion by
 # easynas.pm; it lives on the image (updates with the OS), not the config layer.
 mkdir -p %{buildroot}/etc
-echo "EasyNAS-%{version}" > %{buildroot}/etc/ImageVersion
+echo "EasyNAS-%{version}-%{release}" > %{buildroot}/etc/ImageVersion
 
 # SSH subpackage files.
 # sshd_config is a static addon file and lives on the OS image under
