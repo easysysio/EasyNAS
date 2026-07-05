@@ -8,7 +8,6 @@ Turn any 64-bit machine — a spare PC, a home server, or an ARM board — into 
 full-featured NAS with a clean web interface, btrfs storage, and one-click
 file sharing.
 
-[![Build](https://github.com/yarivha/EasyNAS/actions/workflows/build-rpm.yml/badge.svg)](https://github.com/yarivha/EasyNAS/actions/workflows/build-rpm.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Built on openSUSE](https://img.shields.io/badge/built%20on-openSUSE%20Tumbleweed-73ba25.svg)](https://www.opensuse.org/)
 ![Platform](https://img.shields.io/badge/arch-x86__64%20%7C%20aarch64-informational.svg)
@@ -141,38 +140,7 @@ The web interface listens on port **1443** by default; change it in
 | `lang/` | Translations |
 | `addons/*.easynas` | Add-on manifests (name, service, dependencies) |
 | `startup/` | Console menu (`easynas.sh`), first-boot wizard, update checker |
-| `easynas.spec` | RPM packaging (base + add-on subpackages) |
 | `docs/` | Design documents |
-| `.github/workflows/` | CI: builds the RPMs |
-
-## Building
-
-EasyNAS is delivered as two artifacts: **RPM packages** (the application and
-add-ons) and **bootable images** (the appliance).
-
-### RPM packages
-
-RPMs are built by GitHub Actions from [`easynas.spec`](easynas.spec):
-
-- **Stable** — push a version tag; the workflow builds and attaches the RPMs to a
-  GitHub Release.
-- **Testing** — trigger the workflow manually to produce a testing artifact.
-
-They are then published to the signed zypper repositories by the tooling in the
-[EasyNAS-repo](https://github.com/yarivha/EasyNAS-repo) project.
-
-### Appliance images
-
-Bootable images are produced with KIWI from the
-[EasyNAS-build](https://github.com/yarivha/EasyNAS-build) project:
-
-```bash
-./build.sh --stable      # x86_64 installer ISO
-./build.sh --rpi         # Raspberry Pi
-./build.sh --arm64       # generic ARM64
-./build.sh --vm          # qcow2 VM image
-./build.sh --all         # every shipping image, in sequence
-```
 
 ## Documentation
 
