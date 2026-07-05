@@ -120,36 +120,69 @@ sub createuser($self) {
     }
 
 
- $rc = system("/usr/bin/sudo /usr/sbin/useradd -g $group_default -G \"$groups\" -d $mount_dir -c \"$desc\" $name");
-    if ($rc ne 0)
+ my $realm = get_realm();
+ if ($realm->{mode} eq 'consumer')
     {
-      $result="fail";
-      $msg=$TEXT{'users_failed_to_add_user'};
-      return;
-    } 
- $rc = system("/usr/bin/echo $name:$password1 | /usr/bin/sudo /usr/sbin/chpasswd");
-    if ($rc ne 0)
-    {
-	$result="fail";
-        $msg=$TEXT{'users_failed_to_change_password'};
-	return;
+     $result="fail";
+     $msg=$TEXT{'users_managed_externally'} || "Users are managed on the directory server (read-only).";
+     return;
     }
-  
- if( -f "/usr/bin/smbpasswd" )
+
+ if ($realm->{backend} eq 'ad-dc')
     {
-      $rc = system("/usr/bin/echo -e \"$password1\n$password1\" | /usr/bin/sudo /usr/bin/smbpasswd -s -a $name >/dev/null");
-      if ($rc ne 0)
-	 {
-	  $result="fail";
-          $msg=$TEXT{'users_failed_to_add_samba_user'};
-	  return;
-	 }
-    } 
- 
-  
+     # AD DC: one samba-tool op sets POSIX + Kerberos + NT hash. Assign an
+     # explicit RFC2307 uid so file ownership stays stable across reinstall.
+     # (AD-DC paths validated on a real DC / the Phase-2 spike.)
+     my $uidn = next_uid_number();
+     my $gidn = (split(/:/, `/usr/bin/getent group $group_default 2>/dev/null`))[2];
+     $gidn = next_gid_number() unless (defined $gidn && $gidn ne "");
+     chomp $gidn;
+     $rc = system("/usr/bin/sudo","/usr/bin/samba-tool","user","create",$name,$password1,
+                  "--given-name=$name","--uid-number=$uidn","--gid-number=$gidn",
+                  "--login-shell=/bin/bash","--unix-home=$mount_dir");
+     if ($rc ne 0)
+        {
+         $result="fail";
+         $msg=$TEXT{'users_failed_to_add_user'};
+         return;
+        }
+     foreach my $g (@groups)
+        {
+         system("/usr/bin/sudo","/usr/bin/samba-tool","group","addmembers",$g,$name);
+        }
+    }
+ else
+    {
+     # local backend: POSIX account + Samba (tdbsam) NT hash.
+     $rc = system("/usr/bin/sudo /usr/sbin/useradd -g $group_default -G \"$groups\" -d $mount_dir -c \"$desc\" $name");
+     if ($rc ne 0)
+        {
+         $result="fail";
+         $msg=$TEXT{'users_failed_to_add_user'};
+         return;
+        }
+     $rc = system("/usr/bin/echo $name:$password1 | /usr/bin/sudo /usr/sbin/chpasswd");
+     if ($rc ne 0)
+        {
+         $result="fail";
+         $msg=$TEXT{'users_failed_to_change_password'};
+         return;
+        }
+     if( -f "/usr/bin/smbpasswd" )
+        {
+         $rc = system("/usr/bin/echo -e \"$password1\n$password1\" | /usr/bin/sudo /usr/bin/smbpasswd -s -a $name >/dev/null");
+         if ($rc ne 0)
+            {
+             $result="fail";
+             $msg=$TEXT{'users_failed_to_add_samba_user'};
+             return;
+            }
+        }
+    }
+
     $result="success";
     $msg=$TEXT{'users_created'};
-    return; 
+    return;
 }
 
 
@@ -158,7 +191,30 @@ sub createuser($self) {
 sub deleteuser($self) {
   my $username = $self->param("username");
   my $rc;
-    
+  my $realm = get_realm();
+
+  if ($realm->{mode} eq 'consumer')
+   {
+    $result="fail";
+    $msg=$TEXT{'users_managed_externally'} || "Users are managed on the directory server (read-only).";
+    return;
+   }
+
+  if ($realm->{backend} eq 'ad-dc')
+   {
+    $rc = system("/usr/bin/sudo","/usr/bin/samba-tool","user","delete",$username);
+    if ($rc ne 0)
+     {
+      $result="fail";
+      $msg=$TEXT{'users_failed_to_delete_user'};
+      return;
+     }
+    $result="success";
+    $msg=$TEXT{'users_deleted'};
+    return;
+   }
+
+  # local backend
   if( -f "/usr/bin/smbpasswd" )
    {
     $rc = system("/usr/bin/sudo /usr/bin/smbpasswd -x $username >/dev/null");
@@ -166,7 +222,7 @@ sub deleteuser($self) {
     {
      $result="fail";
      $msg=$TEXT{'users_failed_to_delete_samba_user'};
-     return;    
+     return;
     }
    }
 
@@ -175,13 +231,13 @@ sub deleteuser($self) {
     {
      $result="fail";
      $msg=$TEXT{'users_failed_to_delete_user'};
-     return;  
+     return;
     }
     else
     {
      $result="success";
      $msg=$TEXT{'users_deleted'};
-     return;  
+     return;
     }
 }
 
@@ -205,25 +261,45 @@ sub changepassword($self) {
      $msg=$TEXT{'users_passwords_do_no_match'};
      return;
     }
- $rc = system("/usr/bin/echo $name:$password1 | /usr/bin/sudo /usr/sbin/chpasswd");
-    if ($rc ne 0)
+
+ my $realm = get_realm();
+ if ($realm->{mode} eq 'consumer')
     {
-        $result="fail";
-        $msg=$TEXT{'users_failed_to_change_password'};
-        return;
+     $result="fail";
+     $msg=$TEXT{'users_managed_externally'} || "Users are managed on the directory server (read-only).";
+     return;
     }
 
- if( -f "/usr/bin/smbpasswd" )
+ if ($realm->{backend} eq 'ad-dc')
     {
-      $rc = system("/usr/bin/echo -e \"$password1\n$password1\" | /usr/bin/sudo /usr/bin/smbpasswd -s -a $name >/dev/null");
-      if ($rc ne 0)
-         {
-          $result="fail";
-          $msg=$TEXT{'users_failed_to_add_samba_user'};
-          return;
-         }
+     $rc = system("/usr/bin/sudo","/usr/bin/samba-tool","user","setpassword",$name,"--newpassword=$password1");
+     if ($rc ne 0)
+        {
+         $result="fail";
+         $msg=$TEXT{'users_failed_to_change_password'};
+         return;
+        }
     }
-
+ else
+    {
+     $rc = system("/usr/bin/echo $name:$password1 | /usr/bin/sudo /usr/sbin/chpasswd");
+     if ($rc ne 0)
+        {
+         $result="fail";
+         $msg=$TEXT{'users_failed_to_change_password'};
+         return;
+        }
+     if( -f "/usr/bin/smbpasswd" )
+        {
+         $rc = system("/usr/bin/echo -e \"$password1\n$password1\" | /usr/bin/sudo /usr/bin/smbpasswd -s -a $name >/dev/null");
+         if ($rc ne 0)
+            {
+             $result="fail";
+             $msg=$TEXT{'users_failed_to_add_samba_user'};
+             return;
+            }
+        }
+    }
 
     $result="success";
     $msg=$TEXT{'users_password_changed'};
@@ -246,6 +322,36 @@ sub changesettings($self) {
 	$groups = $groups.$_.",";
     }
     chop($groups);
+
+ my $realm = get_realm();
+ if ($realm->{mode} eq 'consumer')
+    {
+     $result="fail";
+     $msg=$TEXT{'users_managed_externally'} || "Users are managed on the directory server (read-only).";
+     return;
+    }
+
+ if ($realm->{backend} eq 'ad-dc')
+    {
+     # Sync supplementary group membership against the selection (description
+     # edit is not applied on AD in this phase).
+     my %want = map { $_ => 1 } @groups;
+     my %have = map { $_ => 1 } split(' ', `/usr/bin/id -Gn $name 2>/dev/null`);
+     foreach my $g (@groups)
+        {
+         next if $have{$g};
+         system("/usr/bin/sudo","/usr/bin/samba-tool","group","addmembers",$g,$name);
+        }
+     foreach my $g (keys %have)
+        {
+         next if $want{$g} || $g eq $group_default;
+         system("/usr/bin/sudo","/usr/bin/samba-tool","group","removemembers",$g,$name);
+        }
+     $result="success";
+     $msg=$TEXT{'users_settings_saved'};
+     return;
+    }
+
     $rc = system("/usr/bin/sudo /usr/sbin/usermod -g $group_default -G \"$groups\" -d $mount_dir -c \"$desc\" $name");
     if ($rc ne 0)
     {
@@ -253,12 +359,12 @@ sub changesettings($self) {
      $msg=$TEXT{'users_settings_failed_to_save'};
 
     }
-    else 
+    else
     {
      $result="success";
      $msg=$TEXT{'users_settings_saved'};
     }
-    return; 
+    return;
 }
 
 1;

@@ -33,7 +33,8 @@ our @EXPORT    = qw( get_mount_dir get_conf_cron get_addons_file get_update_file
 		     get_lang_text get_service_status get_menu get_addons get_addon_info 
 		     write_log easynas_info addons_info fs_info vol_info users_info groups_info
                      disk_info health_info networks_info cpu_info memory_info
-                     write_share_marker remove_share_marker rediscover_shares);
+                     write_share_marker remove_share_marker rediscover_shares
+                     get_realm next_uid_number next_gid_number);
 
 ############# Declarations #####################
 my $authentication_enable = 1;
@@ -56,6 +57,8 @@ my $addons_update_dir = $conf_dir."/addons";
 my $lang_conf=$conf_dir."/easynas.lang";
 my $conf_cron="/etc/cron.d/easynas.cron";
 my $conf_roles=$conf_dir."/easynas.roles";
+my $realm_conf=$conf_dir."/realm.conf";
+my $uid_base=10000;   # RFC2307 uid/gid pool base for directory backends
 my $conf_cert  = $conf_dir."/easynas.pem";
 my $conf_hosts = "/etc/hosts";
 my $conf_webui = "/usr/lib/systemd/system/easynas.service";
@@ -765,20 +768,68 @@ sub addons_info
 }
 
 ######## users_info ###########
+# Read the active directory backend from realm.conf. Defaults to the
+# self-contained "local" backend so an install with no realm configured keeps
+# working exactly as before. "owned" backends allow user/group create/delete in
+# EasyNAS; "consumer" backends (external AD/LDAP) are read-only -- users are
+# managed on the 3rd-party system. See docs/identity-design.md.
+sub get_realm
+{
+  my %realm = ( backend => 'local', realm => '', domain => '' );
+  if (open(my $fh, '<', $realm_conf)) {
+    while (my $line = <$fh>) {
+      chomp $line;
+      next if $line =~ /^\s*(#|$)/;
+      my ($k, $v) = split(/=/, $line, 2);
+      next unless defined $k && defined $v;
+      $k =~ s/^\s+|\s+$//g; $v =~ s/^\s+|\s+$//g;
+      $realm{lc $k} = $v;
+    }
+    close $fh;
+  }
+  my %mode = ( 'local'=>'owned', 'ad-dc'=>'owned',
+               'ad-member'=>'consumer', 'ldap'=>'consumer' );
+  $realm{mode} = $mode{ $realm{backend} } // 'owned';
+  return \%realm;
+}
+
+# Next free RFC2307 uidNumber/gidNumber from our pool -- explicit numbers keep
+# file ownership stable across reboot/reinstall (vs dynamic idmap).
+sub next_uid_number
+{
+  my $max = $uid_base - 1;
+  foreach (`/usr/bin/getent passwd`) {
+    my (undef,undef,$uid) = split(/:/,$_);
+    $max = $uid if (defined $uid && $uid >= $uid_base && $uid < 65000 && $uid > $max);
+  }
+  return $max + 1;
+}
+
+sub next_gid_number
+{
+  my $max = $uid_base - 1;
+  foreach (`/usr/bin/getent group`) {
+    my (undef,undef,$gid) = split(/:/,$_);
+    $max = $gid if (defined $gid && $gid >= $uid_base && $gid < 65000 && $gid > $max);
+  }
+  return $max + 1;
+}
+
 sub users_info
 {
-  my @userlist = `/usr/bin/cat /etc/passwd`;
-  my $username;
-  my $groups;
-  my $desc;
   my %users;
-  my $uid;
-  foreach (@userlist)
+  # getent resolves through NSS, so this returns local *and* directory users
+  # (winbind/sssd) uniformly -- no per-backend code. Human accounts span the
+  # local EasyNAS range and the RFC2307 directory pool; skip the service and
+  # nobody accounts.
+  foreach (`/usr/bin/getent passwd`)
     {
-        ($username,undef,$uid,undef,$desc,undef,undef) = split(/:/,$_);
-        $groups = `/usr/bin/sudo /usr/bin/id -Gn $username`;
-        if (($uid > 999 ) && ($uid < 6500))
+        my ($username,undef,$uid,undef,$desc) = split(/:/,$_);
+        next unless defined $uid;
+        next if ($username eq 'easynas' || $username eq 'nobody');
+        if (($uid >= 1000) && ($uid < 65000))
         {
+            my $groups = `/usr/bin/id -Gn $username 2>/dev/null`;
             $users{$username}=[$uid,$username,$desc,$groups];
         }
     }
@@ -789,14 +840,16 @@ sub users_info
 ######### groups_info ##########
 sub groups_info
 {
-    my @grouplist = `/usr/bin/cat /etc/group` ;
     my %groups;
-    my $groupname;
-    my $gid;
-    foreach (@grouplist)
+    # getent (NSS) so local + directory groups appear uniformly. Keep the
+    # "users" primary group (gid 100) plus the local/RFC2307 ranges; skip the
+    # easynas service group.
+    foreach (`/usr/bin/getent group`)
     {
-        ($groupname,undef,$gid) = split(/:/,$_);
-        if (($gid eq 100) || ($gid > 999 ) && ($gid < 2000) && ($groupname ne 'easynas'))
+        my ($groupname,undef,$gid) = split(/:/,$_);
+        next unless defined $gid;
+        next if ($groupname eq 'easynas');
+        if (($gid == 100) || (($gid >= 1000) && ($gid < 65000)))
         {
            $groups{$groupname}=[$gid,$groupname];
         }

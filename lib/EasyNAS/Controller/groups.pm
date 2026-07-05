@@ -51,13 +51,27 @@ sub view ($self) {
 sub creategroup($self) {
  my $group=$self->param("group");
  my $rc;
- $rc=system("/usr/bin/sudo","/usr/sbin/groupadd", $group);
+ my $realm = get_realm();
+ if ($realm->{mode} eq 'consumer')
+  {
+   $result="fail";
+   $msg=$TEXT{'groups_managed_externally'} || "Groups are managed on the directory server (read-only).";
+   return;
+  }
+ if ($realm->{backend} eq 'ad-dc')
+  {
+   $rc=system("/usr/bin/sudo","/usr/bin/samba-tool","group","add",$group,"--gid-number=".next_gid_number());
+  }
+ else
+  {
+   $rc=system("/usr/bin/sudo","/usr/sbin/groupadd", $group);
+  }
  if ($rc)
   {
    $result="fail";
    $msg=$TEXT{'groups_failed_to_add'};
   }
-  else 
+  else
   {
    $result="success";
    $msg=$TEXT{'groups_added'};
@@ -66,10 +80,24 @@ sub creategroup($self) {
 }
 
 
-sub deletegroup($self) { 
+sub deletegroup($self) {
  my $group=$self->param("group");
  my $rc;
- $rc=system("/usr/bin/sudo","/usr/sbin/groupdel", $group);
+ my $realm = get_realm();
+ if ($realm->{mode} eq 'consumer')
+  {
+   $result="fail";
+   $msg=$TEXT{'groups_managed_externally'} || "Groups are managed on the directory server (read-only).";
+   return;
+  }
+ if ($realm->{backend} eq 'ad-dc')
+  {
+   $rc=system("/usr/bin/sudo","/usr/bin/samba-tool","group","delete",$group);
+  }
+ else
+  {
+   $rc=system("/usr/bin/sudo","/usr/sbin/groupdel", $group);
+  }
  if ($rc)
   {
    $result="fail";
