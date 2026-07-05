@@ -62,9 +62,14 @@ UNIT="$(dc_unit)"
 ### ===== PROVISION =====
 provision() {
     step "Install packages"
+    # zypper returns non-zero informational codes (e.g. when everything is
+    # already installed / "nothing to do"), so don't trust its exit status --
+    # attempt the install, then verify the tools we actually need are present.
     zypper --non-interactive install \
-        samba samba-ad-dc samba-client samba-winbind krb5-client bind-utils \
-        || die "package install failed"
+        samba samba-ad-dc samba-client samba-winbind krb5-client bind-utils
+    for c in samba-tool wbinfo smbclient net host ; do
+        command -v "$c" >/dev/null || die "required command '$c' missing after install"
+    done
 
     step "Stand down standalone Samba units (conflict with the DC)"
     systemctl disable --now smb nmb winbind 2>/dev/null
