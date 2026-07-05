@@ -73,6 +73,16 @@ The three families split into two behaviours that shape the UI:
   the console menu / a Settings page.
 - Backend-independent — identical regardless of which realm is active.
 
+**First boot does NOT choose a service-plane backend.** It sets only the admin
+password. The realm (Local / AD / OpenLDAP) is configured **on-demand in the web
+UI** via the realm addon, and is switchable — never a console first-login
+decision. Rationale: the realm is optional (guest-only NAS needs none); consumer
+backends need details (domain, bind DN, DNS, credentials) best entered on a
+networked web form, not a console prompt; and management auth must work even
+when no directory exists or the directory is broken. Optionally, the *first web
+login* may show a dismissible "set up users now?" card that launches the realm
+addon — a nudge, not a gate.
+
 ---
 
 ## 3. Service plane — the realm backends
