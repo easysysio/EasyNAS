@@ -43,7 +43,8 @@ sub view ($self) {
 ##### create menu #####
  if (defined($action) && $action eq "create") {
   my %vol = vol_info();
-  $self->stash(volumes => \%vol);
+  my %groups = groups_info();
+  $self->stash(volumes => \%vol, groups => \%groups);
   $self->render(template => 'easynas/nfs_create');
   return;
  }
@@ -57,9 +58,19 @@ sub view ($self) {
    $msg=$TEXT{'nfs_exists'};
   }
   else {
-   my $export="$mount_dir/$vol *($per,sync,no_subtree_check)";
+   my $group=$self->param("group") // "";
+   my $path="$mount_dir/$vol";
+   # On-disk group ownership (docs/identity-design.md sec 4). NFS has no force
+   # group, so ownership is purely filesystem-level: chown + setgid so files
+   # created over NFS belong to the group -- consistent with a Samba share on
+   # the same volume. Only applied if the group resolves via NSS.
+   if ($group ne "" && `/usr/bin/getent group $group 2>/dev/null` ne "") {
+    system("/usr/bin/sudo","/usr/bin/chown","root:$group",$path);
+    system("/usr/bin/sudo","/usr/bin/chmod","2770",$path);
+   }
+   my $export="$path *($per,sync,no_subtree_check)";
    `/bin/echo "$export" | /usr/bin/sudo /usr/bin/tee -a $addon->{config}`;
-   write_share_marker("$mount_dir/$vol","nfs",$export);
+   write_share_marker($path,"nfs",$export);
    $rc=system("/usr/bin/sudo /usr/sbin/exportfs -a >/dev/null");
    if (get_service_status($service)) {
     $rc=system("/usr/bin/sudo /usr/bin/systemctl restart $service >/dev/null");
@@ -93,7 +104,9 @@ sub view ($self) {
   {
    ($path,undef)=split(" ",$_);
    (undef,undef,$fs,$vol)=split("/",$path);
-   push(@shares,{path=>$path,fs=>$fs,vol=>$vol});
+   my $owner=`/usr/bin/stat -c '%G' "$path" 2>/dev/null`;
+   chomp $owner;
+   push(@shares,{path=>$path,fs=>$fs,vol=>$vol,owner=>$owner});
   }
   $self->stash(service_active => $service_active,
 	       shares => \@shares,

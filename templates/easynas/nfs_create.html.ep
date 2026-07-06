@@ -24,6 +24,15 @@
            <option value="ro"><%= ($TEXT->{'nfs_readonly'}) %></option>
           </select>
          </div>
+         <div class="form-group">
+          <label><%= ($TEXT->{'nfs_owner_group'} || 'Owner group') %></label>
+          <select class="form-control" name="group">
+           <option value=""><%= ($TEXT->{'nfs_no_group'} || 'None (root-owned)') %></option>
+% foreach my $g (sort keys %$groups) {
+           <option value="<%= $g %>"><%= $g %></option>
+% }
+          </select>
+         </div>
    </div>
    <div class="panel-footer">
    <center>
