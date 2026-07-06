@@ -1,6 +1,8 @@
 # btrfs Snapshots — Bootable Upgrade Rollback
 
-Status: **Planned** (do after the ext4 build is validated end-to-end)
+Status: **Implemented** (KIWI: btrfs snapshot root + snapper plugins across all
+profiles) — pending validation on a real build: snapshot created on `zypper
+dup`, GRUB rollback submenu, and booting a previous snapshot.
 Author: Yariv Hakim
 
 Give every OS upgrade an automatic, bootable safety net: a snapshot is taken
