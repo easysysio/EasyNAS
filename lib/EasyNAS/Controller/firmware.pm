@@ -13,8 +13,9 @@ my %TEXT=get_lang_text($addon->{'name'});
 sub view ($self) {
   if (!($self->session('is_auth'))) {
         $self->redirect_to('login');
+        return;
   }
-  my $action=$self->param('action'); 
+  my $action=$self->param('action');
   $msg="";
   $result="";
   $self->stash(addon => $addon,

@@ -17,15 +17,25 @@ sub startup ($self) {
   
   my %addons=get_addons();
 
-  # Normal route to controller
-  $r->get('/')->to('dashboard#view');
-  $r->get('/easynas')->to('dashboard#view');
-  $r->get('/easynas/firmware.pl')->to('dashboard#view');
+  # Login/logout are reachable without a session.
   $r->any('/login')->to('login#view');
   $r->get('/logout')->to('login#logout');
-  $r->get('/firmware')->to('firmware#view');
+
+  # Everything else requires an authenticated session. This 'under' gate stops
+  # dispatch for unauthenticated requests -- previously each controller called
+  # redirect_to('login') but did NOT return, so the requested action still ran.
+  my $auth = $r->under(sub ($c) {
+    return 1 if $c->session('is_auth');
+    $c->redirect_to('login');
+    return undef;
+  });
+
+  $auth->get('/')->to('dashboard#view');
+  $auth->get('/easynas')->to('dashboard#view');
+  $auth->get('/easynas/firmware.pl')->to('dashboard#view');
+  $auth->get('/firmware')->to('firmware#view');
   foreach my $item (keys %addons) {
-	  $r->get('/'.$addons{$item}{'program'})->to($addons{$item}{'program'}.'#view');
+	  $auth->get('/'.$addons{$item}{'program'})->to($addons{$item}{'program'}.'#view');
 
   }
 }
