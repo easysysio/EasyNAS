@@ -133,6 +133,17 @@ RemainAfterExit=yes
 WantedBy=multi-user.target
 EOF
 
+# The console (getty@tty1 autologin -> easynas.sh) runs the EasyNAS menu and the
+# first-boot admin-password prompt. It must start AFTER easynas-firstboot has
+# mounted the config partition over /etc/easynas, or the prompt writes
+# admin.conf to the OS layer and the mount then shadows it.
+mkdir -p %{buildroot}/usr/lib/systemd/system/getty@tty1.service.d
+cat > %{buildroot}/usr/lib/systemd/system/getty@tty1.service.d/easynas-firstboot.conf << 'EOF'
+[Unit]
+After=easynas-firstboot.service
+Wants=easynas-firstboot.service
+EOF
+
 # Persistent settings file (config layer). Seeded only if absent so an
 # upgrade never overwrites a user-chosen port; see %post.
 echo "EASYNAS_PORT=1443" > %{buildroot}/etc/easynas/easynas.conf
@@ -190,6 +201,7 @@ EOF
 /etc/ImageVersion
 /usr/lib/systemd/system/easynas.service
 /usr/lib/systemd/system/easynas-firstboot.service
+/usr/lib/systemd/system/getty@tty1.service.d/easynas-firstboot.conf
 /easynas/easy_n_a_s.yml
 /easynas/script
 /easynas/public

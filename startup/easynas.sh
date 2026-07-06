@@ -35,6 +35,9 @@ set_admin_password() {
         break
     done
     ( umask 077 ; printf 'admin:%s\n' "$(openssl passwd -6 "$p1")" > "$ADMIN_CONF" )
+    # The console runs as root, but the web app reads this file as the easynas
+    # service user -- hand it ownership so login can read it.
+    chown easynas:easynas "$ADMIN_CONF" 2>/dev/null
     chmod 600 "$ADMIN_CONF" 2>/dev/null
     unset p1 p2
     echo "Admin password updated."
