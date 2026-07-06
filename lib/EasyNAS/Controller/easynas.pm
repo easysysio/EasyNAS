@@ -966,7 +966,6 @@ sub health_info
           if ($_ =~ /write_io_errs/)
           {
             (undef,$write_errs) = split(" ",$_);
-	    print "write ".$write_errs
           }
 	  if ($_ =~ /read_io_errs/)
           {
