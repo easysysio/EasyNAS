@@ -40,8 +40,10 @@ persist_bind() {
         || echo "$store $target none bind,x-systemd.requires-mounts-for=${CONFIG_MNT} 0 0" >> /etc/fstab
 }
 
-persist_bind easynas /etc/easynas
-persist_bind samba   /var/lib/samba
+persist_bind easynas  /etc/easynas
+persist_bind samba    /var/lib/samba
+persist_bind samba-cf /etc/samba      # smb.conf (ad-dc / ad-member)
+persist_bind sssd     /etc/sssd        # sssd.conf (ldap)
 
 # SSL certificate (conflict #3): generate only if missing, so an OS upgrade
 # never regenerates the appliance's identity.

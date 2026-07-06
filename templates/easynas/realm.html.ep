@@ -45,12 +45,15 @@
      <input type="hidden" name="action" value="configure">
      <div class="form-group">
       <label><%= ($TEXT->{'realm_backend'} || 'Backend') %></label>
-      <select class="form-control" name="backend" id="backend" onchange="toggleAddc()">
+      <select class="form-control" name="backend" id="backend" onchange="toggleBackend()">
        <option value="local"><%= ($TEXT->{'realm_backend_local'} || 'Local accounts') %></option>
        <option value="ad-dc"><%= ($TEXT->{'realm_backend_addc'} || 'Local AD Domain Controller') %></option>
+       <option value="ad-member"><%= ($TEXT->{'realm_backend_member'} || 'Join Active Directory') %></option>
+       <option value="ldap"><%= ($TEXT->{'realm_backend_ldap'} || 'External OpenLDAP') %></option>
       </select>
      </div>
-     <div id="addc-fields" style="display:none">
+
+     <div class="be-fields" id="f-ad-dc" style="display:none">
       <div class="form-group">
        <label><%= ($TEXT->{'realm_name'} || 'Realm (Kerberos)') %></label>
        <input class="form-control" name="realm" placeholder="EASYNAS.LAN">
@@ -68,6 +71,48 @@
        <input class="form-control" name="forwarder" value="1.1.1.1">
       </div>
      </div>
+
+     <div class="be-fields" id="f-ad-member" style="display:none">
+      <div class="form-group">
+       <label><%= ($TEXT->{'realm_name'} || 'Realm (Kerberos)') %></label>
+       <input class="form-control" name="realm" placeholder="CORP.EXAMPLE.COM">
+      </div>
+      <div class="form-group">
+       <label><%= ($TEXT->{'realm_domain'} || 'Domain (NetBIOS)') %></label>
+       <input class="form-control" name="domain" placeholder="CORP">
+      </div>
+      <div class="form-group">
+       <label><%= ($TEXT->{'realm_dc_ip'} || 'Domain controller IP') %></label>
+       <input class="form-control" name="dc_ip" placeholder="192.168.1.10">
+      </div>
+      <div class="form-group">
+       <label><%= ($TEXT->{'realm_adminuser'} || 'Join account (domain admin)') %></label>
+       <input class="form-control" name="adminuser" placeholder="Administrator">
+      </div>
+      <div class="form-group">
+       <label><%= ($TEXT->{'realm_adminpass'} || 'Password') %></label>
+       <input type="password" class="form-control" name="adminpass">
+      </div>
+     </div>
+
+     <div class="be-fields" id="f-ldap" style="display:none">
+      <div class="form-group">
+       <label><%= ($TEXT->{'realm_ldap_uri'} || 'LDAP URI') %></label>
+       <input class="form-control" name="ldap_uri" placeholder="ldap://ldap.example.com">
+      </div>
+      <div class="form-group">
+       <label><%= ($TEXT->{'realm_ldap_base'} || 'Search base') %></label>
+       <input class="form-control" name="ldap_base" placeholder="dc=example,dc=com">
+      </div>
+      <div class="form-group">
+       <label><%= ($TEXT->{'realm_bind_dn'} || 'Bind DN (optional)') %></label>
+       <input class="form-control" name="bind_dn" placeholder="cn=readonly,dc=example,dc=com">
+      </div>
+      <div class="form-group">
+       <label><%= ($TEXT->{'realm_bind_pw'} || 'Bind password (optional)') %></label>
+       <input type="password" class="form-control" name="bind_pw">
+      </div>
+     </div>
     </div>
     <div class="panel-footer">
      <center>
@@ -81,9 +126,12 @@
 </div>
 
 <script>
-function toggleAddc() {
+function toggleBackend() {
   var b = document.getElementById('backend').value;
-  document.getElementById('addc-fields').style.display = (b === 'ad-dc') ? 'block' : 'none';
+  var groups = document.getElementsByClassName('be-fields');
+  for (var i = 0; i < groups.length; i++) { groups[i].style.display = 'none'; }
+  var sel = document.getElementById('f-' + b);
+  if (sel) { sel.style.display = 'block'; }
 }
-toggleAddc();
+toggleBackend();
 </script>

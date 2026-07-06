@@ -91,26 +91,78 @@ sub configure ($self) {
     }
     # Provisioning is long and destructive: run it detached. The script records
     # progress in realm.status and writes realm.conf on success.
-    system("/bin/echo configuring | /usr/bin/sudo /usr/bin/tee $status_file >/dev/null");
-    my $cmd = "/usr/bin/sudo /easynas/startup/realm-setup.sh "
-            . shq($realm) . " " . shq($domain) . " " . shq($pass) . " " . shq($fwd);
-    system("/usr/bin/nohup $cmd >/var/log/easynas/realm-setup.log 2>&1 &");
+    start_bg("/easynas/startup/realm-setup.sh " . join(" ", map { shq($_) } $realm, $domain, $pass, $fwd));
     $result = "success";
     $msg = $TEXT{'realm_provisioning'} || "Provisioning the domain controller. This takes a few minutes -- refresh to check status.";
     write_log($addon->{"name"}, "INFO", "AD DC provisioning started for realm $realm");
     return;
   }
 
-  # ad-member / ldap -- Phase 5
+  if ($backend eq "ad-member") {
+    my $realm  = $self->param("realm")     // "";
+    my $domain = $self->param("domain")    // "";
+    my $dcip   = $self->param("dc_ip")     // "";
+    my $user   = $self->param("adminuser") // "";
+    my $pass   = $self->param("adminpass") // "";
+    if ($realm eq "" || $domain eq "" || $dcip eq "" || $user eq "" || $pass eq "") {
+      $result = "fail";
+      $msg = $TEXT{'realm_join_missing'} || "Realm, domain, DC IP, admin user and password are required.";
+      return;
+    }
+    if ("$realm$domain$dcip$user" =~ /[^A-Za-z0-9._\-\@]/) {
+      $result = "fail";
+      $msg = $TEXT{'realm_bad_name'} || "Fields may contain only letters, digits, dot, dash, at and underscore.";
+      return;
+    }
+    start_bg("/easynas/startup/realm-join.sh " . join(" ", map { shq($_) } $realm, $domain, $dcip, $user, $pass));
+    $result = "success";
+    $msg = $TEXT{'realm_joining'} || "Joining the Active Directory domain -- refresh to check status.";
+    write_log($addon->{"name"}, "INFO", "AD join started for realm $realm");
+    return;
+  }
+
+  if ($backend eq "ldap") {
+    my $uri    = $self->param("ldap_uri")  // "";
+    my $base   = $self->param("ldap_base") // "";
+    my $binddn = $self->param("bind_dn")   // "";
+    my $bindpw = $self->param("bind_pw")   // "";
+    if ($uri eq "" || $base eq "") {
+      $result = "fail";
+      $msg = $TEXT{'realm_ldap_missing'} || "LDAP URI and search base are required.";
+      return;
+    }
+    start_bg("/easynas/startup/realm-ldap.sh " . join(" ", map { shq($_) } $uri, $base, $binddn, $bindpw));
+    $result = "success";
+    $msg = $TEXT{'realm_ldap_configuring'} || "Configuring the LDAP directory -- refresh to check status.";
+    write_log($addon->{"name"}, "INFO", "LDAP directory configuration started");
+    return;
+  }
+
   $result = "fail";
-  $msg = $TEXT{'realm_backend_todo'} || "This backend is not available yet.";
+  $msg = $TEXT{'realm_backend_todo'} || "Unknown backend.";
+}
+
+# Launch a setup script detached, recording an immediate "configuring" state.
+sub start_bg ($cmd) {
+  system("/bin/echo configuring | /usr/bin/sudo /usr/bin/tee $status_file >/dev/null");
+  system("/usr/bin/nohup /usr/bin/sudo $cmd >/var/log/easynas/realm-setup.log 2>&1 &");
 }
 
 sub leave ($self) {
   my $realm = get_realm();
-  if ($realm->{backend} eq "ad-dc") {
+  my $b = $realm->{backend};
+  if ($b eq "ad-dc") {
     system("/usr/bin/sudo /usr/bin/systemctl disable --now samba-ad-dc.service samba.service 2>/dev/null");
   }
+  elsif ($b eq "ad-member") {
+    system("/usr/bin/sudo /usr/bin/systemctl disable --now winbind smb 2>/dev/null");
+  }
+  elsif ($b eq "ldap") {
+    system("/usr/bin/sudo /usr/bin/systemctl disable --now sssd 2>/dev/null");
+  }
+  # Reset NSS back to files-only.
+  system("/usr/bin/sudo /usr/bin/sed -i -E 's/^(passwd:).*/\\1 files/' /etc/nsswitch.conf 2>/dev/null");
+  system("/usr/bin/sudo /usr/bin/sed -i -E 's/^(group:).*/\\1 files/'  /etc/nsswitch.conf 2>/dev/null");
   write_realm_conf("local", "", "");
   system("/bin/echo ready | /usr/bin/sudo /usr/bin/tee $status_file >/dev/null");
   $result = "success";
