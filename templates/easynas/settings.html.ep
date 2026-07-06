@@ -40,6 +40,12 @@
         <label><%= ($TEXT->{'settings_port'}) %></label>
         <input class="form-control" value="<%= $port %>" name="port">
        </div>
+       <div class="form-group">
+        <label><%= ($TEXT->{'settings_snapshots'} || 'Upgrade snapshots to keep') %></label>
+        <input class="form-control" type="number" min="1" max="100" value="<%= $snapshots %>" name="snapshots"
+               placeholder="<%= ($TEXT->{'settings_snapshots_na'} || 'not available (no snapshots)') %>">
+        <span class="help-block"><small><%= ($TEXT->{'settings_snapshots_help'} || 'How many pre/post upgrade snapshots to retain before old ones are removed.') %></small></span>
+       </div>
        <div class="panel-footer">
         <center>
          <button type="submit" class="btn btn-default"><%= ($TEXT->{'settings_save'}) %></button>

@@ -31,11 +31,18 @@ sub view ($self) {
   my $str=`/usr/bin/grep '^EASYNAS_PORT=' /etc/easynas/easynas.conf 2>/dev/null`;
   (my $port) = $str =~ /(\d+)/;
   $port = 1443 unless $port;
+  # Upgrade-snapshot retention = snapper's NUMBER_LIMIT on the root config
+  # (how many pre/post upgrade snapshots to keep before old ones are cleaned).
+  # Empty when snapper isn't present (e.g. an ext4 build).
+  my $snapshots="";
+  my $sc=`/usr/bin/sudo /usr/bin/snapper -c root get-config 2>/dev/null`;
+  if ($sc =~ /^NUMBER_LIMIT\s*\|\s*(\S+)/m) { $snapshots=$1; }
   $self->stash(hostname => $hostname,
 	       port => $port,
+	       snapshots => $snapshots,
 	       result => $result,
 	       msg => $msg);
-  $self->render(template => 'easynas/settings'); 
+  $self->render(template => 'easynas/settings');
 
 }
 
@@ -49,6 +56,12 @@ sub changesettings($self) {
   $result="fail";
   $msg=$TEXT{'settings_bad_port'};
   return;
+ }
+ # Upgrade-snapshot retention: set snapper's NUMBER_LIMIT (and make sure the
+ # number-cleanup algorithm is on so old snapshots are actually removed).
+ my $snapshots=$self->param("snapshots");
+ if (defined $snapshots && $snapshots =~ /^\d+$/ && $snapshots >= 1 && $snapshots <= 100) {
+  system("/usr/bin/sudo /usr/bin/snapper -c root set-config \"NUMBER_LIMIT=$snapshots\" \"NUMBER_CLEANUP=yes\" 2>/dev/null");
  }
  $rc=system("/bin/echo \"$hostname\" | /usr/bin/sudo /usr/bin/tee /etc/hostname > /dev/null");
  $rc=system("/usr/bin/sudo /bin/hostname $hostname > /dev/null");
