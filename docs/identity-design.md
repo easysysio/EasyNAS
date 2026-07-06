@@ -267,11 +267,14 @@ it sidesteps NFS uid-matching and is simple to reason about.)
    SMB out of scope). Realm addon + `realm-apply.sh` dispatch per backend;
    `/etc/samba` + `/etc/sssd` persisted. Awaits a real external AD/LDAP to test.
 6. **Backend switching** (leave/rejoin) + the guided re-ACL after a re-number.
-7. **Persistence** — **done**: `/etc/easynas` + `/var/lib/samba` bind-mounted
-   from the config partition, realm re-applied on boot, so a realm survives
-   reboot/reinstall. **Still to do:** local-backend `/etc/passwd` persistence,
-   migration of pre-existing local accounts, and the real-build validation
-   matrix (x86_64 + ARM, each backend).
+7. **Persistence + migration** — **done**: `/etc/easynas`, `/var/lib/samba`,
+   `/etc/samba`, `/etc/sssd` bind-mounted from the config partition; realm
+   re-applied on boot (survives reboot/reinstall); pre-existing local accounts
+   importable into a DC with their uid preserved (`realm-import.sh`).
+   **Still to do:** local-backend `/etc/passwd` persistence (deliberately not
+   bind-mounted — the owned-DC path is the persistent route; documented
+   limitation), and the real-build validation matrix (x86_64 + ARM, each
+   backend).
 
 The **realm addon** (configure/status/leave for local + ad-dc) is also built;
 external backends (ad-member, ldap) remain for Phase 5.
