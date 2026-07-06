@@ -236,8 +236,12 @@ it sidesteps NFS uid-matching and is simple to reason about.)
 
 - [ ] Internal DNS coexistence with NetworkManager on a **local DC** — the top
       risk; validate in the Phase-2 spike.
-- [ ] Persist the **Local** backend's account store on the config partition
-      (the §8.3 concern, scoped to this backend).
+- [x] Persist `/etc/easynas` + `/var/lib/samba` on the config partition — **done
+      (Phase 7)**: bind-mounted by `firstboot.sh`, DC re-applied on boot by
+      `realm-apply.sh`. Still open: the **Local** backend's system accounts
+      (`/etc/passwd`) are not persisted; the AD backends avoid this.
+- [ ] The config partition is **512M** — confirm it's enough for the AD DC
+      database (a small directory is ~50-100 MB); consider enlarging for AD-DC.
 - [ ] Confirm samba/winbind/SSSD packages install on the aarch64 repos.
 - [ ] Backend **switch** flow: reapply share group ownership after a re-number.
 - [ ] NFS version policy: standardize on **NFSv4 + idmap** (or squash to group).
@@ -260,9 +264,14 @@ it sidesteps NFS uid-matching and is simple to reason about.)
    owner via `stat`/NSS. NFS/other sharing addons still to follow the pattern.
 5. **Consumer backends:** join external AD, then OpenLDAP — read-only pickers.
 6. **Backend switching** (leave/rejoin) + the guided re-ACL after a re-number.
-7. **Persistence + migration + validation matrix:** config-partition stores;
-   local-account migration; every protocol authenticates a directory user on a
-   real build (x86_64 + ARM), for each backend.
+7. **Persistence** — **done**: `/etc/easynas` + `/var/lib/samba` bind-mounted
+   from the config partition, realm re-applied on boot, so a realm survives
+   reboot/reinstall. **Still to do:** local-backend `/etc/passwd` persistence,
+   migration of pre-existing local accounts, and the real-build validation
+   matrix (x86_64 + ARM, each backend).
+
+The **realm addon** (configure/status/leave for local + ad-dc) is also built;
+external backends (ad-member, ldap) remain for Phase 5.
 
 ---
 
