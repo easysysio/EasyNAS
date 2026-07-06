@@ -66,7 +66,6 @@ while [[ true ]] ; do
     clear
     echo "#########################################"
     cat /etc/ImageVersion
-    echo
     echo "#########################################"
     echo ""
     echo "Status: $ACTIVE"
