@@ -249,14 +249,15 @@ it sidesteps NFS uid-matching and is simple to reason about.)
 ## 8. Phased plan
 
 1. **Admin credential file + `login.pm`** — done (Phase 1).
-2. **Realm addon skeleton + backend config** (`realm.conf`, status) + **VM spike
-   (AD local DC)** — the richest owned backend; validates winbind, RFC2307 and
-   the DNS/NetworkManager risk that the other backends don't have. If this spike
-   is painful, reconsider scope before the app rewrite.
-3. **Owned-backend user/group CRUD** (Local + AD-local-DC); `users_info` via
-   `getent`; gate the pages on realm presence.
-4. **Ownership:** per-share group ownership in `samba.pm`; pre-realm volumes
-   `root:root`; UI resolves via `getent`.
+2. **VM spike (AD local DC)** — **done**: validated 11/11 + reboot on openSUSE
+   Tumbleweed (see §10). The realm *addon* that runs this sequence is not built
+   yet.
+3. **Owned-backend user/group CRUD** — **done (code)**: `get_realm`, `samba-tool`
+   / local dispatch, consumer read-only guard, `users_info`/`groups_info` via
+   `getent`. Awaits real-DC exercise on the appliance.
+4. **Ownership** — **done (Samba)**: per-share group ownership in `samba.pm`
+   (setgid + `force group`, guest→nobody, no-group→`root:root`); UI resolves the
+   owner via `stat`/NSS. NFS/other sharing addons still to follow the pattern.
 5. **Consumer backends:** join external AD, then OpenLDAP — read-only pickers.
 6. **Backend switching** (leave/rejoin) + the guided re-ACL after a re-number.
 7. **Persistence + migration + validation matrix:** config-partition stores;
