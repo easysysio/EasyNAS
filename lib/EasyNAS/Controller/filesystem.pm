@@ -59,6 +59,42 @@ sub view($self) {
      &changeraid($self);
    }
 
+#------- Balance / Scrub (whole filesystem) -------
+   if (defined $action && $action eq "Balance") { &balance($self); }
+   if (defined $action && $action eq "Scrub")   { &scrub($self);   }
+
+#------- Per-disk actions -------
+   if (defined $action && $action eq "removehd")  { &removehd($self);  }
+   if (defined $action && $action eq "repairhd")  { &repairhd($self);  }
+   if (defined $action && $action eq "addhd")     { &addhd($self);     }
+   if (defined $action && $action eq "replacehd") { &replacehd($self); }
+
+#------- Add / Replace disk selection menu -------
+   if (defined $action && $action eq "display") {
+     my $menu=$self->param("menu") // "";
+     if ($menu eq "add_hd" || $menu eq "exchange") {
+       my $fs=$self->param("fs");
+       my $uuid=$self->param("uuid");
+       my $olddisk=$self->param("disk");
+       my %disks=disk_info();
+       my @free_disks;
+       foreach (sort(keys(%disks))) {
+         push(@free_disks,$_." ".$disks{$_}[2]) if ($disks{$_}[3] eq "disk_free");
+       }
+       if (!@free_disks) {
+         $result="fail";
+         $msg=$TEXT{'no_free_disk'};
+       }
+       else {
+         $self->stash(mode => ($menu eq "add_hd" ? "add" : "replace"),
+                      fs_name => $fs, uuid => $uuid, olddisk => $olddisk,
+                      freedisks => \@free_disks);
+         $self->render(template => 'easynas/filesystem_disk');
+         return;
+       }
+     }
+   }
+
 
 
 #--------- Create Menu ----------
@@ -243,6 +279,109 @@ sub changeraid($self) {
  $msg=$TEXT{'raid_converting'}
       || "Converting the filesystem to $raid in the background. This can take a while.";
  return;
+}
+
+
+####### disk-action helpers #######
+# Mount point for a filesystem name (ROOT lives at /).
+sub fs_mount { my $fs=shift; return ($fs eq "ROOT") ? "/" : get_mount_dir()."/".$fs; }
+
+# Guard: the device operations below all need the filesystem mounted.
+sub require_mounted {
+ my $fs=shift;
+ return 1 if mounted($fs) eq "Mounted";
+ $result="fail";
+ $msg=$TEXT{'fs_not_mounted'} || "The filesystem must be mounted for this action.";
+ return 0;
+}
+
+
+####### balance #######
+# Rebalance the filesystem's block groups across its devices. Long-running on a
+# full array, so run detached; 'btrfs balance status <mount>' shows progress.
+sub balance($self) {
+ my $fs=$self->param("fs");
+ return unless require_mounted($fs);
+ my $mount=fs_mount($fs);
+ system("/usr/bin/nohup /usr/bin/sudo /sbin/btrfs balance start $mount >/var/log/easynas/balance.log 2>&1 &");
+ $result="success";
+ $msg=$TEXT{'fs_balancing'} || "Balancing the filesystem in the background.";
+}
+
+
+####### scrub #######
+# Verify (and repair from redundancy) every block. 'scrub start' returns at once
+# and runs as a background kernel task; 'btrfs scrub status' shows progress.
+sub scrub($self) {
+ my $fs=$self->param("fs");
+ return unless require_mounted($fs);
+ my $mount=fs_mount($fs);
+ system("/usr/bin/sudo /sbin/btrfs scrub start $mount >/dev/null 2>&1");
+ $result="success";
+ $msg=$TEXT{'fs_scrubbing'} || "Scrub started; the filesystem is being verified.";
+}
+
+
+####### repairhd #######
+# btrfs has no per-disk repair -- a scrub rewrites any corrupted block from a
+# good copy on the redundant devices, which is the repair path for a bad disk.
+sub repairhd($self) {
+ my $fs=$self->param("fs");
+ return unless require_mounted($fs);
+ my $mount=fs_mount($fs);
+ system("/usr/bin/sudo /sbin/btrfs scrub start $mount >/dev/null 2>&1");
+ $result="success";
+ $msg=$TEXT{'fs_repairing'} || "Repair started: a scrub rebuilds bad blocks from redundancy.";
+}
+
+
+####### removehd #######
+# Remove a device from the pool. btrfs migrates its data onto the remaining
+# devices first, so this is long-running -- run detached.
+sub removehd($self) {
+ my $fs=$self->param("fs");
+ my $disk=$self->param("disk");
+ unless (defined $disk && $disk =~ m{^/dev/[\w]+$}) { $result="fail"; $msg="Invalid disk."; return; }
+ return unless require_mounted($fs);
+ my $mount=fs_mount($fs);
+ system("/usr/bin/nohup /usr/bin/sudo /sbin/btrfs device remove $disk $mount >/var/log/easynas/balance.log 2>&1 &");
+ $result="success";
+ $msg=$TEXT{'fs_removing_disk'} || "Removing the disk in the background; its data is being migrated.";
+}
+
+
+####### addhd #######
+# Add a free device to the pool. Adding is quick (no data moves yet); the user
+# runs Balance afterward to spread existing data across the new device. The
+# form's disk value is "sdX <size>", so take the first field.
+sub addhd($self) {
+ my $fs=$self->param("fs");
+ my ($disk)=split(" ",$self->param("disk") // "");
+ unless (defined $disk && $disk =~ /^[A-Za-z0-9]+$/) { $result="fail"; $msg="Invalid disk."; return; }
+ return unless require_mounted($fs);
+ my $mount=fs_mount($fs);
+ my $rc=system("/usr/bin/sudo /sbin/btrfs device add -f /dev/$disk $mount >/dev/null 2>&1");
+ if ($rc ne 0) { $result="fail"; $msg=$TEXT{'fs_failed_adding_disk'} || "Failed to add the disk."; return; }
+ $result="success";
+ $msg=$TEXT{'fs_disk_added'} || "Disk added. Run Balance to spread data across it.";
+}
+
+
+####### replacehd #######
+# Replace an existing device with a free one; btrfs copies the old device's
+# contents onto the new one -- long-running, so run detached. olddisk is a
+# /dev path; the new disk comes from the form as "sdX <size>".
+sub replacehd($self) {
+ my $fs=$self->param("fs");
+ my $olddisk=$self->param("olddisk");
+ my ($newdisk)=split(" ",$self->param("disk") // "");
+ unless (defined $olddisk && $olddisk =~ m{^/dev/[\w]+$}) { $result="fail"; $msg="Invalid disk."; return; }
+ unless (defined $newdisk && $newdisk =~ /^[A-Za-z0-9]+$/) { $result="fail"; $msg="Invalid disk."; return; }
+ return unless require_mounted($fs);
+ my $mount=fs_mount($fs);
+ system("/usr/bin/nohup /usr/bin/sudo /sbin/btrfs replace start -f $olddisk /dev/$newdisk $mount >/var/log/easynas/balance.log 2>&1 &");
+ $result="success";
+ $msg=$TEXT{'fs_replacing_disk'} || "Replacing the disk in the background.";
 }
 
 

@@ -139,5 +139,5 @@
 </tbody>
 </table>
 <br><a href="filesystem.pl?menu=add_hd&action=display&fs=<%= $fs_name %>&uuid=<%= $uuid %>">[Add Hard Disk]</a><br><br>
-<form method="post" action="filesystem.pl" enctype="multipart/form-data"><input type="submit" name="action" value="Balance" /><input type="submit" name="action" value="Scrub" /><input type="hidden" name="menu" value="none"  /><input type="hidden" name="fs" value="<%= $fs_name %>"  /><input type="hidden" name="uuid" value="<%= $uuid %>"  /></form></div><!-- end of #tab4 --></div><!-- end of .tab_container --></div></div></div></div>
+<form method="get" action="filesystem.pl"><input type="submit" name="action" value="Balance" /><input type="submit" name="action" value="Scrub" /><input type="hidden" name="menu" value="none"  /><input type="hidden" name="fs" value="<%= $fs_name %>"  /><input type="hidden" name="uuid" value="<%= $uuid %>"  /></form></div><!-- end of #tab4 --></div><!-- end of .tab_container --></div></div></div></div>
 

@@ -1,0 +1,49 @@
+% layout 'default';
+
+<div class="row">
+ <div class="col-lg-8">
+  <div class="panel panel-default">
+   <div class="panel-heading">
+    <label>
+    % if ($mode eq "add") {
+     <%= ($TEXT->{'fs_add_disk'} || 'Add Hard Disk') %> &mdash; <%= $fs_name %>
+    % } else {
+     <%= ($TEXT->{'fs_replace_disk'} || 'Replace Hard Disk') %> &mdash; <%= $fs_name %>
+    % }
+    </label>
+   </div>
+   <form role="form">
+    % if ($mode eq "add") {
+    <input type="hidden" name="action" value="addhd">
+    % } else {
+    <input type="hidden" name="action" value="replacehd">
+    <input type="hidden" name="olddisk" value="<%= $olddisk %>">
+    % }
+    <input type="hidden" name="fs" value="<%= $fs_name %>">
+    <input type="hidden" name="uuid" value="<%= $uuid %>">
+    <input type="hidden" name="menu" value="none">
+    <div class="panel-body">
+     % if ($mode eq "replace") {
+     <div class="form-group">
+      <label><%= ($TEXT->{'fs_replace_from'} || 'Disk to replace') %></label>
+      <p class="form-control-static"><%= $olddisk %></p>
+     </div>
+     % }
+     <div class="form-group">
+      <label><%= ($TEXT->{'fs_select_disk'} || 'Select a free disk') %></label>
+      <select name="disk" class="form-control">
+       % foreach my $disk (@$freedisks) {
+       <option value="<%= $disk %>"><%= $disk %></option>
+       % }
+      </select>
+     </div>
+    </div>
+    <div class="panel-footer">
+     <center>
+     <button type="submit" class="btn btn-default"><%= ($TEXT->{'fs_apply'} || 'Apply') %></button>
+     </center>
+    </div>
+   </form>
+  </div>
+ </div>
+</div>
