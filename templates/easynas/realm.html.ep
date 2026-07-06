@@ -45,10 +45,17 @@
    <div class="panel-body">
 % if (@$computers) {
     <table class="table table-striped">
-     <thead><tr><th><%= ($TEXT->{'realm_computer_name'} || 'System') %></th></tr></thead>
+     <thead><tr><th><%= ($TEXT->{'realm_computer_name'} || 'System') %></th><th><%= ($TEXT->{'realm_remove'} || 'Remove') %></th></tr></thead>
      <tbody>
 % foreach my $c (sort @$computers) {
-      <tr><td><i class="fa fa-desktop"></i> <%= $c %></td></tr>
+      <tr>
+       <td><i class="fa fa-desktop"></i> <%= $c %></td>
+% if (lc($c) ne $me) {
+       <td><a onclick="return confirm('<%= ($TEXT->{'realm_remove_confirm'} || 'Remove this system from the domain?') %>')" href="?action=delcomputer&computer=<%= $c %>"><i class="fa fa-trash" title="<%= ($TEXT->{'realm_remove'} || 'Remove') %>"></i></a></td>
+% } else {
+       <td><span class="text-muted">(<%= ($TEXT->{'realm_this_dc'} || 'this DC') %>)</span></td>
+% }
+      </tr>
 % }
      </tbody>
     </table>

@@ -68,12 +68,16 @@ sub view ($self) {
   $result = "";
   $self->stash(addon => $addon, TEXT => \%TEXT);
 
-  if (defined $action && $action eq "configure") { configure($self); }
-  if (defined $action && $action eq "leave")     { leave($self); }
+  if (defined $action && $action eq "configure")   { configure($self); }
+  if (defined $action && $action eq "leave")       { leave($self); }
+  if (defined $action && $action eq "delcomputer") { delcomputer($self); }
 
+  my $me = `/bin/hostname -s`;
+  chomp $me;
   $self->stash(realm     => get_realm(),
                status    => realm_status(),
                computers => [computers_info()],
+               me        => lc($me),
                result    => $result,
                msg       => $msg);
   $self->render(template => 'easynas/realm');
@@ -164,6 +168,37 @@ sub configure ($self) {
 sub start_bg ($cmd) {
   system("/bin/echo configuring | /usr/bin/sudo /usr/bin/tee $status_file >/dev/null");
   system("/usr/bin/nohup /usr/bin/sudo $cmd >/var/log/easynas/realm-setup.log 2>&1 &");
+}
+
+sub delcomputer ($self) {
+  my $name = $self->param("computer") // "";
+  my $realm = get_realm();
+  if ($realm->{backend} ne "ad-dc") {
+    $result = "fail";
+    $msg = $TEXT{'realm_not_dc'} || "Only available on a local domain controller.";
+    return;
+  }
+  my $me = `/bin/hostname -s`;
+  chomp $me;
+  if ($name eq "" || lc($name) eq lc($me)) {
+    $result = "fail";
+    $msg = $TEXT{'realm_cannot_del_dc'} || "Cannot remove the domain controller's own account.";
+    return;
+  }
+  if ($name =~ /[^A-Za-z0-9._-]/) {
+    $result = "fail";
+    $msg = $TEXT{'realm_bad_name'} || "Invalid computer name.";
+    return;
+  }
+  my $rc = system("/usr/bin/sudo", "/usr/bin/samba-tool", "computer", "delete", $name);
+  if ($rc == 0) {
+    $result = "success";
+    $msg = $TEXT{'realm_computer_removed'} || "Computer removed from the domain.";
+    write_log($addon->{"name"}, "INFO", "Removed computer $name");
+  } else {
+    $result = "fail";
+    $msg = $TEXT{'realm_computer_remove_failed'} || "Failed to remove the computer.";
+  }
 }
 
 sub leave ($self) {
