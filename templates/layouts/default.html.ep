@@ -2,11 +2,14 @@
  use lib '/easynas/lib/EasyNAS/Controller';
  use easynas;
 
- my $username=$self->session('user'); 
+ my $username=$self->session('user');
  my @lang_list = get_lang_list();
  my %easynas = easynas_info();
  my %addons = get_addons();
  my @menu = get_menu();
+ # Only surface the update banner to a logged-in admin (the login page uses this
+ # layout too, and the banner carries a reboot link).
+ my $update_state = $username ? get_update_state() : "";
 
 %>
 
@@ -197,6 +200,23 @@
             <!-- Page Content -->
             <div id="page-wrapper">
                 <div class="container-fluid">
+
+%# ---- global system-update banner (shown on every page) ----
+% if ($update_state eq "updating") {
+                    <div class="alert alert-info"><i class="fa fa-spinner fa-spin"></i>
+                      <%= ($TEXT->{'firmware_updating'} || 'System update running in the background...') %></div>
+% } elsif ($update_state eq "ready") {
+                    <div class="alert alert-success">
+                      <i class="fa fa-check"></i> <%= ($TEXT->{'firmware_update_done'} || 'Update complete. Reboot to apply it.') %>
+                      <a class="btn btn-warning btn-xs" onclick="return confirm('<%= ($TEXT->{'firmware_reboot_confirm'} || 'Reboot the appliance now?') %>')"
+                         href="/firmware?action=reboot"><i class="fa fa-power-off"></i> <%= ($TEXT->{'firmware_reboot'} || 'Reboot now') %></a>
+                    </div>
+% } elsif ($update_state =~ /^failed/) {
+                    <div class="alert alert-danger">
+                      <i class="fa fa-exclamation-triangle"></i>
+                      <%= ($TEXT->{'firmware_update_failed'} || 'The last update failed.') %>
+                      <a href="/firmware"><%= ($TEXT->{'firmware'} || 'Updates') %></a></div>
+% }
 
                     <div class="row">
                         <div class="col-lg-12">

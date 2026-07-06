@@ -34,7 +34,7 @@ our @EXPORT    = qw( get_mount_dir get_conf_cron get_addons_file get_update_file
 		     write_log easynas_info addons_info fs_info vol_info users_info groups_info
                      disk_info health_info networks_info cpu_info memory_info
                      write_share_marker remove_share_marker rediscover_shares
-                     get_realm next_uid_number next_gid_number);
+                     get_realm next_uid_number next_gid_number get_update_state);
 
 ############# Declarations #####################
 my $authentication_enable = 1;
@@ -779,6 +779,17 @@ sub addons_info
 # working exactly as before. "owned" backends allow user/group create/delete in
 # EasyNAS; "consumer" backends (external AD/LDAP) are read-only -- users are
 # managed on the 3rd-party system. See docs/identity-design.md.
+# Background system-update state ("updating" / "ready" / "failed: ..."), written
+# by firmware.pm's zypper dup. Read by the layout so every page shows a banner.
+sub get_update_state
+{
+  open(my $fh, '<', $conf_dir."/update.status") or return "";
+  my $s = <$fh>;
+  close $fh;
+  chomp $s if defined $s;
+  return $s // "";
+}
+
 sub get_realm
 {
   my %realm = ( backend => 'local', realm => '', domain => '' );
