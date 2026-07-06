@@ -72,16 +72,22 @@ sub view ($self) {
   if (defined $action && $action eq "leave")       { leave($self); }
   if (defined $action && $action eq "delcomputer") { delcomputer($self); }
   if (defined $action && $action eq "import")      { import_local($self); }
+  if (defined $action && $action eq "purgelocal")  { purge_local($self); }
 
   my $me = `/bin/hostname -s`;
   chomp $me;
-  $self->stash(realm       => get_realm(),
-               status      => realm_status(),
-               computers   => [computers_info()],
-               local_count => scalar(local_accounts()),
-               me          => lc($me),
-               result      => $result,
-               msg         => $msg);
+  my $realm = get_realm();
+  # On a local DC, split pre-existing local accounts into those still to import
+  # and those already in the DC (redundant -- offer to remove the local copy).
+  my ($toimport, $topurge) = ($realm->{backend} eq 'ad-dc') ? local_split() : ([], []);
+  $self->stash(realm        => $realm,
+               status       => realm_status(),
+               computers    => [computers_info()],
+               import_count => scalar(@$toimport),
+               purge_count  => scalar(@$topurge),
+               me           => lc($me),
+               result       => $result,
+               msg          => $msg);
   $self->render(template => 'easynas/realm');
 }
 
@@ -183,6 +189,45 @@ sub local_accounts {
     push(@a, $n) if ($uid >= 1000 && $uid < 6500);
   }
   return @a;
+}
+
+# Split the local accounts by whether they already exist in the DC: those still
+# to import vs those already there (redundant -- the local copy can be removed,
+# the DC copy keeps the same uid so file ownership is unaffected).
+sub local_split {
+  my @local = local_accounts();
+  return ([], []) unless @local;
+  my %indc;
+  foreach (`/usr/bin/sudo /usr/bin/samba-tool user list 2>/dev/null`) {
+    chomp;
+    $indc{$_} = 1;
+  }
+  my (@toimport, @topurge);
+  foreach my $u (@local) {
+    if ($indc{$u}) { push @topurge, $u; } else { push @toimport, $u; }
+  }
+  return (\@toimport, \@topurge);
+}
+
+# Remove the local system accounts that have already been imported into the DC,
+# clearing the redundant dual state left after a local->ad-dc switch + import.
+sub purge_local ($self) {
+  my $realm = get_realm();
+  if ($realm->{backend} ne "ad-dc") {
+    $result = "fail";
+    $msg = $TEXT{'realm_not_dc'} || "Only available on a local domain controller.";
+    return;
+  }
+  my (undef, $topurge) = local_split();
+  my $n = 0;
+  foreach my $u (@$topurge) {
+    next if $u =~ /[^A-Za-z0-9._-]/;
+    system("/usr/bin/sudo /usr/bin/smbpasswd -x $u >/dev/null 2>&1");
+    if (system("/usr/bin/sudo", "/usr/sbin/userdel", "-f", $u) == 0) { $n++; }
+  }
+  $result = "success";
+  $msg = $TEXT{'realm_local_removed'} || "Removed old local accounts now in the domain.";
+  write_log($addon->{"name"}, "INFO", "Removed $n redundant local accounts");
 }
 
 sub import_local ($self) {

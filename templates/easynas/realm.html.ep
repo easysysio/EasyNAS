@@ -30,11 +30,19 @@
     <div class="alert alert-danger"><%= ($TEXT->{'realm_failed'} || 'Last provisioning failed:') %>
       <%= $status %> (<%= ($TEXT->{'realm_see_log'} || 'see /var/log/easynas/realm-setup.log') %>)</div>
 % }
-% if ($realm->{backend} eq "ad-dc" && $local_count) {
+% if ($realm->{backend} eq "ad-dc" && $import_count) {
     <div class="alert alert-warning">
-     <%= sprintf(($TEXT->{'realm_import_prompt'} || '%d local account(s) predate this realm. Import them into the domain (uid preserved, passwords reset)?'), $local_count) %>
-     <a class="btn btn-xs btn-default" onclick="return confirm('<%= ($TEXT->{'realm_import_confirm'} || 'Import local accounts into the domain?') %>')"
+     <%= sprintf(($TEXT->{'realm_import_prompt'} || '%d local account(s) predate this realm.'), $import_count) %>
+     <br><small><%= ($TEXT->{'realm_import_warn'} || 'Until imported, these users cannot sign in over SMB (their old passwords are not portable). Importing recreates them in the domain with their uid preserved and a temporary password to reset.') %></small>
+     <br><a class="btn btn-xs btn-default" onclick="return confirm('<%= ($TEXT->{'realm_import_confirm'} || 'Import local accounts into the domain?') %>')"
         href="?action=import"><%= ($TEXT->{'realm_import'} || 'Import') %></a>
+    </div>
+% }
+% if ($realm->{backend} eq "ad-dc" && $purge_count) {
+    <div class="alert alert-info">
+     <%= sprintf(($TEXT->{'realm_purge_prompt'} || '%d local account(s) are now also in the domain (redundant).'), $purge_count) %>
+     <a class="btn btn-xs btn-default" onclick="return confirm('<%= ($TEXT->{'realm_purge_confirm'} || 'Remove the old local copies? The domain accounts (same uid) stay.') %>')"
+        href="?action=purgelocal"><%= ($TEXT->{'realm_purge'} || 'Remove old local accounts') %></a>
     </div>
 % }
 % if ($realm->{backend} ne "local") {
