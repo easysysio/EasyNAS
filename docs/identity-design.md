@@ -332,15 +332,17 @@ Validated by `tools/realm-dc-spike.sh` on openSUSE Tumbleweed (Samba 4.24):
 the local-DC backend works, but only after these non-obvious requirements.
 Standing up the DC on a clean image needs all of them.
 
-### Base image package list (KIWI)
-- [ ] `samba-ad-dc` (already present) + `samba-winbind`
-- [ ] `python3-cryptography` — samba-tool runtime dep, **not** pulled in by
+### Base image package list (KIWI) — **added (x86_64 + aarch64)**
+- [x] `samba-ad-dc` + `samba-winbind` + `samba-client`
+- [x] `python3-cryptography` — samba-tool runtime dep, **not** pulled in by
       samba-ad-dc; without it `samba-tool` dies with `ModuleNotFoundError`.
-- [ ] `krb5-server` — openSUSE builds Samba AD DC against **MIT Kerberos**, so
+- [x] `krb5-server` — openSUSE builds Samba AD DC against **MIT Kerberos**, so
       the DC spawns the MIT KDC (`krb5kdc`); without it the DC exits with
       `mitkdc child process exited`.
-- [ ] `diffutils` — the samba apparmor ExecStartPre needs `diff` (non-fatal).
-- [ ] confirm all of the above install on the **aarch64** repos.
+- [x] `diffutils` — the samba apparmor ExecStartPre needs `diff` (non-fatal).
+- [x] `sssd` + `sssd-ldap` — for the external OpenLDAP backend.
+- [ ] confirm all of the above actually install/build on the **aarch64** repos
+      (needs a real ARM build).
 
 ### Realm addon — local-DC provisioning steps (in order)
 - [ ] **hostname ≠ NetBIOS domain** — provision refuses when the short hostname
