@@ -21,6 +21,15 @@
 % }
           </select>
          </div>
+         <div class="form-group">
+          <label><%= ($TEXT->{'samba_owner_group'} || 'Owner group') %></label>
+          <select class="form-control" name="group">
+           <option value=""><%= ($TEXT->{'samba_no_group'} || 'None (open / pre-realm)') %></option>
+% foreach my $g (sort keys %$groups) {
+           <option value="<%= $g %>"><%= $g %></option>
+% }
+          </select>
+         </div>
          <div class="checkbox">
           <label><input type="checkbox" name="browsable" value="yes" checked> <%= ($TEXT->{'samba_browsable'}) %></label>
          </div>

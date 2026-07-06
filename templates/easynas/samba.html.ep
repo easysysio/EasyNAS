@@ -30,13 +30,14 @@
 <div class="tab-pane fade" id="tabs-2">
 <table class="table table-bordered table-striped">
  <thead>
-  <tr><th><%= ($TEXT->{'samba_share_name'}) %></th><th><%= ($TEXT->{'samba_path'}) %></th><th><%= ($TEXT->{'samba_delete'}) %></th></tr>
+  <tr><th><%= ($TEXT->{'samba_share_name'}) %></th><th><%= ($TEXT->{'samba_path'}) %></th><th><%= ($TEXT->{'samba_owner'} || 'Owner') %></th><th><%= ($TEXT->{'samba_delete'}) %></th></tr>
  </thead>
  <tbody>
 % foreach my $share (@$shares) {
   <tr>
    <td><%= $share->{name} %></td>
    <td><%= $share->{path} %></td>
+   <td><%= $share->{owner} %></td>
    <td><a onclick="return confirm('<%= ($TEXT->{'samba_delete_share'}) %>')" href="?action=delete&share=<%= $share->{name} %>&vol=<%= $share->{vol} %>"><i class="fa fa-trash" title="<%= ($TEXT->{'samba_delete'}) %>"></i></a></td>
   </tr>
 % }
