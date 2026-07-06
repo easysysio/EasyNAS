@@ -62,41 +62,21 @@ if [ ! -f /var/lib/samba/private/sam.ldb ] ; then
         || fail "domain provision"
 fi
 
-# 6. Kerberos config (copy, do not symlink).
-cp -f /var/lib/samba/private/krb5.conf /etc/krb5.conf
-
-# 7. Keep NetworkManager from overwriting resolv.conf.
-mkdir -p /etc/NetworkManager/conf.d
-printf '[main]\ndns=none\n' > /etc/NetworkManager/conf.d/90-easynas-dns.conf
-systemctl reload NetworkManager 2>/dev/null
-
-# 8. Resolve users/groups through winbind (seed /etc from the openSUSE vendor
-#    default under /usr/etc if needed).
-[ -f /etc/nsswitch.conf ] || cp /usr/etc/nsswitch.conf /etc/nsswitch.conf 2>/dev/null
-sed -i -E 's/^(passwd:).*/\1 files winbind/' /etc/nsswitch.conf
-sed -i -E 's/^(group:).*/\1 files winbind/'  /etc/nsswitch.conf
-
-# 9. Start the DC (unit name differs across builds).
-UNIT=samba-ad-dc.service
-systemctl list-unit-files "$UNIT" >/dev/null 2>&1 || UNIT=samba.service
-systemctl enable "$UNIT" >/dev/null 2>&1
-systemctl restart "$UNIT" || fail "start $UNIT"
-sleep 5
-systemctl is-active --quiet "$UNIT" || fail "$UNIT did not stay up"
-
-# 10. The DC now serves DNS -- point the box at it.
-printf 'search %s\nnameserver 127.0.0.1\n' "$REALM_LC" > /etc/resolv.conf
-
-# 11. Give Domain Users a gidNumber so members' primary group resolves in NSS.
+# 6. Give Domain Users a gidNumber so members' primary group resolves in NSS.
 samba-tool group addunixattrs "Domain Users" 10000 2>/dev/null
 
-# 12. Record the active backend for the app (easynas.pm get_realm).
+# 7. Record the active backend for the app (easynas.pm get_realm). Written
+#    before apply so realm-apply.sh (which reads it) sees the ad-dc realm.
 cat > "$RCONF" <<EOF
 BACKEND=ad-dc
 REALM=$REALM
 DOMAIN=$DOMAIN
 EOF
 chown easynas:easynas "$RCONF" 2>/dev/null
+
+# 8. Establish the runtime config (Kerberos, NetworkManager, winbind, the DC
+#    service, resolver). Shared with the boot path so it is defined once.
+FORWARDER="$FORWARDER" /easynas/startup/realm-apply.sh || fail "starting the domain controller"
 
 echo "ready" > "$STATUS"
 chown easynas:easynas "$STATUS" 2>/dev/null

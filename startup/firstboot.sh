@@ -17,6 +17,32 @@
 CONF_DIR=/etc/easynas
 CRON=/etc/cron.d/easynas.cron
 
+# --- Layer-2 persistence (docs/immutable-design.md sec 8.3) ------------------
+# The config partition mounts at /config. Persistent state lives under
+# /config/<name> and is bind-mounted onto its real location so it survives an
+# OS reinstall: /etc/easynas (admin/realm config, certs) and /var/lib/samba
+# (the AD DC database). No-op when /config isn't a mounted partition (e.g. a
+# source/dev checkout), so nothing breaks off-appliance.
+CONFIG_MNT=/config
+
+persist_bind() {
+    local name="$1" target="$2"
+    local store="${CONFIG_MNT}/${name}"
+    mountpoint -q "$CONFIG_MNT" || return 0
+    mkdir -p "$store" "$target"
+    # First use: seed the store from the image's initial contents so nothing is
+    # shadowed once we bind-mount over the target.
+    if [ -z "$(ls -A "$store" 2>/dev/null)" ] && [ -n "$(ls -A "$target" 2>/dev/null)" ]; then
+        cp -a "$target/." "$store/" 2>/dev/null
+    fi
+    mountpoint -q "$target" || mount --bind "$store" "$target"
+    grep -q " $target " /etc/fstab 2>/dev/null \
+        || echo "$store $target none bind,x-systemd.requires-mounts-for=${CONFIG_MNT} 0 0" >> /etc/fstab
+}
+
+persist_bind easynas /etc/easynas
+persist_bind samba   /var/lib/samba
+
 # SSL certificate (conflict #3): generate only if missing, so an OS upgrade
 # never regenerates the appliance's identity.
 if [ ! -f ${CONF_DIR}/easynas.cert ]; then
@@ -41,5 +67,11 @@ fi
 
 chown -R easynas:easynas ${CONF_DIR}
 chown -R easynas:easynas /var/log/easynas
+
+# Re-establish an AD DC realm on boot (idempotent, no-op unless the backend is
+# ad-dc): after a reboot or an OS reinstall the database is persisted on the
+# config partition, but the OS-layer runtime config (service enablement,
+# nsswitch, Kerberos, resolver) must be reapplied. See realm-apply.sh.
+/easynas/startup/realm-apply.sh 2>/dev/null || true
 
 exit 0
