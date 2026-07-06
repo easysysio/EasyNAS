@@ -30,19 +30,38 @@
 <div class="tab-pane fade" id="tabs-2">
 <table class="table table-bordered table-striped">
  <thead>
-  <tr><th><%= ($TEXT->{'samba_share_name'}) %></th><th><%= ($TEXT->{'samba_path'}) %></th><th><%= ($TEXT->{'samba_owner'} || 'Owner') %></th><th><%= ($TEXT->{'samba_delete'}) %></th></tr>
+  <tr><th><%= ($TEXT->{'samba_share_name'}) %></th><th><%= ($TEXT->{'samba_path'}) %></th><th><%= ($TEXT->{'samba_owner'} || 'Owner') %></th><th><%= ($TEXT->{'samba_owner_group'} || 'Owner group') %></th><th><%= ($TEXT->{'samba_delete'}) %></th></tr>
  </thead>
  <tbody>
 % foreach my $share (@$shares) {
   <tr>
    <td><%= $share->{name} %></td>
    <td><%= $share->{path} %></td>
-   <td><%= $share->{owner} %></td>
+   <td><%= $share->{owner} %>\
+% if ($share->{stale}) {
+ <i class="fa fa-exclamation-triangle text-warning" title="<%= ($TEXT->{'samba_stale'} || 'ownership out of sync -- resync or reassign') %>"></i>\
+% }
+   </td>
+   <td>
+    <form style="display:inline">
+     <input type="hidden" name="action" value="chgroup">
+     <input type="hidden" name="share" value="<%= $share->{name} %>">
+     <input type="hidden" name="vol" value="<%= $share->{vol} %>">
+     <select name="group" class="input-sm" onchange="this.form.submit()">
+      <option value=""><%= ($TEXT->{'samba_no_group'} || '(none)') %></option>
+% foreach my $g (sort keys %$groups) {
+      <option value="<%= $g %>" <%= ($g eq $share->{group}) ? 'selected' : '' %>><%= $g %></option>
+% }
+     </select>
+    </form>
+   </td>
    <td><a onclick="return confirm('<%= ($TEXT->{'samba_delete_share'}) %>')" href="?action=delete&share=<%= $share->{name} %>&vol=<%= $share->{vol} %>"><i class="fa fa-trash" title="<%= ($TEXT->{'samba_delete'}) %>"></i></a></td>
   </tr>
 % }
  </tbody>
 </table>
+<a href="?action=resync" onclick="return confirm('<%= ($TEXT->{'samba_resync_confirm'} || 'Resync all share ownership to their current groups?') %>')">
+  <i class="fa fa-refresh"></i> <%= ($TEXT->{'samba_resync'} || 'Resync ownership') %></a>
 <br>
 <a href="?action=create">[<%= ($TEXT->{'samba_add_smb'}) %>]</a>
 </div><!-- end of #tab2 -->

@@ -44,6 +44,35 @@ sub share_section {
  return $s;
 }
 
+# Rewrite a share's ownership directives to $group (or strip them when $group is
+# ""). Used by the re-ACL after a backend switch: reads the config, drops the
+# old force group/valid users/write list lines in the share's section, re-adds
+# them after the [share] header, and writes the file back.
+sub reassign_group {
+ my ($config,$share,$group,$readonly)=@_;
+ my @in=`/usr/bin/sudo /bin/cat $config 2>/dev/null`;
+ my @out;
+ my $in=0;
+ foreach my $line (@in) {
+  if ($line =~ /^#### \Q$share\E ####/) { $in=1; push @out,$line; next; }
+  if ($in) {
+   next if $line =~ /^\s*(force group|valid users|write list)\s*=/;   # drop old
+   push @out,$line;
+   if ($line =~ /^\[\Q$share\E\]/ && $group ne "") {
+    push @out,"force group = $group\n";
+    push @out,"valid users = \@$group\n";
+    push @out,"write list = \@$group\n" if ($readonly ne "yes");
+   }
+   $in=0 if ($line =~ /^comment\s*=\s*\Q$share\E/);                    # section end
+  } else {
+   push @out,$line;
+  }
+ }
+ open(my $fh,'|-',"/usr/bin/sudo /usr/bin/tee $config > /dev/null");
+ print $fh @out;
+ close($fh);
+}
+
 sub view ($self) {
   if (!($self->session('is_auth'))) {
         $self->redirect_to('login');
@@ -142,30 +171,88 @@ sub view ($self) {
   write_log($addon->{"name"},"INFO","Samba share was deleted");
  }
 
+##### resync ownership (re-ACL after a backend switch) #####
+# Re-chown every group-owned share dir to its force group's *current* gid. Fixes
+# stale on-disk ownership when a backend switch renumbered the gids but the
+# group names stayed the same.
+ if (defined($action) && $action eq "resync") {
+  my @conf=`/usr/bin/sudo /bin/cat $config 2>/dev/null`;
+  my ($s,$p,$g);
+  my $flush=sub {
+   if (defined $s && defined $p && defined $g
+       && `/usr/bin/getent group $g 2>/dev/null` ne "") {
+    system("/usr/bin/sudo","/usr/bin/chown","root:$g",$p);
+    system("/usr/bin/sudo","/usr/bin/chmod","2770",$p);
+   }
+   $s=$p=$g=undef;
+  };
+  foreach (@conf) {
+   if (/^#### (.+) ####/)                       { $flush->(); $s=$1; }
+   elsif (defined $s && /^\s*path\s*=\s*(\S+)/) { $p=$1; }
+   elsif (defined $s && /^\s*force group\s*=\s*(\S+)/) { $g=$1; }
+  }
+  $flush->();
+  if (get_service_status($service)) {
+   $rc=system("/usr/bin/sudo /usr/bin/systemctl restart $service > /dev/null");
+  }
+  $result="success";
+  $msg=$TEXT{'samba_resynced'} || "Share ownership resynced to current groups.";
+  write_log($addon->{"name"},"INFO","Samba share ownership resynced");
+ }
+
+##### chgroup (reassign one share's owner group) #####
+ if (defined($action) && $action eq "chgroup") {
+  my $share=$self->param("share");
+  my $vol=$self->param("vol");
+  my $group=$self->param("group") // "";
+  my $path="$mount_dir/$vol";
+  if (defined($share) && $share =~ /^[A-Za-z0-9._-]+$/
+      && ($group eq "" || ($group =~ /^[A-Za-z0-9._-]+$/
+                           && `/usr/bin/getent group $group 2>/dev/null` ne ""))) {
+   my $ro=`/usr/bin/sudo /bin/grep -A20 "#### $share ####" $config 2>/dev/null | /usr/bin/grep -m1 "read only"`;
+   $ro = ($ro =~ /yes/i) ? "yes" : "no";
+   if ($group ne "") {
+    system("/usr/bin/sudo","/usr/bin/chown","root:$group",$path);
+    system("/usr/bin/sudo","/usr/bin/chmod","2770",$path);
+   }
+   reassign_group($config,$share,$group,$ro);
+   if (get_service_status($service)) {
+    $rc=system("/usr/bin/sudo /usr/bin/systemctl restart $service > /dev/null");
+   }
+   $result="success";
+   $msg=$TEXT{'samba_group_changed'} || "Owner group updated.";
+   write_log($addon->{"name"},"INFO","Samba share $share owner group set to '$group'");
+  }
+ }
+
 ##### menu ######
   my $service_active=get_service_status($service);
+  my %groups=groups_info();
   my @shares;
-  my $cur;
+  my ($cur,$cpath,$cgroup);
   my @conf=`/usr/bin/sudo /bin/cat $config 2>/dev/null`;
+  my $push_share=sub {
+   return unless (defined $cur && defined $cpath);
+   my $vol=$cpath;
+   $vol =~ s|^$mount_dir/||;
+   # Resolve the on-disk owning group via NSS (stat %G). A share is "stale" if
+   # it forces a group but the on-disk group differs -- the re-ACL signal.
+   my $owner=`/usr/bin/stat -c '%G' "$cpath" 2>/dev/null`;
+   chomp $owner;
+   my $stale=(defined($cgroup) && $cgroup ne "" && $owner ne $cgroup) ? 1 : 0;
+   push(@shares,{name=>$cur,path=>$cpath,vol=>$vol,owner=>$owner,
+                 group=>($cgroup//""),stale=>$stale});
+  };
   foreach (@conf)
   {
-   if (/^#### (.+) ####/) {
-    $cur=$1;
-   }
-   elsif (defined($cur) && /^\s*path\s*=\s*(\S+)/) {
-    my $path=$1;
-    my $vol=$path;
-    $vol =~ s|^$mount_dir/||;
-    # Resolve the on-disk owning group name through NSS (stat %G) so the UI
-    # shows who owns the share regardless of backend.
-    my $owner=`/usr/bin/stat -c '%G' "$path" 2>/dev/null`;
-    chomp $owner;
-    push(@shares,{name=>$cur,path=>$path,vol=>$vol,owner=>$owner});
-    $cur=undef;
-   }
+   if (/^#### (.+) ####/) { $push_share->(); $cur=$1; $cpath=undef; $cgroup=undef; }
+   elsif (defined($cur) && /^\s*path\s*=\s*(\S+)/)        { $cpath=$1; }
+   elsif (defined($cur) && /^\s*force group\s*=\s*(\S+)/) { $cgroup=$1; }
   }
+  $push_share->();
   $self->stash(service_active => $service_active,
 	       shares => \@shares,
+	       groups => \%groups,
 	       result => $result,
 	       msg => $msg);
   $self->render(template => 'easynas/samba');

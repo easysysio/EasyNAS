@@ -38,6 +38,8 @@
     </div>
 % }
 % if ($realm->{backend} ne "local") {
+    <p class="text-muted"><small><i class="fa fa-info-circle"></i>
+      <%= ($TEXT->{'realm_reacl_tip'} || 'After switching backends, review share ownership on the Samba page (Resync ownership).') %></small></p>
     <a class="btn btn-warning" onclick="return confirm('<%= ($TEXT->{'realm_leave_confirm'} || 'Return to local accounts?') %>')"
        href="?action=leave"><%= ($TEXT->{'realm_leave'} || 'Leave / reset to local') %></a>
 % }
