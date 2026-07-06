@@ -71,15 +71,17 @@ sub view ($self) {
   if (defined $action && $action eq "configure")   { configure($self); }
   if (defined $action && $action eq "leave")       { leave($self); }
   if (defined $action && $action eq "delcomputer") { delcomputer($self); }
+  if (defined $action && $action eq "import")      { import_local($self); }
 
   my $me = `/bin/hostname -s`;
   chomp $me;
-  $self->stash(realm     => get_realm(),
-               status    => realm_status(),
-               computers => [computers_info()],
-               me        => lc($me),
-               result    => $result,
-               msg       => $msg);
+  $self->stash(realm       => get_realm(),
+               status      => realm_status(),
+               computers   => [computers_info()],
+               local_count => scalar(local_accounts()),
+               me          => lc($me),
+               result      => $result,
+               msg         => $msg);
   $self->render(template => 'easynas/realm');
 }
 
@@ -168,6 +170,42 @@ sub configure ($self) {
 sub start_bg ($cmd) {
   system("/bin/echo configuring | /usr/bin/sudo /usr/bin/tee $status_file >/dev/null");
   system("/usr/bin/nohup /usr/bin/sudo $cmd >/var/log/easynas/realm-setup.log 2>&1 &");
+}
+
+# Pre-existing local EasyNAS accounts (/etc/passwd, uid 1000-6499). Read from
+# the file directly (not getent) so directory users don't appear here.
+sub local_accounts {
+  my @a;
+  foreach (`/bin/cat /etc/passwd 2>/dev/null`) {
+    my ($n, undef, $uid) = split(/:/);
+    next unless defined $uid;
+    next if ($n eq 'easynas' || $n eq 'nobody');
+    push(@a, $n) if ($uid >= 1000 && $uid < 6500);
+  }
+  return @a;
+}
+
+sub import_local ($self) {
+  my $realm = get_realm();
+  if ($realm->{backend} ne "ad-dc") {
+    $result = "fail";
+    $msg = $TEXT{'realm_not_dc'} || "Only available on a local domain controller.";
+    return;
+  }
+  my @acc = local_accounts();
+  if (!@acc) {
+    $result = "fail";
+    $msg = $TEXT{'realm_no_local'} || "No local accounts to import.";
+    return;
+  }
+  # One temporary password for all imported users; the admin has them reset it.
+  my @chars = ('A'..'Z', 'a'..'z', 0..9);
+  my $temp = "Reset-" . join('', map { $chars[int(rand(@chars))] } 1..8) . "!";
+  system("/usr/bin/nohup /usr/bin/sudo /easynas/startup/realm-import.sh "
+         . shq($temp) . " >>/var/log/easynas/realm-setup.log 2>&1 &");
+  $result = "success";
+  $msg = ($TEXT{'realm_importing'} || "Importing local accounts. Temporary password:") . " $temp";
+  write_log($addon->{"name"}, "INFO", "Importing " . scalar(@acc) . " local accounts into the DC");
 }
 
 sub delcomputer ($self) {
