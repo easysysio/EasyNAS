@@ -17,8 +17,12 @@
 <div class="col-lg-6"><div class="panel panel-default"><div class="panel-heading"><div class="row"><div class="col-xs-3"><%= ($TEXT->{'dashboard_cpu'}) %></div><div class="panel-body">
 <i id="cpu-icon" class="fa fa-microchip fa-3x" style="color:<%= $cpu->{usage} > 90 ? "red" : "green" %>"></i>
 &nbsp;<%= $cpu->{model} %> (<%= $cpu->{cores} %> <%= ($TEXT->{'dashboard_cores'}) %>)
-<div class="progress" role="progressbar" aria-label="cpu usage" aria-valuenow="<%= $cpu->{usage} %>" aria-valuemin="0" aria-valuemax="100">
- <span id="cpu-usage-text"><%= $cpu->{usage} %></span>%<div id="cpu-bar" class="progress-bar<%= $cpu->{usage} > 90 ? " progress-bar-danger" : "" %>" style="width: <%= $cpu->{usage} %>%"></div>
+<div style="text-align:center">
+<svg viewBox="0 0 120 68" style="width:170px;max-width:100%" role="img" aria-label="cpu usage">
+ <path d="M10 60 A50 50 0 0 1 110 60" fill="none" stroke="#e5e5e5" stroke-width="11" stroke-linecap="round"/>
+ <path id="cpu-gauge" d="M10 60 A50 50 0 0 1 110 60" fill="none" stroke="<%= $cpu->{usage} > 90 ? "#d9534f" : "#5cb85c" %>" stroke-width="11" stroke-linecap="round" stroke-dasharray="157.08" stroke-dashoffset="<%= sprintf('%.1f', 157.08*(1-$cpu->{usage}/100)) %>"/>
+ <text id="cpu-gauge-text" x="60" y="55" text-anchor="middle" font-size="22" font-weight="bold" fill="#666"><%= $cpu->{usage} %>%</text>
+</svg>
 </div>
 <%= ($TEXT->{'dashboard_load'}) %>: <span id="cpu-load"><%= $cpu->{load1} %> / <%= $cpu->{load5} %> / <%= $cpu->{load15} %></span>
 </div></div></div><div class="panel-footer"><span class="pull-left"><%= ($TEXT->{'dashboard_load'}) %>&nbsp;1/5/15&nbsp;min</span><div class="clearfix"></div></div></div></div>
@@ -26,8 +30,12 @@
 <div class="col-lg-6"><div class="panel panel-default"><div class="panel-heading"><div class="row"><div class="col-xs-3"><%= ($TEXT->{'dashboard_memory'}) %></div><div class="panel-body">
 <i id="mem-icon" class="fa fa-memory fa-3x" style="color:<%= $memory->{percentage} > 90 ? "red" : "green" %>"></i>
 &nbsp;<span id="mem-usedtotal"><%= $memory->{used} %> / <%= $memory->{total} %></span>
-<div class="progress" role="progressbar" aria-label="memory usage" aria-valuenow="<%= $memory->{percentage} %>" aria-valuemin="0" aria-valuemax="100">
- <span id="mem-usage-text"><%= $memory->{percentage} %></span>%<div id="mem-bar" class="progress-bar<%= $memory->{percentage} > 90 ? " progress-bar-danger" : "" %>" style="width: <%= $memory->{percentage} %>%"></div>
+<div style="text-align:center">
+<svg viewBox="0 0 120 68" style="width:170px;max-width:100%" role="img" aria-label="memory usage">
+ <path d="M10 60 A50 50 0 0 1 110 60" fill="none" stroke="#e5e5e5" stroke-width="11" stroke-linecap="round"/>
+ <path id="mem-gauge" d="M10 60 A50 50 0 0 1 110 60" fill="none" stroke="<%= $memory->{percentage} > 90 ? "#d9534f" : "#5cb85c" %>" stroke-width="11" stroke-linecap="round" stroke-dasharray="157.08" stroke-dashoffset="<%= sprintf('%.1f', 157.08*(1-$memory->{percentage}/100)) %>"/>
+ <text id="mem-gauge-text" x="60" y="55" text-anchor="middle" font-size="22" font-weight="bold" fill="#666"><%= $memory->{percentage} %>%</text>
+</svg>
 </div>
 % if ($memory->{has_swap}) {
 <%= ($TEXT->{'dashboard_swap'}) %>: <%= $memory->{swap_used} %> / <%= $memory->{swap_total} %>
@@ -95,17 +103,23 @@
 // Live CPU + memory: poll the dashboard's JSON stats endpoint and update the
 // gauges in place, so they move without a page refresh.
 (function poll(){
+  var LEN=157.08; // arc length of the r=50 semicircle gauge (pi*r)
   function txt(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; }
-  function bar(id,v){ var e=document.getElementById(id); if(e){ e.style.width=v+'%';
-    e.className='progress-bar'+(v>90?' progress-bar-danger':''); } }
   function col(id,hot){ var e=document.getElementById(id); if(e) e.style.color=hot?'red':'green'; }
+  // Drive an SVG gauge: fill the arc to v% and colour it red past 90%.
+  function gauge(gid,tid,v){
+    var g=document.getElementById(gid);
+    if(g){ g.setAttribute('stroke-dashoffset', (LEN*(1-v/100)).toFixed(1));
+           g.setAttribute('stroke', v>90?'#d9534f':'#5cb85c'); }
+    var t=document.getElementById(tid); if(t) t.textContent=v+'%';
+  }
   fetch('?action=stats', {headers:{'Accept':'application/json'}})
    .then(function(r){ return r.json(); })
    .then(function(d){
      var c=d.cpu, m=d.memory;
-     txt('cpu-usage-text', c.usage); bar('cpu-bar', c.usage); col('cpu-icon', c.usage>90);
+     gauge('cpu-gauge','cpu-gauge-text', c.usage); col('cpu-icon', c.usage>90);
      txt('cpu-load', c.load1+' / '+c.load5+' / '+c.load15);
-     txt('mem-usage-text', m.percentage); bar('mem-bar', m.percentage); col('mem-icon', m.percentage>90);
+     gauge('mem-gauge','mem-gauge-text', m.percentage); col('mem-icon', m.percentage>90);
      txt('mem-usedtotal', m.used+' / '+m.total);
      txt('mem-available', m.available);
    })
