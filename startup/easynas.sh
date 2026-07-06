@@ -34,11 +34,12 @@ set_admin_password() {
         if [ "$p1" != "$p2" ] ; then echo "Passwords do not match, try again." ; continue ; fi
         break
     done
-    ( umask 077 ; printf 'admin:%s\n' "$(openssl passwd -6 "$p1")" > "$ADMIN_CONF" )
-    # The console runs as root, but the web app reads this file as the easynas
-    # service user -- hand it ownership so login can read it.
-    chown easynas:easynas "$ADMIN_CONF" 2>/dev/null
-    chmod 600 "$ADMIN_CONF" 2>/dev/null
+    # /etc/easynas is owned by the easynas service user and the console runs as
+    # the unprivileged 'admin' account (which has passwordless sudo), so write
+    # via sudo and hand the file to easynas -- the web app reads it as that user.
+    printf 'admin:%s\n' "$(openssl passwd -6 "$p1")" | sudo /usr/bin/tee "$ADMIN_CONF" >/dev/null
+    sudo /usr/bin/chown easynas:easynas "$ADMIN_CONF"
+    sudo /usr/bin/chmod 600 "$ADMIN_CONF"
     unset p1 p2
     echo "Admin password updated."
 }
