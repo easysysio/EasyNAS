@@ -54,6 +54,11 @@ sub view($self) {
      &changename($self);
    }
 
+#-------ChangeRaid -------
+   if (defined $action && $action eq "changeraid")  {
+     &changeraid($self);
+   }
+
 
 
 #--------- Create Menu ----------
@@ -175,6 +180,69 @@ sub deletefs($self) {
      $result="success";
      $msg=$TEXT{'fs_deleted'};
      return;
+}
+
+
+####### changeraid #######
+# Convert an existing filesystem to a different btrfs RAID profile with an
+# online 'btrfs balance ... -dconvert/-mconvert'. This rewrites every block
+# group, so it can run for a long time on a full array -- kick it off detached
+# (logging to /var/log/easynas/balance.log) and just report that it started.
+sub changeraid($self) {
+ my $fs    = $self->param("fs");
+ my $raid  = $self->param("raid");
+ my $force = $self->param("force");
+
+ # Whitelist the target profile: this value goes into a shell command below.
+ unless (defined $raid && $raid =~ /^(?:single|raid0|raid1|raid5|raid6|raid10)$/) {
+   $result="fail";
+   $msg="Invalid raid level.";
+   return;
+ }
+
+ # A balance/convert only works on a mounted filesystem.
+ if (mounted($fs) ne "Mounted") {
+   $result="fail";
+   $msg=$TEXT{'fs_not_mounted'} || "The filesystem must be mounted to change its RAID level.";
+   return;
+ }
+
+ # Current profile, canonicalised to the radio values (single/raidN).
+ my $current = lc(raid_status($fs));
+ $current = "single" if $current eq "jbod";
+ if ($current eq $raid) {
+   $result="fail";
+   $msg=$TEXT{'raid_the_same'};
+   return;
+ }
+
+ # Changing the RAID level changes redundancy, so require an explicit confirm.
+ if (!$force) {
+   $result="fail";
+   $msg=$TEXT{'raid_require_force'};
+   return;
+ }
+
+ # Enforce the device-count minimum for the target profile.
+ my @devs   = `/usr/bin/sudo /sbin/btrfs filesystem show $fs | /usr/bin/grep devid`;
+ my $number = scalar(@devs);
+ my %req = ( raid0  => [2,'raid_0_require_two'],   raid1  => [2,'raid_1_require_two'],
+            raid10 => [4,'raid_10_require_four'], raid5  => [3,'raid_5_require_three'],
+            raid6  => [4,'raid_6_require_four'] );
+ if (exists $req{$raid} && $number < $req{$raid}[0]) {
+   $result="fail";
+   $msg=$TEXT{$req{$raid}[1]};
+   return;
+ }
+
+ my $mount = ($fs eq "ROOT") ? "/" : get_mount_dir()."/".$fs;
+ system("/usr/bin/nohup /usr/bin/sudo /sbin/btrfs balance start "
+       ."-dconvert=$raid -mconvert=$raid $mount "
+       .">/var/log/easynas/balance.log 2>&1 &");
+ $result="success";
+ $msg=$TEXT{'raid_converting'}
+      || "Converting the filesystem to $raid in the background. This can take a while.";
+ return;
 }
 
 

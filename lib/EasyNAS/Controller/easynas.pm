@@ -34,7 +34,7 @@ our @EXPORT    = qw( get_mount_dir get_conf_cron get_addons_file get_update_file
 		     write_log easynas_info addons_info fs_info vol_info users_info groups_info
                      disk_info health_info networks_info cpu_info memory_info
                      write_share_marker remove_share_marker rediscover_shares
-                     get_realm next_uid_number next_gid_number get_update_state);
+                     get_realm next_uid_number next_gid_number get_update_state raid_status);
 
 ############# Declarations #####################
 my $authentication_enable = 1;
