@@ -262,7 +262,10 @@ it sidesteps NFS uid-matching and is simple to reason about.)
 4. **Ownership** — **done (Samba)**: per-share group ownership in `samba.pm`
    (setgid + `force group`, guest→nobody, no-group→`root:root`); UI resolves the
    owner via `stat`/NSS. NFS/other sharing addons still to follow the pattern.
-5. **Consumer backends:** join external AD, then OpenLDAP — read-only pickers.
+5. **Consumer backends** — **done (code)**: `realm-join.sh` (AD member, winbind
+   `rid` idmap) and `realm-ldap.sh` (external OpenLDAP via SSSD, NSS+PAM only —
+   SMB out of scope). Realm addon + `realm-apply.sh` dispatch per backend;
+   `/etc/samba` + `/etc/sssd` persisted. Awaits a real external AD/LDAP to test.
 6. **Backend switching** (leave/rejoin) + the guided re-ACL after a re-number.
 7. **Persistence** — **done**: `/etc/easynas` + `/var/lib/samba` bind-mounted
    from the config partition, realm re-applied on boot, so a realm survives
