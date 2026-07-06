@@ -104,8 +104,13 @@ sub write_update_list {
 # shows a Reboot button when it reaches "ready".
 sub update($self) {
  system("/bin/echo updating | /usr/bin/sudo /usr/bin/tee $update_status >/dev/null");
+ # --allow-vendor-change: the image mixes vendors (base openSUSE + the KIWI
+ # build repo Virtualization:Appliances + EasyNAS), and dup otherwise stops on
+ # a vendor-change problem and -- being non-interactive -- cancels. Allowing it
+ # lets dup consolidate onto the enabled repos. --replacefiles handles the
+ # occasional file conflict on a full upgrade.
  system("/usr/bin/nohup /bin/sh -c '"
-       ."/usr/bin/sudo /usr/bin/zypper -n --gpg-auto-import-keys dup "
+       ."/usr/bin/sudo /usr/bin/zypper -n --gpg-auto-import-keys dup --allow-vendor-change --replacefiles "
        ."&& echo ready | /usr/bin/sudo /usr/bin/tee $update_status "
        ."|| echo failed | /usr/bin/sudo /usr/bin/tee $update_status"
        ."' >/var/log/easynas/update.log 2>&1 &");
