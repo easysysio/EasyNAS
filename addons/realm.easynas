@@ -1,10 +1,11 @@
 <addon>
- <enable>false</enable>
+ <enable>true</enable>
  <name>realm</name>
  <description>realm</description>
- <icon>fa-suitcase</icon>
- <version>1.1.0</version>
+ <icon>fa-id-card</icon>
+ <version>2.0.0</version>
  <author>Yariv Hakim</author>
  <type>realm</type>
- <program>realm.pl</program>
+ <program>realm</program>
+ <service>samba-ad-dc.service</service>
 </addon>

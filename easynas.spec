@@ -221,6 +221,7 @@ EOF
 /easynas/lib/EasyNAS/Controller/addons.pm
 /easynas/lib/EasyNAS/Controller/users.pm
 /easynas/lib/EasyNAS/Controller/groups.pm
+/easynas/lib/EasyNAS/Controller/realm.pm
 /easynas/lib/EasyNAS/Controller/firmware.pm
 /easynas/lib/EasyNAS/Controller/network.pm
 /easynas/lib/EasyNAS/Controller/settings.pm
@@ -233,6 +234,7 @@ EOF
 /easynas/templates/easynas/addons*
 /easynas/templates/easynas/users*
 /easynas/templates/easynas/groups*
+/easynas/templates/easynas/realm*
 /easynas/templates/easynas/network*
 /easynas/templates/easynas/firmware*
 /easynas/templates/easynas/login*

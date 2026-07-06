@@ -1,0 +1,89 @@
+% layout 'default';
+
+% if ($result eq "fail") {
+<div class="alert alert-danger alert-dismissable">
+<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button><%= $msg %></div>
+% } elsif ($result eq "success") {
+<div class="alert alert-success alert-dismissable">
+<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button><%= $msg %></div>
+% }
+
+<div class="row">
+ <div class="col-lg-6">
+
+  %# ---- current status ----
+  <div class="panel panel-default">
+   <div class="panel-heading"><%= ($TEXT->{'realm_status'} || 'Directory status') %></div>
+   <div class="panel-body">
+    <p><b><%= ($TEXT->{'realm_backend'} || 'Backend') %>:</b>
+% my $names = { 'local' => 'Local accounts', 'ad-dc' => 'Local AD Domain Controller', 'ad-member' => 'Joined Active Directory', 'ldap' => 'External OpenLDAP' };
+       <%= ($names->{$realm->{backend}} || $realm->{backend}) %>
+       (<%= $realm->{mode} %>)</p>
+% if ($realm->{realm} ne "") {
+    <p><b><%= ($TEXT->{'realm_name'} || 'Realm') %>:</b> <%= $realm->{realm} %>
+       &nbsp; <b><%= ($TEXT->{'realm_domain'} || 'Domain') %>:</b> <%= $realm->{domain} %></p>
+% }
+% if ($status eq "configuring") {
+    <div class="alert alert-info"><i class="fa fa-spinner fa-spin"></i>
+      <%= ($TEXT->{'realm_in_progress'} || 'Provisioning in progress -- this takes a few minutes. Refresh to check.') %></div>
+% } elsif ($status =~ /^failed/) {
+    <div class="alert alert-danger"><%= ($TEXT->{'realm_failed'} || 'Last provisioning failed:') %>
+      <%= $status %> (<%= ($TEXT->{'realm_see_log'} || 'see /var/log/easynas/realm-setup.log') %>)</div>
+% }
+% if ($realm->{backend} ne "local") {
+    <a class="btn btn-warning" onclick="return confirm('<%= ($TEXT->{'realm_leave_confirm'} || 'Return to local accounts?') %>')"
+       href="?action=leave"><%= ($TEXT->{'realm_leave'} || 'Leave / reset to local') %></a>
+% }
+   </div>
+  </div>
+
+  %# ---- configure a backend ----
+  <div class="panel panel-default">
+   <div class="panel-heading"><%= ($TEXT->{'realm_configure'} || 'Configure directory') %></div>
+   <div class="panel-body">
+    <form role="form">
+     <input type="hidden" name="action" value="configure">
+     <div class="form-group">
+      <label><%= ($TEXT->{'realm_backend'} || 'Backend') %></label>
+      <select class="form-control" name="backend" id="backend" onchange="toggleAddc()">
+       <option value="local"><%= ($TEXT->{'realm_backend_local'} || 'Local accounts') %></option>
+       <option value="ad-dc"><%= ($TEXT->{'realm_backend_addc'} || 'Local AD Domain Controller') %></option>
+      </select>
+     </div>
+     <div id="addc-fields" style="display:none">
+      <div class="form-group">
+       <label><%= ($TEXT->{'realm_name'} || 'Realm (Kerberos)') %></label>
+       <input class="form-control" name="realm" placeholder="EASYNAS.LAN">
+      </div>
+      <div class="form-group">
+       <label><%= ($TEXT->{'realm_domain'} || 'Domain (NetBIOS)') %></label>
+       <input class="form-control" name="domain" placeholder="EASYNAS">
+      </div>
+      <div class="form-group">
+       <label><%= ($TEXT->{'realm_adminpass'} || 'Administrator password') %></label>
+       <input type="password" class="form-control" name="adminpass">
+      </div>
+      <div class="form-group">
+       <label><%= ($TEXT->{'realm_forwarder'} || 'DNS forwarder') %></label>
+       <input class="form-control" name="forwarder" value="1.1.1.1">
+      </div>
+     </div>
+    </div>
+    <div class="panel-footer">
+     <center>
+      <button type="submit" class="btn btn-default"><%= ($TEXT->{'realm_save'} || 'Save') %></button>
+     </center>
+    </form>
+   </div>
+  </div>
+
+ </div>
+</div>
+
+<script>
+function toggleAddc() {
+  var b = document.getElementById('backend').value;
+  document.getElementById('addc-fields').style.display = (b === 'ad-dc') ? 'block' : 'none';
+}
+toggleAddc();
+</script>
