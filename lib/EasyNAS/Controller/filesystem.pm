@@ -93,22 +93,26 @@ sub view($self) {
       my $uuid=$self->param("uuid");
       #my $raid = raid_status($fs);
       my @disks = `/usr/bin/sudo /sbin/btrfs filesystem show $uuid | /usr/bin/grep devid`;
-      #my %disks = drive_status();
-      my $pre_disk = 0;
+      my %health = health_info();
       my $number_disks = 0;
-      my $number;
-      my $disk;
-      my $size;
-      my $used;
-      my $status;
-      my $compress;
-      
+      my @fsdisks;
+      # Each 'devid' line: "devid N size <size> used <used> path /dev/sdX".
+      # Build one entry per real device so the Disks tab lists them all, not a
+      # single hardcoded row.
       foreach (@disks)
       {
 	$number_disks++;
-      } 
+	my (undef,$number,undef,$size,undef,$used,undef,$disk) = split(' ',$_);
+	my $status = exists $health{$disk}
+	             ? ($health{$disk}[0] eq 'disk_good' ? 'OK' : 'Failed')
+	             : 'Used';
+	push @fsdisks, { number => $number, disk => $disk,
+	                 size => $size, used => $used, status => $status };
+      }
       $self->stash( fs_name => $fs,
-		    number_disks => $number_disks);
+		    uuid => $uuid,
+		    number_disks => $number_disks,
+		    fsdisks => \@fsdisks);
       $self->render(template => 'easynas/filesystem_settings');
       return;
     }  
