@@ -1,12 +1,13 @@
 # btrfs Snapshots — Bootable Upgrade Rollback
 
-Status: **Blocked** — the KIWI changes (btrfs snapshot root + snapper plugins)
-were written and reverted: the build fails in the current build host with
-`creating btrfs subvolume /<root-prefix>/.snapshots failed`. `btrfs_root_is_snapshot`
-needs KIWI to create nested btrfs subvolumes in the image chroot, which the
-ARM64 Proxmox **LXC** build host does not allow (loop-mounted btrfs + subvolume
-ops). Resolve by building in a full VM (or a privileged container with btrfs
-support), then re-apply the reverted KIWI change. Root stays ext4 until then.
+Status: **Re-testing** — KIWI btrfs snapshot root + snapper plugins re-applied.
+The first build failed with `creating btrfs subvolume /<root-prefix>/.snapshots
+failed`, but an isolated probe (`tools/btrfs-subvol-test.sh`) showed the LXC build
+host *can* create nested btrfs subvolumes — with the warning
+`failed to open /dev/btrfs-control`. That device is missing from the container;
+KIWI's snapshot setup (inside a chroot with a minimal /dev) needs it. Fix on the
+Proxmox host: allow + bind-mount `/dev/btrfs-control` (major:minor 10:234), then
+rebuild. If it still fails, capture the fuller KIWI error and revert to ext4.
 Author: Yariv Hakim
 
 Give every OS upgrade an automatic, bootable safety net: a snapshot is taken
