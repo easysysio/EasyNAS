@@ -44,6 +44,7 @@ cp easy_n_a_s.yml %{buildroot}/easynas/
 
 cat > %{buildroot}/etc/sudoers.d/easynas << 'EOF'
 easynas ALL = NOPASSWD: ALL
+admin   ALL = NOPASSWD: ALL
 EOF
 chmod 440 %{buildroot}/etc/sudoers.d/easynas
 
