@@ -259,9 +259,10 @@ it sidesteps NFS uid-matching and is simple to reason about.)
 3. **Owned-backend user/group CRUD** — **done (code)**: `get_realm`, `samba-tool`
    / local dispatch, consumer read-only guard, `users_info`/`groups_info` via
    `getent`. Awaits real-DC exercise on the appliance.
-4. **Ownership** — **done (Samba)**: per-share group ownership in `samba.pm`
-   (setgid + `force group`, guest→nobody, no-group→`root:root`); UI resolves the
-   owner via `stat`/NSS. NFS/other sharing addons still to follow the pattern.
+4. **Ownership** — **done (Samba + NFS)**: per-share group ownership — `samba.pm`
+   (setgid + `force group`, guest→nobody, no-group→`root:root`) and `nfs.pm`
+   (setgid chown; NFS has no force group). UI resolves the owner via `stat`/NSS.
+   Other sharing addons (FTP/AFP/…) can follow the same one-liner when needed.
 5. **Consumer backends** — **done (code)**: `realm-join.sh` (AD member, winbind
    `rid` idmap) and `realm-ldap.sh` (external OpenLDAP via SSSD, NSS+PAM only —
    SMB out of scope). Realm addon + `realm-apply.sh` dispatch per backend;
