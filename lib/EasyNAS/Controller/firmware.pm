@@ -61,9 +61,31 @@ sub view ($self) {
   $self->render(template => 'easynas/firmware'); 
 }
 
+# The EasyNAS channel repo is either EasyNAS (stable) or EasyNAS_Beta (testing);
+# only one is enabled per image. Query updates from whichever is enabled instead
+# of hardcoding the stable alias, so this also works on a testing image.
+sub active_repo {
+ my $repo="EasyNAS";
+ foreach (`/usr/bin/sudo /usr/bin/zypper --quiet lr -E 2>/dev/null`) {
+  if (/\bEasyNAS_Beta\b/) { $repo="EasyNAS_Beta"; last; }
+ }
+ return $repo;
+}
+
+sub write_update_list {
+ my $repo=active_repo();
+ system("/usr/bin/sudo /usr/bin/zypper --quiet -x lu -a --repo $repo | /usr/bin/sudo /usr/bin/tee /etc/easynas/easynas.updates >/dev/null");
+}
+
 ##### update #####
 sub update($self) {
  my $package=$self->param('package');
+ # Only allow sane package names -- $package is fed to a shell command.
+ if (!defined $package || $package !~ /^[A-Za-z0-9._+-]+$/) {
+  $result="fail";
+  $msg=$TEXT{'firmware_update_failed'};
+  return;
+ }
  my $rc = system("/usr/bin/sudo /usr/bin/zypper -n update $package > /dev/null");
  if ($rc) {
   $result="fail";
@@ -72,25 +94,26 @@ sub update($self) {
  else {
   $result="success";
   $msg=$TEXT{'firmware_update_success'};
+  # New code is on disk but the running daemon still has the old modules
+  # loaded. Restart the app so the update takes effect -- delayed and detached
+  # so this HTTP response is delivered before the service bounces.
+  if ($package =~ /^easynas/) {
+   system("/bin/sh -c '/bin/sleep 2; /usr/bin/sudo /usr/bin/systemctl restart easynas.service' >/dev/null 2>&1 &");
+  }
  }
- $rc=system("/usr/bin/sudo /usr/bin/zypper --quiet -x lu -a --repo EasyNAS  | /usr/bin/sudo /usr/bin/tee /etc/easynas/easynas.updates");
+ write_update_list();
  return;
 }
 
 #####  Refresh #####
 sub refresh($self) {
- my $rc;
- $rc=system("/usr/bin/sudo /usr/bin/zypper --quiet -x lu -a --repo EasyNAS  | /usr/bin/sudo /usr/bin/tee /etc/easynas/easynas.updates");
- if ($rc) {
-  $result="fail";
-  $msg=$TEXT{'firmware_not_refreshed'};
- }
- else {
-  $result="success";
-  $msg=$TEXT{'firmware_refreshed'};
- }
-  return;
-} 
+ # Pull fresh repo metadata, then rebuild the update list from the active repo.
+ system("/usr/bin/sudo /usr/bin/zypper --quiet --gpg-auto-import-keys refresh >/dev/null 2>&1");
+ write_update_list();
+ $result="success";
+ $msg=$TEXT{'firmware_refreshed'};
+ return;
+}
 
 
 
