@@ -167,9 +167,15 @@
 function toggleBackend() {
   var b = document.getElementById('backend').value;
   var groups = document.getElementsByClassName('be-fields');
-  for (var i = 0; i < groups.length; i++) { groups[i].style.display = 'none'; }
-  var sel = document.getElementById('f-' + b);
-  if (sel) { sel.style.display = 'block'; }
+  for (var i = 0; i < groups.length; i++) {
+    var show = (groups[i].id === 'f-' + b);
+    groups[i].style.display = show ? 'block' : 'none';
+    // Disable inputs in the non-selected groups so they don't submit --
+    // several backends share field names (realm/domain/adminpass), and the
+    // hidden empty ones would otherwise override what the user typed.
+    var inputs = groups[i].getElementsByTagName('input');
+    for (var j = 0; j < inputs.length; j++) { inputs[j].disabled = !show; }
+  }
 }
 toggleBackend();
 </script>
