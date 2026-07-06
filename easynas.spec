@@ -44,7 +44,6 @@ cp easy_n_a_s.yml %{buildroot}/easynas/
 
 cat > %{buildroot}/etc/sudoers.d/easynas << 'EOF'
 easynas ALL = NOPASSWD: ALL
-admin   ALL = NOPASSWD: ALL
 EOF
 chmod 440 %{buildroot}/etc/sudoers.d/easynas
 
@@ -257,7 +256,11 @@ EOF
 
 %pre
 /usr/bin/getent group easynas || /usr/sbin/groupadd -r easynas
-/usr/bin/getent passwd easynas || /usr/sbin/useradd -r -g easynas -d /easynas -s /sbin/nologin easynas
+# easynas is the single system user: it runs the service AND the console (the
+# getty autologs in as easynas and runs the menu as its login shell). Give it
+# the menu as its shell; keep it set on upgrades of an existing easynas user.
+/usr/bin/getent passwd easynas || /usr/sbin/useradd -r -g easynas -d /easynas -s /easynas/startup/easynas.sh easynas
+/usr/sbin/usermod -s /easynas/startup/easynas.sh easynas 2>/dev/null || true
 
 
 %post
