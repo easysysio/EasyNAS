@@ -266,7 +266,10 @@ it sidesteps NFS uid-matching and is simple to reason about.)
    `rid` idmap) and `realm-ldap.sh` (external OpenLDAP via SSSD, NSS+PAM only —
    SMB out of scope). Realm addon + `realm-apply.sh` dispatch per backend;
    `/etc/samba` + `/etc/sssd` persisted. Awaits a real external AD/LDAP to test.
-6. **Backend switching** (leave/rejoin) + the guided re-ACL after a re-number.
+6. **Backend switching** — **done**: leave/configure any backend (realm addon),
+   plus the guided re-ACL — the Samba share list flags stale ownership, offers
+   per-share group reassignment, and a "Resync ownership" bulk re-chown to
+   current gids.
 7. **Persistence + migration** — **done**: `/etc/easynas`, `/var/lib/samba`,
    `/etc/samba`, `/etc/sssd` bind-mounted from the config partition; realm
    re-applied on boot (survives reboot/reinstall); pre-existing local accounts
