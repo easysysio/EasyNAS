@@ -16,6 +16,14 @@ sub view ($self) {
         return;
   }
   my $action=$self->param('action');
+
+  # Lightweight status endpoint: the global update banner polls this while an
+  # update runs so the page can refresh itself when it finishes.
+  if (defined $action && $action eq "status") {
+    $self->render(text => update_state());
+    return;
+  }
+
   $msg="";
   $result="";
   $self->stash(addon => $addon,

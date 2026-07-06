@@ -205,6 +205,16 @@
 % if ($update_state eq "updating") {
                     <div class="alert alert-info"><i class="fa fa-spinner fa-spin"></i>
                       <%= ($TEXT->{'firmware_updating'} || 'System update running in the background...') %></div>
+                    <script>
+                    // While updating, poll the status and refresh once it changes
+                    // (ready/failed) so the reboot link appears on its own.
+                    (function poll(){
+                      fetch('/firmware?action=status').then(function(r){return r.text();}).then(function(s){
+                        if (s.trim() !== 'updating') { location.reload(); }
+                        else { setTimeout(poll, 10000); }
+                      }).catch(function(){ setTimeout(poll, 10000); });
+                    })();
+                    </script>
 % } elsif ($update_state eq "ready") {
                     <div class="alert alert-success">
                       <i class="fa fa-check"></i> <%= ($TEXT->{'firmware_update_done'} || 'Update complete. Reboot to apply it.') %>
