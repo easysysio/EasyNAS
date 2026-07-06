@@ -37,6 +37,28 @@
    </div>
   </div>
 
+  %# ---- computers registered in the DC (ad-dc only) ----
+% if ($realm->{backend} eq "ad-dc") {
+  <div class="panel panel-default">
+   <div class="panel-heading"><i class="fa fa-desktop"></i>
+     <%= ($TEXT->{'realm_computers'} || 'Computers') %></div>
+   <div class="panel-body">
+% if (@$computers) {
+    <table class="table table-striped">
+     <thead><tr><th><%= ($TEXT->{'realm_computer_name'} || 'System') %></th></tr></thead>
+     <tbody>
+% foreach my $c (sort @$computers) {
+      <tr><td><i class="fa fa-desktop"></i> <%= $c %></td></tr>
+% }
+     </tbody>
+    </table>
+% } else {
+    <p><%= ($TEXT->{'realm_no_computers'} || 'No systems have joined the domain yet.') %></p>
+% }
+   </div>
+  </div>
+% }
+
   %# ---- configure a backend ----
   <div class="panel panel-default">
    <div class="panel-heading"><%= ($TEXT->{'realm_configure'} || 'Configure directory') %></div>

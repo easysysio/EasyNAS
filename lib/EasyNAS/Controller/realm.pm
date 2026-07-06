@@ -21,6 +21,23 @@ my $realm_conf  = "/etc/easynas/realm.conf";
 # POSIX-safe single-quote wrapping for values passed to a shell command.
 sub shq { my $s = shift // ""; $s =~ s/'/'\\''/g; return "'$s'"; }
 
+# Computer accounts registered in the local AD DC (joined via realmd/SSSD on
+# Linux or natively on Windows). Only meaningful for the ad-dc backend, where
+# EasyNAS is the directory authority; empty for the other backends.
+sub computers_info {
+  my @computers;
+  my $realm = get_realm();
+  if ($realm->{backend} eq "ad-dc") {
+    foreach (`/usr/bin/sudo /usr/bin/samba-tool computer list 2>/dev/null`) {
+      chomp;
+      next if $_ eq "";
+      s/\$$//;              # strip the trailing $ from the account name
+      push(@computers, $_);
+    }
+  }
+  return @computers;
+}
+
 # In-progress state written by realm-setup.sh ("configuring" / "ready" /
 # "failed: ..."); empty when no realm has ever been configured.
 sub realm_status {
@@ -54,10 +71,11 @@ sub view ($self) {
   if (defined $action && $action eq "configure") { configure($self); }
   if (defined $action && $action eq "leave")     { leave($self); }
 
-  $self->stash(realm  => get_realm(),
-               status => realm_status(),
-               result => $result,
-               msg    => $msg);
+  $self->stash(realm     => get_realm(),
+               status    => realm_status(),
+               computers => [computers_info()],
+               result    => $result,
+               msg       => $msg);
   $self->render(template => 'easynas/realm');
 }
 
