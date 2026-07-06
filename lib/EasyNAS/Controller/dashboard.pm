@@ -10,7 +10,17 @@ sub view ($self) {
         $self->redirect_to('login');
   }
   my $username=$self->session('user');
-  my $action=$self->param('action'); 
+  my $action=$self->param('action');
+
+  # Live-stats endpoint for the dashboard poll: only CPU + memory (skip the
+  # expensive disk/fs/vol enumeration), returned as JSON.
+  if (defined $action && $action eq "stats") {
+    my %cpu    = cpu_info();
+    my %memory = memory_info();
+    $self->render(json => { cpu => \%cpu, memory => \%memory });
+    return;
+  }
+
   my $addon = get_addon_info("dashboard");
   my %addons = get_addons();
   my %TEXT=get_lang_text($addon->{'name'});

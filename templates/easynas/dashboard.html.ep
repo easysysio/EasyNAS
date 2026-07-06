@@ -15,19 +15,19 @@
 
 
 <div class="col-lg-6"><div class="panel panel-default"><div class="panel-heading"><div class="row"><div class="col-xs-3"><%= ($TEXT->{'dashboard_cpu'}) %></div><div class="panel-body">
-<i class="fa fa-microchip fa-3x" style="color:<%= $cpu->{usage} > 90 ? "red" : "green" %>"></i>
+<i id="cpu-icon" class="fa fa-microchip fa-3x" style="color:<%= $cpu->{usage} > 90 ? "red" : "green" %>"></i>
 &nbsp;<%= $cpu->{model} %> (<%= $cpu->{cores} %> <%= ($TEXT->{'dashboard_cores'}) %>)
 <div class="progress" role="progressbar" aria-label="cpu usage" aria-valuenow="<%= $cpu->{usage} %>" aria-valuemin="0" aria-valuemax="100">
- <%= $cpu->{usage} %>%<div class="progress-bar<%= $cpu->{usage} > 90 ? " progress-bar-danger" : "" %>" style="width: <%= $cpu->{usage} %>%"></div>
+ <span id="cpu-usage-text"><%= $cpu->{usage} %></span>%<div id="cpu-bar" class="progress-bar<%= $cpu->{usage} > 90 ? " progress-bar-danger" : "" %>" style="width: <%= $cpu->{usage} %>%"></div>
 </div>
-<%= ($TEXT->{'dashboard_load'}) %>: <%= $cpu->{load1} %> / <%= $cpu->{load5} %> / <%= $cpu->{load15} %>
+<%= ($TEXT->{'dashboard_load'}) %>: <span id="cpu-load"><%= $cpu->{load1} %> / <%= $cpu->{load5} %> / <%= $cpu->{load15} %></span>
 </div></div></div><div class="panel-footer"><span class="pull-left"><%= ($TEXT->{'dashboard_load'}) %>&nbsp;1/5/15&nbsp;min</span><div class="clearfix"></div></div></div></div>
 
 <div class="col-lg-6"><div class="panel panel-default"><div class="panel-heading"><div class="row"><div class="col-xs-3"><%= ($TEXT->{'dashboard_memory'}) %></div><div class="panel-body">
-<i class="fa fa-memory fa-3x" style="color:<%= $memory->{percentage} > 90 ? "red" : "green" %>"></i>
-&nbsp;<%= $memory->{used} %> / <%= $memory->{total} %>
+<i id="mem-icon" class="fa fa-memory fa-3x" style="color:<%= $memory->{percentage} > 90 ? "red" : "green" %>"></i>
+&nbsp;<span id="mem-usedtotal"><%= $memory->{used} %> / <%= $memory->{total} %></span>
 <div class="progress" role="progressbar" aria-label="memory usage" aria-valuenow="<%= $memory->{percentage} %>" aria-valuemin="0" aria-valuemax="100">
- <%= $memory->{percentage} %>%<div class="progress-bar<%= $memory->{percentage} > 90 ? " progress-bar-danger" : "" %>" style="width: <%= $memory->{percentage} %>%"></div>
+ <span id="mem-usage-text"><%= $memory->{percentage} %></span>%<div id="mem-bar" class="progress-bar<%= $memory->{percentage} > 90 ? " progress-bar-danger" : "" %>" style="width: <%= $memory->{percentage} %>%"></div>
 </div>
 % if ($memory->{has_swap}) {
 <%= ($TEXT->{'dashboard_swap'}) %>: <%= $memory->{swap_used} %> / <%= $memory->{swap_total} %>
@@ -35,7 +35,7 @@
  <%= $memory->{swap_percentage} %>%<div class="progress-bar" style="width: <%= $memory->{swap_percentage} %>%"></div>
 </div>
 % }
-</div></div></div><div class="panel-footer"><span class="pull-left"><%= ($TEXT->{'dashboard_memory_available'}) %>:&nbsp;<%= $memory->{available} %></span><div class="clearfix"></div></div></div></div>
+</div></div></div><div class="panel-footer"><span class="pull-left"><%= ($TEXT->{'dashboard_memory_available'}) %>:&nbsp;<span id="mem-available"><%= $memory->{available} %></span></span><div class="clearfix"></div></div></div></div>
 
 <div class="col-lg-6"><div class="panel panel-default"><div class="panel-heading"><div class="row"><div class="col-xs-3">Disk</div><div class="panel-body">
 <table>
@@ -90,3 +90,26 @@
 </table>
 </div></div></div><div class="panel-footer"><span class="pull-left"><i class="fa fa-arrow-circle-right" style="color:red"></i></span><span class="pull-left">&nbsp;Degraded</span><br><span class="pull-left"><i class="fa fa-arrow-circle-right" style="color:green"></i></span><span class="pull-left">&nbsp;Good</span><br></div></div></div>  
 
+
+<script>
+// Live CPU + memory: poll the dashboard's JSON stats endpoint and update the
+// gauges in place, so they move without a page refresh.
+(function poll(){
+  function txt(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; }
+  function bar(id,v){ var e=document.getElementById(id); if(e){ e.style.width=v+'%';
+    e.className='progress-bar'+(v>90?' progress-bar-danger':''); } }
+  function col(id,hot){ var e=document.getElementById(id); if(e) e.style.color=hot?'red':'green'; }
+  fetch('?action=stats', {headers:{'Accept':'application/json'}})
+   .then(function(r){ return r.json(); })
+   .then(function(d){
+     var c=d.cpu, m=d.memory;
+     txt('cpu-usage-text', c.usage); bar('cpu-bar', c.usage); col('cpu-icon', c.usage>90);
+     txt('cpu-load', c.load1+' / '+c.load5+' / '+c.load15);
+     txt('mem-usage-text', m.percentage); bar('mem-bar', m.percentage); col('mem-icon', m.percentage>90);
+     txt('mem-usedtotal', m.used+' / '+m.total);
+     txt('mem-available', m.available);
+   })
+   .catch(function(){})
+   .then(function(){ setTimeout(poll, 3000); });
+})();
+</script>
