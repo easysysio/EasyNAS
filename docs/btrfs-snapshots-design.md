@@ -1,8 +1,12 @@
 # btrfs Snapshots — Bootable Upgrade Rollback
 
-Status: **Implemented** (KIWI: btrfs snapshot root + snapper plugins across all
-profiles) — pending validation on a real build: snapshot created on `zypper
-dup`, GRUB rollback submenu, and booting a previous snapshot.
+Status: **Blocked** — the KIWI changes (btrfs snapshot root + snapper plugins)
+were written and reverted: the build fails in the current build host with
+`creating btrfs subvolume /<root-prefix>/.snapshots failed`. `btrfs_root_is_snapshot`
+needs KIWI to create nested btrfs subvolumes in the image chroot, which the
+ARM64 Proxmox **LXC** build host does not allow (loop-mounted btrfs + subvolume
+ops). Resolve by building in a full VM (or a privileged container with btrfs
+support), then re-apply the reverted KIWI change. Root stays ext4 until then.
 Author: Yariv Hakim
 
 Give every OS upgrade an automatic, bootable safety net: a snapshot is taken
