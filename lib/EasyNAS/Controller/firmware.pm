@@ -23,7 +23,12 @@ sub view ($self) {
 #### Update #####
  if (defined $action && $action eq "update") {
   update($self);
- }  
+ }
+
+#### Reboot #####
+ if (defined $action && $action eq "reboot") {
+  reboot_system($self);
+ }
 
 #### Refresh #####
  if (defined $action && $action eq "refresh") {
@@ -57,8 +62,18 @@ sub view ($self) {
  
   $self->stash(result => $result,
                msg => $msg,
-	       updates => \%updates);	
-  $self->render(template => 'easynas/firmware'); 
+	       update_state => update_state(),
+	       updates => \%updates);
+  $self->render(template => 'easynas/firmware');
+}
+
+# Background update progress: "updating" / "ready" (reboot to apply) / "failed".
+my $update_status="/etc/easynas/update.status";
+sub update_state {
+ open(my $fh,'<',$update_status) or return "";
+ my $s=<$fh>; close $fh;
+ chomp $s if defined $s;
+ return $s // "";
 }
 
 # The EasyNAS channel repo is either EasyNAS (stable) or EasyNAS_Beta (testing);
@@ -77,31 +92,35 @@ sub write_update_list {
  system("/usr/bin/sudo /usr/bin/zypper --quiet -x lu -a --repo $repo | /usr/bin/sudo /usr/bin/tee /etc/easynas/easynas.updates >/dev/null");
 }
 
-##### update #####
+##### update (whole system) #####
+# Upgrade the OS and every EasyNAS package together with 'zypper dup', so the
+# appliance is fully consistent after an update. If the root is btrfs with
+# snapper-zypp-plugin, dup auto-creates a bootable pre/post snapshot, so a bad
+# update can be rolled back by booting the previous snapshot from GRUB (see
+# docs/btrfs-snapshots-design.md). We do NOT hot-restart the service -- the user
+# reboots afterward so a new kernel/OS/app all take effect at once.
+#
+# dup is long, so run it detached and track progress in update.status; the page
+# shows a Reboot button when it reaches "ready".
 sub update($self) {
- my $package=$self->param('package');
- # Only allow sane package names -- $package is fed to a shell command.
- if (!defined $package || $package !~ /^[A-Za-z0-9._+-]+$/) {
-  $result="fail";
-  $msg=$TEXT{'firmware_update_failed'};
-  return;
- }
- my $rc = system("/usr/bin/sudo /usr/bin/zypper -n update $package > /dev/null");
- if ($rc) {
-  $result="fail";
-  $msg=$TEXT{'firmware_update_failed'};
- }
- else {
-  $result="success";
-  $msg=$TEXT{'firmware_update_success'};
-  # New code is on disk but the running daemon still has the old modules
-  # loaded. Restart the app so the update takes effect -- delayed and detached
-  # so this HTTP response is delivered before the service bounces.
-  if ($package =~ /^easynas/) {
-   system("/bin/sh -c '/bin/sleep 2; /usr/bin/sudo /usr/bin/systemctl restart easynas.service' >/dev/null 2>&1 &");
-  }
- }
+ system("/bin/echo updating | /usr/bin/sudo /usr/bin/tee $update_status >/dev/null");
+ system("/usr/bin/nohup /bin/sh -c '"
+       ."/usr/bin/sudo /usr/bin/zypper -n --gpg-auto-import-keys dup "
+       ."&& echo ready | /usr/bin/sudo /usr/bin/tee $update_status "
+       ."|| echo failed | /usr/bin/sudo /usr/bin/tee $update_status"
+       ."' >/var/log/easynas/update.log 2>&1 &");
+ $result="success";
+ $msg=$TEXT{'firmware_updating'} || "Updating the system in the background. When it finishes, reboot to apply.";
  write_update_list();
+ return;
+}
+
+##### reboot #####
+sub reboot_system($self) {
+ system("/bin/echo | /usr/bin/sudo /usr/bin/tee $update_status >/dev/null");   # clear state
+ system("/bin/sh -c '/bin/sleep 2; /usr/bin/sudo /usr/bin/systemctl reboot' >/dev/null 2>&1 &");
+ $result="success";
+ $msg=$TEXT{'firmware_rebooting'} || "Rebooting to apply the update...";
  return;
 }
 

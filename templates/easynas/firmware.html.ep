@@ -16,6 +16,22 @@
 
 
 
+%# ---- update status / actions ----
+% if ($update_state eq "updating") {
+<div class="alert alert-info"><i class="fa fa-spinner fa-spin"></i>
+  <%= ($TEXT->{'firmware_updating'} || 'Updating the system in the background -- this can take a while. Refresh to check.') %></div>
+% } elsif ($update_state eq "ready") {
+<div class="alert alert-success">
+  <%= ($TEXT->{'firmware_update_done'} || 'Update complete. Reboot to apply it.') %>
+  <a class="btn btn-warning btn-sm" onclick="return confirm('<%= ($TEXT->{'firmware_reboot_confirm'} || 'Reboot the appliance now?') %>')"
+     href="?action=reboot"><i class="fa fa-power-off"></i> <%= ($TEXT->{'firmware_reboot'} || 'Reboot now') %></a>
+</div>
+% } elsif ($update_state eq "failed") {
+<div class="alert alert-danger">
+  <%= ($TEXT->{'firmware_update_failed'} || 'The update failed.') %>
+  (<%= ($TEXT->{'firmware_see_log'} || 'see /var/log/easynas/update.log') %>)</div>
+% }
+
 <div class="row">
                         <div class="col-lg-12">
                                 <!-- /.panel-heading -->
@@ -27,7 +43,6 @@
 						<th><%= ($TEXT->{'firmware_desc'}) %></th>
 						<th><%= ($TEXT->{'firmware_current'}) %></th>
 						<th><%= ($TEXT->{'firmware_new'}) %></th>
-						<th><%= ($TEXT->{'firmware_actions'}) %></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -37,7 +52,6 @@
 						 <td><%= $updates->{$update}[1] %></td>
 						 <td><%= $updates->{$update}[2] %></td>
 						 <td><%= $updates->{$update}[3] %></td>
-						 <td><a onclick="return confirm('<%= ($TEXT->{'firmware_update_r_u_sure'}) %>')"href=?action=update&package=<%= $updates->{$update}[0] %>><i class="fa fa-cloud-download fa-2x" title="<%= ($TEXT->{'firmware_update'}) %>"></i>&nbsp;</a></td>
 						</tr>
 					    %}
                                             </tbody>
@@ -45,7 +59,12 @@
                                     </div>
 				</div>
 			</div>
-			<BR><BR><a href="?action=refresh">[<%= ($TEXT->{'firmware_refresh'}) %>]</a>
+			<BR>
+% if ($update_state ne "updating") {
+			<a class="btn btn-primary" onclick="return confirm('<%= ($TEXT->{'firmware_update_r_u_sure'} || 'Update the whole system (OS + EasyNAS)? A snapshot is taken first where supported.') %>')"
+			   href="?action=update"><i class="fa fa-cloud-download"></i> <%= ($TEXT->{'firmware_update'} || 'Update system') %></a>
+% }
+			&nbsp;<a href="?action=refresh">[<%= ($TEXT->{'firmware_refresh'}) %>]</a>
 
 
 
