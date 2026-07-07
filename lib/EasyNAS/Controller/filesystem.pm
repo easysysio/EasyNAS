@@ -138,6 +138,7 @@ sub view($self) {
       $current_raid = "single" if ($current_raid eq "jbod" || $current_raid eq "");
       # Current live mount options, so the Settings tab reflects the real state
       # (compression, read-only, ssd, autodefrag) instead of hardcoded defaults.
+      my $mount_dir = get_mount_dir();
       my $sdir = ($fs eq "ROOT") ? "/" : "$mount_dir/$fs";
       my $opts = "";
       foreach (`/usr/bin/sudo /bin/cat /proc/mounts 2>/dev/null`) {
