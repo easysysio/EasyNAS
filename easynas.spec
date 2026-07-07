@@ -237,6 +237,8 @@ EOF
 /easynas/lib/EasyNAS/Controller/firmware.pm
 /easynas/lib/EasyNAS/Controller/network.pm
 /easynas/lib/EasyNAS/Controller/settings.pm
+/easynas/lib/EasyNAS/Controller/power.pm
+/easynas/lib/EasyNAS/Controller/language.pm
 /easynas/templates/layouts
 /easynas/templates/easynas/disk*
 /easynas/templates/easynas/filesystem*
@@ -250,6 +252,7 @@ EOF
 /easynas/templates/easynas/network*
 /easynas/templates/easynas/firmware*
 /easynas/templates/easynas/login*
+/easynas/templates/easynas/power*
 /easynas/startup
 /easynas/lang/en-en/iso.txt
 /easynas/lang/en-en/lang_english_easynas.pl
@@ -603,7 +606,7 @@ Polish Language for EasyNAS
 
 
 %changelog
-* Thu Jun 26 2026 Yariv Hakim
+* Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv
   - First Release (R1)
