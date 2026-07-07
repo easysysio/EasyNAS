@@ -85,29 +85,29 @@
       <div class="form-group">
            <label><%= ($TEXT->{'fs_compression'}) %></label>
 	   <select name="compress" class="form-control">
-	    <option value="lzo" selected><%= ($TEXT->{'fs_faster'}) %></option>
-            <option value="zlib"><%= ($TEXT->{'fs_better'}) %></option>
-	    <option value="zstd"><%= ($TEXT->{'fs_optimized'}) %></option>
-            <option value="none"><%= ($TEXT->{'fs_none'}) %></option>
+	    <option value="lzo"  <%= ($cur_compress eq "lzo")  ? "selected" : "" %>><%= ($TEXT->{'fs_faster'}) %></option>
+            <option value="zlib" <%= ($cur_compress eq "zlib") ? "selected" : "" %>><%= ($TEXT->{'fs_better'}) %></option>
+	    <option value="zstd" <%= ($cur_compress eq "zstd") ? "selected" : "" %>><%= ($TEXT->{'fs_optimized'}) %></option>
+            <option value="none" <%= ($cur_compress eq "none") ? "selected" : "" %>><%= ($TEXT->{'fs_none'}) %></option>
            </select>
           </div>
        <div class="form-group">
        <div class="form-group">
            <label><%= ($TEXT->{'fs_mount_options'}) %></label>
 	   <select name="mount" class="form-control">
-	    <option value="readonly"><%= ($TEXT->{'fs_readonly'}) %></option>
-	    <option value="read&write" selected><%= ($TEXT->{'fs_read&write'}) %></option>
+	    <option value="readonly" <%= $cur_ro ? "selected" : "" %>><%= ($TEXT->{'fs_readonly'}) %></option>
+	    <option value="read&write" <%= $cur_ro ? "" : "selected" %>><%= ($TEXT->{'fs_read&write'}) %></option>
 	   </select>
           </div>
 	  <div class="form-group">
 	   <div class="checkbox">
             <label>
-             <input type="checkbox" name="ssd"><%= ($TEXT->{'fs_ssd_optimization'}) %>
+             <input type="checkbox" name="ssd" <%= $cur_ssd ? "checked" : "" %>><%= ($TEXT->{'fs_ssd_optimization'}) %>
             </label>
 	   </div>
  	   <div class="checkbox">
             <label>
-	     <input type="checkbox" name="defrag" checked><%= ($TEXT->{'fs_auto_defrag'}) %>
+	     <input type="checkbox" name="defrag" <%= $cur_defrag ? "checked" : "" %>><%= ($TEXT->{'fs_auto_defrag'}) %>
             </label>
            </div>
 	   <div class="checkbox">

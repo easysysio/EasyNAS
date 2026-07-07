@@ -136,6 +136,19 @@ sub view($self) {
       # so the RAID tab pre-selects the level the filesystem is actually on.
       my $current_raid = lc(raid_status($fs) // "");
       $current_raid = "single" if ($current_raid eq "jbod" || $current_raid eq "");
+      # Current live mount options, so the Settings tab reflects the real state
+      # (compression, read-only, ssd, autodefrag) instead of hardcoded defaults.
+      my $sdir = ($fs eq "ROOT") ? "/" : "$mount_dir/$fs";
+      my $opts = "";
+      foreach (`/usr/bin/sudo /bin/cat /proc/mounts 2>/dev/null`) {
+        my ($dev,$mp,$type,$o) = split(' ',$_);
+        if (defined $mp && $mp eq $sdir && defined $type && $type eq "btrfs") { $opts=$o; last; }
+      }
+      my %mopt = map { $_ => 1 } split(/,/,$opts);
+      my $cur_compress = ($opts =~ /compress(?:-force)?=(\w+)/) ? $1 : "none";
+      my $cur_ro     = $mopt{ro} ? 1 : 0;
+      my $cur_ssd    = $mopt{ssd} ? 1 : 0;
+      my $cur_defrag = $mopt{autodefrag} ? 1 : 0;
       my @disks = `/usr/bin/sudo /sbin/btrfs filesystem show $uuid | /usr/bin/grep devid`;
       my %health = health_info();
       my $number_disks = 0;
@@ -157,6 +170,10 @@ sub view($self) {
 		    uuid => $uuid,
 		    number_disks => $number_disks,
 		    current_raid => $current_raid,
+		    cur_compress => $cur_compress,
+		    cur_ro => $cur_ro,
+		    cur_ssd => $cur_ssd,
+		    cur_defrag => $cur_defrag,
 		    fsdisks => \@fsdisks);
       $self->render(template => 'easynas/filesystem_settings');
       return;
