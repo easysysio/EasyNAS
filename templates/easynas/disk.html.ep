@@ -48,7 +48,7 @@
 						    <td><a href="?action=healthmenu&disk=/dev/<%= $disk %>"><%= ($TEXT->{$health->{'/dev/'.$disk}[0]}) %></a></td>
 						    <td>
 						    <a onclick="return confirm('<%= ($TEXT->{'disk_format_are_u_sure'}) %>')" href=?action=format&disk=/dev/<%= $disk %>><i class="fa fa-trash fa-2x" title="<%= ($TEXT->{'disk_format'}) %>"></i>&nbsp;</a>
-						    <a href="disk.pl?menu=settings&action=display&disk=/dev/<%= $disk %>"><i class="fa fa-sliders fa-2x" title="<%= ($TEXT->{'settings'}) %>"></i>&nbsp;</a>
+						    <a href="?menu=settings&action=display&disk=/dev/<%= $disk %>"><i class="fa fa-sliders fa-2x" title="<%= ($TEXT->{'settings'}) %>"></i>&nbsp;</a>
 						</td></tr>
 						<div class="modal fade" id="<%= $disk %>" tabindex="-1" role="dialog" aria-labelledby="DiskModalLabel" aria-hidden="true">
                                                    <div class="modal-dialog">

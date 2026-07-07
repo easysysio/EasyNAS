@@ -127,17 +127,17 @@
 <tbody>
 % foreach my $d (@$fsdisks) {
 <tr>
-<td><a href="disk.pl?menu=settings&action=display&disk=<%= $d->{disk} %>"><i class="fa fa-hdd-o fa-2x" title="Settings"></i></a></td>
+<td><a href="disk?menu=settings&action=display&disk=<%= $d->{disk} %>"><i class="fa fa-hdd-o fa-2x" title="Settings"></i></a></td>
 <td><%= $d->{number} %></td>
 <td><%= $d->{disk} %></td>
 <td><%= $d->{size} %></td>
 <td><%= $d->{used} %></td>
 <td><%= $d->{status} %></td>
-<td><a href="disk.pl?action=display&menu=settings&disk=<%= $d->{disk} %>"><i class="fa fa-sliders fa-2x" title="Settings"></i>&nbsp;</a><a onclick="return confirm('Are you sure you want to remove the hardisk ?')" href="filesystem.pl?action=removehd&menu=none&fs=<%= $fs_name %>&uuid=<%= $uuid %>&disk=<%= $d->{disk} %>"><i class="fa fa-trash fa-2x" title="Remove HD"></i>&nbsp;</a><a href="filesystem.pl?action=display&menu=exchange&disk=<%= $d->{disk} %>&fs=<%= $fs_name %>"><i class="fa fa-exchange fa-2x" title="Replace HD"></i>&nbsp;</a><a onclick="return confirm('Are you sure you want to repair the hardisk ?')" href="filesystem.pl?action=repairhd&menu=none&fs=<%= $fs_name %>&uuid=<%= $uuid %>&disk=<%= $d->{disk} %>"><i class="fa fa-wrench fa-2x" title="Repair HD"></i></a></td>
+<td><a href="disk?action=display&menu=settings&disk=<%= $d->{disk} %>"><i class="fa fa-sliders fa-2x" title="Settings"></i>&nbsp;</a><a onclick="return confirm('Are you sure you want to remove the hardisk ?')" href="?action=removehd&menu=none&fs=<%= $fs_name %>&uuid=<%= $uuid %>&disk=<%= $d->{disk} %>"><i class="fa fa-trash fa-2x" title="Remove HD"></i>&nbsp;</a><a href="?action=display&menu=exchange&disk=<%= $d->{disk} %>&fs=<%= $fs_name %>"><i class="fa fa-exchange fa-2x" title="Replace HD"></i>&nbsp;</a><a onclick="return confirm('Are you sure you want to repair the hardisk ?')" href="?action=repairhd&menu=none&fs=<%= $fs_name %>&uuid=<%= $uuid %>&disk=<%= $d->{disk} %>"><i class="fa fa-wrench fa-2x" title="Repair HD"></i></a></td>
 </tr>
 % }
 </tbody>
 </table>
-<br><a href="filesystem.pl?menu=add_hd&action=display&fs=<%= $fs_name %>&uuid=<%= $uuid %>">[Add Hard Disk]</a><br><br>
-<form method="get" action="filesystem.pl"><input type="submit" name="action" value="Balance" /><input type="submit" name="action" value="Scrub" /><input type="hidden" name="menu" value="none"  /><input type="hidden" name="fs" value="<%= $fs_name %>"  /><input type="hidden" name="uuid" value="<%= $uuid %>"  /></form></div><!-- end of #tab4 --></div><!-- end of .tab_container --></div></div></div></div>
+<br><a href="?menu=add_hd&action=display&fs=<%= $fs_name %>&uuid=<%= $uuid %>">[Add Hard Disk]</a><br><br>
+<form method="get"><input type="submit" name="action" value="Balance" /><input type="submit" name="action" value="Scrub" /><input type="hidden" name="menu" value="none"  /><input type="hidden" name="fs" value="<%= $fs_name %>"  /><input type="hidden" name="uuid" value="<%= $uuid %>"  /></form></div><!-- end of #tab4 --></div><!-- end of .tab_container --></div></div></div></div>
 
