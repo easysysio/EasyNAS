@@ -97,6 +97,10 @@ $TEXT{'free_swap_memory'} = "Free Swap Memory";
 #### Settings ####
 $TEXT{'settings'} = "Settings"; 
 $TEXT{'settings_date_time'} = "Date / Time";
+$TEXT{'settings_date'} = "Date";
+$TEXT{'settings_time'} = "Time";
+$TEXT{'settings_date_help'} = "Manual set is for when NTP is not in use; NTP will otherwise re-sync the clock.";
+$TEXT{'settings_date_set'} = "Date and time updated.";
 $TEXT{'settings_cert'} = "Certificate";
 $TEXT{'settings_repo'} = "Repository";
 $TEXT{'settings_hostname'} = "Hostname";

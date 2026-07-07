@@ -24,8 +24,16 @@ sub view ($self) {
    changesettings($self);
   }
 
+######### setdate #########
+  if (defined $action && $action eq "setdate") {
+   setdate($self);
+  }
+
 ##### menu ######
   my $hostname=`/bin/hostname`;
+  # Current date/time to seed the Date/Time tab inputs.
+  my $today=`/bin/date +%Y-%m-%d`; chomp $today;
+  my $now=`/bin/date +%H:%M`;      chomp $now;
   # Port lives in the persistent config layer (/etc/easynas/easynas.conf),
   # not the read-only systemd unit. Fall back to the default if unset.
   my $str=`/usr/bin/grep '^EASYNAS_PORT=' /etc/easynas/easynas.conf 2>/dev/null`;
@@ -40,10 +48,38 @@ sub view ($self) {
   $self->stash(hostname => $hostname,
 	       port => $port,
 	       snapshots => $snapshots,
+	       today => $today,
+	       now => $now,
 	       result => $result,
 	       msg => $msg);
   $self->render(template => 'easynas/settings');
 
+}
+
+######## setdate ########
+# Manually set the system date/time (a fallback when NTP isn't in use). Inputs
+# are strictly shape-validated before they reach the shell.
+sub setdate($self) {
+ my $date=$self->param("date");   # YYYY-MM-DD
+ my $time=$self->param("time");   # HH:MM
+ unless (defined $date && $date =~ /^\d{4}-\d{2}-\d{2}$/
+      && defined $time && $time =~ /^\d{2}:\d{2}$/) {
+  $result="fail";
+  $msg=$TEXT{'error_updating_date'} || "Invalid date or time.";
+  return;
+ }
+ my $rc=system("/usr/bin/sudo /usr/bin/date -s \"$date $time:00\" >/dev/null 2>&1");
+ if ($rc ne 0) {
+  $result="fail";
+  $msg=$TEXT{'error_updating_date'} || "Failed to set the date/time.";
+  return;
+ }
+ # Persist to the hardware clock so it survives a reboot.
+ system("/usr/bin/sudo /sbin/hwclock --systohc >/dev/null 2>&1");
+ write_log("settings","INFO","date/time was changed");
+ $result="success";
+ $msg=$TEXT{'settings_date_set'} || "Date and time updated.";
+ return;
 }
 
 ######## changesettings #######
