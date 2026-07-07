@@ -6,7 +6,7 @@
  <author>Yariv Hakim</author>
  <icon>fa-file-video</icon>
  <type>multimedia</type>
- <program>dlna.pl</program>
+ <program>dlna</program>
  <config>/etc/easynas/minidlna</config>
  <service>easynas-minidlna.service</service>
 </addon>

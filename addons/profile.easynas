@@ -4,5 +4,5 @@
  <version>1.0.0</version>
  <icon>fa-user</icon>
  <author>Yariv Hakim</author>
- <program>profile.pl</program>
+ <program>profile</program>
 </addon>

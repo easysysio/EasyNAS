@@ -6,5 +6,5 @@
  <author>Yariv Hakim</author>
  <type>realm</type>
  <icon>fa-laptop</icon>
- <program>computers.pl</program>
+ <program>computers</program>
 </addon>

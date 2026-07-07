@@ -6,7 +6,7 @@
  <author>Yariv Hakim</author>
  <icon>fa-external-link</icon>
  <type>storage</type>
- <program>iscsi.pl</program>
+ <program>iscsi</program>
  <config>/etc/easynas/tgt/targets.conf</config>
  <service>easynas-tgtd.service</service>
 </addon>

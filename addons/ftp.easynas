@@ -7,6 +7,6 @@
  <icon>fa-file</icon>
  <config>/etc/easynas/pure-ftpd.conf</config>
  <type>sharing</type>
- <program>ftp.pl</program>
+ <program>ftp</program>
  <service>easynas-pure-ftpd.service</service>
 </addon>

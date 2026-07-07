@@ -6,5 +6,5 @@
  <author>Yariv Hakim</author>
  <icon>fa-refresh</icon>
  <type>storage</type>
- <program>sync.pl</program>
+ <program>sync</program>
 </addon>

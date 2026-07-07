@@ -6,7 +6,7 @@
  <author>Yariv Hakim</author>
  <icon>fa-film</icon>
  <type>multimedia</type>
- <program>plex.pl</program>
+ <program>plex</program>
  <config>/etc/systemd/system/plexmediaserver.service.d/override.conf</config>
  <service>easynas-plex.service</service>
 </addon>

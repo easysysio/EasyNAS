@@ -6,7 +6,7 @@
  <author>Yariv Hakim</author>
  <icon>fa-refresh</icon>
  <type>sharing</type>
- <program>rsyncd.pl</program>
+ <program>rsyncd</program>
  <config>/etc/easynas/rsyncd/rsyncd.conf</config>
  <secrets>/etc/easynas/rsyncd/rsyncd.secrets</secrets>
  <service>easynas-rsyncd.service</service>

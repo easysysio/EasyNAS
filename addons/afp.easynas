@@ -7,6 +7,6 @@
  <icon>fa-brands fa-apple</icon>
  <type>sharing</type>
  <config>/etc/easynas/netatalk/afp.conf</config>
- <program>afp.pl</program>
+ <program>afp</program>
  <service>easynas-netatalk.service</service>
 </addon>

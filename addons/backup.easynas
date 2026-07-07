@@ -6,5 +6,5 @@
  <icon>fa-floppy-disk</icon>
  <author>Yariv Hakim</author>
  <type>system</type>
- <program>backup.pl</program>
+ <program>backup</program>
 </addon>
