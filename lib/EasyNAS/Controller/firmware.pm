@@ -113,16 +113,23 @@ sub write_update_list {
 # shows a Reboot button when it reaches "ready".
 sub update($self) {
  system("/bin/echo updating | /usr/bin/sudo /usr/bin/tee $update_status >/dev/null");
- # --allow-vendor-change: the image mixes vendors (base openSUSE + the KIWI
- # build repo Virtualization:Appliances + EasyNAS), and dup otherwise stops on
- # a vendor-change problem and -- being non-interactive -- cancels. Allowing it
- # lets dup consolidate onto the enabled repos. --replacefiles handles the
- # occasional file conflict on a full upgrade.
- system("/usr/bin/nohup /bin/sh -c '"
-       ."/usr/bin/sudo /usr/bin/zypper -n --gpg-auto-import-keys dup --allow-vendor-change --replacefiles "
-       ."&& echo ready | /usr/bin/sudo /usr/bin/tee $update_status "
-       ."|| echo failed | /usr/bin/sudo /usr/bin/tee $update_status"
-       ."' >/var/log/easynas/update.log 2>&1 &");
+ # Run the upgrade in a TRANSIENT systemd unit (its own cgroup) via systemd-run,
+ # NOT as a child of easynas.service. The easynas RPM's %post restarts
+ # easynas.service; if zypper ran inside that cgroup, systemd would tear it down
+ # and kill zypper mid-transaction ("exiting as soon as possible"). A transient
+ # unit is independent, so it survives the restart and finishes the upgrade.
+ # The unit runs as root, so zypper/tee inside need no sudo; --collect cleans it
+ # up when it exits.
+ # (--allow-vendor-change: the image mixes vendors -- base openSUSE + the KIWI
+ # build repo + EasyNAS -- so dup must consolidate onto the enabled repos;
+ # --replacefiles handles the occasional file conflict on a full upgrade.)
+ system("/usr/bin/sudo /usr/bin/systemd-run --collect --unit=easynas-update "
+       ."/bin/sh -c '"
+       ."/usr/bin/zypper -n --gpg-auto-import-keys dup --allow-vendor-change --replacefiles "
+       .">/var/log/easynas/update.log 2>&1 "
+       ."&& echo ready | /usr/bin/tee $update_status "
+       ."|| echo failed | /usr/bin/tee $update_status"
+       ."' >/dev/null 2>&1");
  $result="success";
  $msg=$TEXT{'firmware_updating'} || "Updating the system in the background. When it finishes, reboot to apply.";
  write_update_list();
