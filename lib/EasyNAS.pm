@@ -39,6 +39,8 @@ sub startup ($self) {
 	  $auth->get('/'.$addons{$item}{'program'})->to($addons{$item}{'program'}.'#view');
 
   }
+  # Cert upload is a multipart POST (a GET can't carry a file).
+  $auth->post('/settings')->to('settings#view');
 }
 
 1;

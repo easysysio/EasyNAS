@@ -29,11 +29,18 @@ sub view ($self) {
    setdate($self);
   }
 
+######### upload_crt #########
+  if (defined $action && $action eq "upload_crt") {
+   upload_crt($self);
+  }
+
 ##### menu ######
   my $hostname=`/bin/hostname`;
   # Current date/time to seed the Date/Time tab inputs.
   my $today=`/bin/date +%Y-%m-%d`; chomp $today;
   my $now=`/bin/date +%H:%M`;      chomp $now;
+  # Active TLS cert summary (issuer + validity) for the Certificate tab.
+  my $cert_info=`/usr/bin/sudo /usr/bin/openssl x509 -in /etc/easynas/easynas.cert -noout -issuer -dates 2>/dev/null`;
   # Port lives in the persistent config layer (/etc/easynas/easynas.conf),
   # not the read-only systemd unit. Fall back to the default if unset.
   my $str=`/usr/bin/grep '^EASYNAS_PORT=' /etc/easynas/easynas.conf 2>/dev/null`;
@@ -50,10 +57,43 @@ sub view ($self) {
 	       snapshots => $snapshots,
 	       today => $today,
 	       now => $now,
+	       cert_info => $cert_info,
 	       result => $result,
 	       msg => $msg);
   $self->render(template => 'easynas/settings');
 
+}
+
+######## upload_crt ########
+# Replace the appliance's TLS certificate (and optionally its key) with an
+# uploaded PEM, then restart so the daemon serves it. The daemon reads
+# /etc/easynas/easynas.{cert,key} (see the service's -l https://...?cert=&key=).
+sub upload_crt($self) {
+ my $cert_dir="/etc/easynas";
+ my $cert_up=$self->req->upload('cert');
+ my $key_up =$self->req->upload('key');
+ unless (defined $cert_up && $cert_up->size > 0) {
+  $result="fail";
+  $msg=$TEXT{'no_cert'} || "No certificate file was provided.";
+  return;
+ }
+ # Land via /tmp then sudo-move, so ownership/permissions are correct regardless
+ # of who owns the existing cert files.
+ $cert_up->move_to("/tmp/easynas_upload.cert");
+ system("/usr/bin/sudo /bin/mv -f /tmp/easynas_upload.cert $cert_dir/easynas.cert");
+ system("/usr/bin/sudo /bin/chown easynas:easynas $cert_dir/easynas.cert");
+ if (defined $key_up && $key_up->size > 0) {
+  $key_up->move_to("/tmp/easynas_upload.key");
+  system("/usr/bin/sudo /bin/mv -f /tmp/easynas_upload.key $cert_dir/easynas.key");
+  system("/usr/bin/sudo /bin/chown easynas:easynas $cert_dir/easynas.key");
+  system("/usr/bin/sudo /bin/chmod 600 $cert_dir/easynas.key");
+ }
+ write_log("settings","INFO","TLS certificate was uploaded");
+ $result="success";
+ $msg=$TEXT{'settings_cert_uploaded'} || "Certificate uploaded. Restarting to apply it...";
+ # Restart so the daemon picks up the new cert/key.
+ system("/usr/bin/sudo /usr/bin/systemctl restart easynas.service &");
+ return;
 }
 
 ######## setdate ########
