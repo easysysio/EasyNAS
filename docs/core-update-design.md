@@ -101,8 +101,18 @@ the roadmap for atomic, self-healing updates — a later, bigger project.
 
 ## 6. Phases
 
-1. Publishing: build+push the `.raw.xz` + sha256 + sig + `latest` to the channel.
-2. Appliance check: read `/etc/ImageVersion` vs `latest`; surface availability.
-3. Download + verify + stage + flag (resolve OPEN PROBLEM A).
-4. The initramfs writer dracut module (resolve OPEN PROBLEM B / recovery).
-5. UI: the Core Update action, progress, and the reboot.
+1. [x] **Publishing** — `build.sh` `publish_core_image()`: `.raw.xz` + `.sha256` +
+   `latest.<arch>` manifest in OUTPUT_DIR (commit 138186f). GPG `.sig` still TODO.
+2. [x] **Appliance check** — `firmware.pm` `core_update_available()` compares the
+   channel `latest.<arch>` version to `/etc/ImageVersion`; the Firmware page shows
+   "A core update is available: X" (commit 97f41c9).
+3. [ ] **STAGING partition** — add `EFI·swap·CONFIG·STAGING·root` to the KIWI blocks.
+4. [ ] **Download + verify + stage + flag** — Core Update controller action.
+5. [ ] **Writer** — dracut module: write EFI+root from the staged image.
+6. [ ] **UI** — Core Update action/page + progress + reboot.
+
+**Known versioning caveat:** `/etc/ImageVersion` is written by the easynas RPM, so
+an *app* RPM update also bumps it. The core check therefore compares against the
+app version, not a pure OS-image version — good enough now (a newer published
+image is offered), but to be precise the OS-image version should be stamped at
+image-build time (config.sh), independent of the app RPM. Refine before shipping.
