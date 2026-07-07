@@ -64,34 +64,33 @@ change doesn't clobber the wrong slot.
 
 ---
 
-## OPEN PROBLEM A — where to stage a ~5.5 GB image on a 2 GB / small-CONFIG box
+## DECISION A — dedicated staging partition
 
-The `.raw.xz` is ~2 GB compressed, ~5.5 GB uncompressed. Constraints: **2 GB RAM**
-(no RAM staging) and a **512 MB CONFIG** partition (too small even for the
-compressed file). The writer also can't stage on root (it overwrites root).
+A dedicated **STAGING** partition on the system disk holds the downloaded
+`.raw.xz`. The writer streams it (`xz -dc … | dd`), so it only stores the
+**compressed** image; size it for that plus headroom for image growth —
+**~4 GB** (current image is ~2 GB compressed). It is:
+- big enough for the compressed image (2 GB RAM rules out RAM; CONFIG at 512 MB
+  is too small; root can't be used since the writer overwrites it);
+- **never** touched by the writer (like CONFIG/swap), so a re-download survives a
+  failed write.
 
-Candidate answers (need a decision):
-- **Require a data pool** for core updates and stage the `.xz` there; the writer
-  reads it from the data disk. Simple, but no core update on a pool-less box.
-- **Dedicated staging space** — enlarge CONFIG, or add a small update partition.
-- **Stream during the writer** — pull the image over the network *inside* the
-  initramfs and write as it downloads (no full local copy). Most flexible, most
-  initramfs plumbing (network + verify-while-writing).
+New system-disk layout: **EFI · swap · CONFIG · STAGING · root**.
 
-## OPEN PROBLEM B — no A/B means a failed write can brick the box
+## DECISION B — writer + USB-reinstall recovery
 
-We chose the writer (single root), so a write interrupted mid-way leaves root
-corrupt and unbootable — and we can't "retry from the running system" because it's
-already gone. Options:
-- **Accept it, with a recovery path**: the USB/ISO **reinstall always works** and
-  preserves CONFIG + data pools, so "bricked" = reinstall from USB, not data loss.
-  Simplest; document it.
-- **A/B dual-root** later: write to the inactive slot, flip the bootloader, auto-
-  rollback on boot failure. Atomic and safe, but needs a repartition of the image
-  and a slot-switcher — a bigger project.
+Single root, no A/B. Mitigations:
+- **Verify sha256 (and GPG sig) before writing** — never start a write on a bad
+  image.
+- If a write is interrupted, root is unbootable; recovery is the **USB/ISO
+  reinstall**, which always works and **preserves CONFIG + data pools** — so the
+  worst case is reinstall-from-USB, not data loss. Documented as the recovery
+  path.
+- The staged image and flag persist on the STAGING/CONFIG partitions, so a failed
+  attempt can be retried from USB or re-flagged.
 
-Recommended first version: **writer + USB-reinstall recovery**, decide staging =
-"require a data pool" to start, and keep A/B on the roadmap.
+A/B dual-root (write to inactive slot, bootloader flip, auto-rollback) stays on
+the roadmap for atomic, self-healing updates — a later, bigger project.
 
 ---
 
