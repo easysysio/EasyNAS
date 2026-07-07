@@ -73,6 +73,40 @@ sub reassign_group {
  close($fh);
 }
 
+# Write (or overwrite) a share from the submitted form params: apply on-disk
+# ownership for the model, append the smb.conf section, drop a share marker and
+# reload samba. Shared by add and change (edit).
+sub apply_share {
+ my ($self,$config,$mount_dir,$service)=@_;
+ my $share=$self->param("name");
+ my $vol=$self->param("vol");
+ my $group=$self->param("group") // "";
+ my $readonly=($self->param("readonly") // "") eq "yes" ? "yes" : "no";
+ my $guest=($self->param("guest") // "") eq "yes" ? "yes" : "no";
+ my $browsable=($self->param("browsable") // "") eq "yes" ? "yes" : "no";
+ my $recycle=($self->param("recycle") // "") eq "yes" ? 1 : 0;
+ my $has_group=($guest ne "yes" && $group ne ""
+                && `/usr/bin/getent group $group 2>/dev/null` ne "");
+ my $path="$mount_dir/$vol";
+ if ($guest eq "yes") {
+  system("/usr/bin/sudo","/usr/bin/chown","nobody:nobody",$path);
+  system("/usr/bin/sudo","/usr/bin/chmod","2775",$path);
+ }
+ elsif ($has_group) {
+  system("/usr/bin/sudo","/usr/bin/chown","root:$group",$path);
+  system("/usr/bin/sudo","/usr/bin/chmod","2770",$path);
+ }
+ my $section=share_section($share,$path,$browsable,$guest,$readonly,$recycle,
+                           $has_group ? $group : "");
+ open(my $fh,'|-',"/usr/bin/sudo /usr/bin/tee -a $config > /dev/null");
+ print $fh $section;
+ close($fh);
+ write_share_marker($path,"smb",$section);
+ if (get_service_status($service)) {
+  system("/usr/bin/sudo /usr/bin/systemctl restart $service > /dev/null");
+ }
+}
+
 sub view ($self) {
   if (!($self->session('is_auth'))) {
         $self->redirect_to('login');
@@ -108,24 +142,42 @@ sub view ($self) {
  if (defined($action) && $action eq "create") {
   my %vol = vol_info();
   my %groups = groups_info();
-  $self->stash(volumes => \%vol, groups => \%groups);
+  $self->stash(volumes => \%vol, groups => \%groups, edit => 0,
+               sname => "", svol => "", sgroup => "",
+               sbrowsable => "yes", sguest => "no", sreadonly => "no", srecycle => 0);
   $self->render(template => 'easynas/samba_create');
   return;
+ }
+
+##### edit menu (load an existing share into the form) #####
+ if (defined($action) && $action eq "editmenu") {
+  my $share=$self->param("share");
+  if (defined($share) && $share =~ /^[A-Za-z0-9._-]+$/) {
+   my %vol = vol_info();
+   my %groups = groups_info();
+   my @sec=`/usr/bin/sudo /bin/sed -n '/#### $share ####/,/comment = $share/p' $config 2>/dev/null`;
+   my ($spath,$sgroup,$sbrowsable,$sguest,$sreadonly,$srecycle)=("","","yes","no","no",0);
+   foreach (@sec) {
+    if    (/^\s*path\s*=\s*(\S+)/)         { $spath=$1; }
+    elsif (/^\s*browsable\s*=\s*(\S+)/)    { $sbrowsable=$1; }
+    elsif (/^\s*guest ok\s*=\s*(\S+)/)     { $sguest=$1; }
+    elsif (/^\s*read only\s*=\s*(\S+)/)    { $sreadonly=$1; }
+    elsif (/^\s*force group\s*=\s*(\S+)/)  { $sgroup=$1; }
+    elsif (/^\s*vfs object\s*=\s*recycle/) { $srecycle=1; }
+   }
+   my $svol=$spath; $svol =~ s|^\Q$mount_dir\E/||;
+   $self->stash(volumes => \%vol, groups => \%groups, edit => 1,
+                sname => $share, svol => $svol, sgroup => $sgroup,
+                sbrowsable => $sbrowsable, sguest => $sguest,
+                sreadonly => $sreadonly, srecycle => $srecycle);
+   $self->render(template => 'easynas/samba_create');
+   return;
+  }
  }
 
 ##### add share #####
  if (defined($action) && $action eq "add") {
   my $share=$self->param("name");
-  my $vol=$self->param("vol");
-  my $group=$self->param("group") // "";
-  my $readonly=($self->param("readonly") // "") eq "yes" ? "yes" : "no";
-  my $guest=($self->param("guest") // "") eq "yes" ? "yes" : "no";
-  my $browsable=($self->param("browsable") // "") eq "yes" ? "yes" : "no";
-  my $recycle=($self->param("recycle") // "") eq "yes" ? 1 : 0;
-  # Only accept a group that actually resolves (via NSS); otherwise treat the
-  # share as ungrouped (pre-realm) rather than write a broken force group.
-  my $has_group=($guest ne "yes" && $group ne ""
-                 && `/usr/bin/getent group $group 2>/dev/null` ne "");
   if (!defined($share) || $share eq "") {
    $result="fail";
    $msg=$TEXT{'samba_missing_name'};
@@ -135,27 +187,27 @@ sub view ($self) {
    $msg=$TEXT{'samba_share_exists'};
   }
   else {
-   my $path="$mount_dir/$vol";
-   # Apply on-disk ownership to match the share model: guest -> nobody,
-   # group-owned -> root:group + setgid (new files inherit the group).
-   if ($guest eq "yes") {
-    system("/usr/bin/sudo","/usr/bin/chown","nobody:nobody",$path);
-    system("/usr/bin/sudo","/usr/bin/chmod","2775",$path);
-   }
-   elsif ($has_group) {
-    system("/usr/bin/sudo","/usr/bin/chown","root:$group",$path);
-    system("/usr/bin/sudo","/usr/bin/chmod","2770",$path);
-   }
-   my $section=share_section($share,$path,$browsable,$guest,$readonly,$recycle,
-                             $has_group ? $group : "");
-   open(my $fh,'|-',"/usr/bin/sudo /usr/bin/tee -a $config > /dev/null");
-   print $fh $section;
-   close($fh);
-   write_share_marker($path,"smb",$section);
-   if (get_service_status($service)) {
-    $rc=system("/usr/bin/sudo /usr/bin/systemctl restart $service > /dev/null");
-   }
+   apply_share($self,$config,$mount_dir,$service);
    write_log($addon->{"name"},"INFO","Samba share was added");
+  }
+ }
+
+##### change share (edit an existing share in place) #####
+# Rename isn't supported inline (that's delete + add), so the section header
+# name is fixed; everything else is rewritten by dropping the old section and
+# writing the new one from the form.
+ if (defined($action) && $action eq "change") {
+  my $share=$self->param("name");
+  if (!defined($share) || $share !~ /^[A-Za-z0-9._-]+$/) {
+   $result="fail";
+   $msg=$TEXT{'samba_missing_name'};
+  }
+  else {
+   $rc=system("/usr/bin/sudo /usr/bin/sed -i '/#### $share ####/,/comment = $share/d' $config");
+   apply_share($self,$config,$mount_dir,$service);
+   $result="success";
+   $msg=$TEXT{'samba_share_edited'} || "Share updated.";
+   write_log($addon->{"name"},"INFO","Samba share $share was edited");
   }
  }
 

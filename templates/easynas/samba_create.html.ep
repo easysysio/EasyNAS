@@ -4,20 +4,20 @@
  <div class="col-lg-6">
   <div class="panel panel-default">
    <div class="panel-heading">
-    <label><%= ($TEXT->{'samba_add_smb'}) %></label>
+    <label><%= $edit ? ($TEXT->{'samba_edit_smb'} || 'Edit Share') : ($TEXT->{'samba_add_smb'}) %></label>
    </div>
    <div class="panel-body">
         <form role="form">
-         <input type=hidden name="action" value="add">
+         <input type=hidden name="action" value="<%= $edit ? 'change' : 'add' %>">
          <div class="form-group">
           <label><%= ($TEXT->{'samba_share_name'}) %></label>
-          <input class="form-control" name="name">
+          <input class="form-control" name="name" value="<%= $sname %>" <%= $edit ? 'readonly' : '' %>>
          </div>
          <div class="form-group">
           <label><%= ($TEXT->{'samba_vol'}) %></label>
           <select class="form-control" name="vol">
 % foreach my $vol (sort keys %$volumes) {
-           <option value="<%= $vol %>"><%= $vol %></option>
+           <option value="<%= $vol %>" <%= ($vol eq $svol) ? 'selected' : '' %>><%= $vol %></option>
 % }
           </select>
          </div>
@@ -26,21 +26,21 @@
           <select class="form-control" name="group">
            <option value=""><%= ($TEXT->{'samba_no_group'} || 'None (open / pre-realm)') %></option>
 % foreach my $g (sort keys %$groups) {
-           <option value="<%= $g %>"><%= $g %></option>
+           <option value="<%= $g %>" <%= ($g eq $sgroup) ? 'selected' : '' %>><%= $g %></option>
 % }
           </select>
          </div>
          <div class="checkbox">
-          <label><input type="checkbox" name="browsable" value="yes" checked> <%= ($TEXT->{'samba_browsable'}) %></label>
+          <label><input type="checkbox" name="browsable" value="yes" <%= ($sbrowsable eq 'yes') ? 'checked' : '' %>> <%= ($TEXT->{'samba_browsable'}) %></label>
          </div>
          <div class="checkbox">
-          <label><input type="checkbox" name="readonly" value="yes"> <%= ($TEXT->{'samba_readonly'}) %></label>
+          <label><input type="checkbox" name="readonly" value="yes" <%= ($sreadonly eq 'yes') ? 'checked' : '' %>> <%= ($TEXT->{'samba_readonly'}) %></label>
          </div>
          <div class="checkbox">
-          <label><input type="checkbox" name="guest" value="yes"> <%= ($TEXT->{'samba_allow_guest'}) %></label>
+          <label><input type="checkbox" name="guest" value="yes" <%= ($sguest eq 'yes') ? 'checked' : '' %>> <%= ($TEXT->{'samba_allow_guest'}) %></label>
          </div>
          <div class="checkbox">
-          <label><input type="checkbox" name="recycle" value="yes"> <%= ($TEXT->{'samba_recycle'}) %></label>
+          <label><input type="checkbox" name="recycle" value="yes" <%= $srecycle ? 'checked' : '' %>> <%= ($TEXT->{'samba_recycle'}) %></label>
          </div>
    </div>
    <div class="panel-footer">
