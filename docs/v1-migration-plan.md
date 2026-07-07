@@ -19,10 +19,9 @@ built before Phase 4:
 
 ## A. Reachable in the UI but dead in v2 (do first)
 
-- [ ] **Restart / Shutdown** — v1 `power.pl`. Modals `#restart`/`#shutdown` in
-      `templates/layouts/default.html.ep` have no body and there is no controller.
-- [ ] **Language switcher** — v1 `index.pl?action=language`. Not routed; the flag
-      dropdown links nowhere.
+- [x] **Restart / Shutdown** — v1 `power.pl`. Done: `power.pm` (reboot/shutdown
+      via systemctl, detached) + `#restart`/`#shutdown` modal bodies. (commit 21c787d)
+- [x] **Language switcher** -- done: /language route + set_current_lang, link fixed to pass the dir code. (commit 6e3e761)
 - [ ] **Global search** — v1 `search.pl` (313 loc). The sidebar search box is inert.
 
 ## B. Ported controllers with partial parity
