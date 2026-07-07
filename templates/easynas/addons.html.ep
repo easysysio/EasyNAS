@@ -14,146 +14,52 @@
 </div>
  %}
 
-
-<div class="row">
- <div class="col-lg-3 col-md-6">
-  <div class="panel panel-green">
-   <div class="panel-heading">
-    <div class="row">
-     <div class="col-xs-3">
-      <i class="fa fa-copy fa-5x"></i>
-     </div>
-     <div class="col-xs-9 text-right">
-      <div class="huge"><%= $fs %></div>
-      <div><%= ($TEXT->{'addons_sharing'}) %></div>
-     </div>
-    </div>
-   </div>
-   <a href="?action=addonslist&group=fs">
-    <div class="panel-footer">
-     <span class="pull-left">View Details</span>
-     <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
-     <div class="clearfix"></div>
-    </div>
-   </a>
-  </div>
+%# ================= Updates (pinned on top) =================
+% if (@$updates) {
+<div class="panel panel-default">
+ <div class="panel-heading">
+  <b><%= ($TEXT->{'addons_updates'} || 'Updates') %>: <%= scalar @$updates %></b>
+  <a class="btn btn-success btn-xs pull-right"
+     onclick="return confirm('<%= ($TEXT->{'addons_update_all_confirm'} || 'Update all add-ons now?') %>')"
+     href="?action=update_all"><i class="fa fa-refresh"></i> <%= ($TEXT->{'addons_update_all'} || 'Update all') %></a>
  </div>
-
-<div class="col-lg-3 col-md-6">
- <div class="panel panel-green">
-  <div class="panel-heading">
-   <div class="row">
-    <div class="col-xs-3">
-     <i class="fa fa-hard-drive fa-5x"></i>
-    </div>
-    <div class="col-xs-9 text-right">
-     <div class="huge"><%= $stg %></div>
-      <div><%= ($TEXT->{'addons_storage'}) %></div>
-     </div>
-    </div>
-   </div>
-   <a href="?action=addonslist&group=stg">
-    <div class="panel-footer">
-     <span class="pull-left">View Details</span>
-     <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
-     <div class="clearfix"></div>
-    </div>
-   </a>
+ <div class="panel-body"><div class="row">
+% for my $a (@$updates) {
+  <div class="col-sm-3 col-xs-6 text-center" style="margin-bottom:20px">
+   <i class="<%= $a->{icon} %> fa-3x"></i>
+   <div style="margin-top:6px"><b><%= ucfirst $a->{name} %></b></div>
+   <div><small class="text-muted"><%= ($TEXT->{"addons_$a->{cat}"} || ucfirst $a->{cat}) %></small></div>
+   <div><small><%= $a->{version} %> &rarr; <b><%= $a->{newver} %></b></small></div>
+   <a class="btn btn-success btn-xs" style="margin-top:4px"
+      href="?action=update_addon&package=<%= $a->{pkg} %>"><i class="fa fa-refresh"></i> <%= ($TEXT->{'addons_update'} || 'Update') %></a>
   </div>
- </div>
-
- <div class="col-lg-3 col-md-6">
-  <div class="panel panel-yellow">
-   <div class="panel-heading">
-    <div class="row">
-     <div class="col-xs-3">
-      <i class="fa fa-server fa-5x"></i>
-     </div>
-     <div class="col-xs-9 text-right">
-      <div class="huge"><%= $srv %></div>
-      <div><%= ($TEXT->{'addons_services'}) %></div>
-     </div>
-    </div>
-   </div>
-   <a href="?action=addonslist&group=srv">
-    <div class="panel-footer">
-     <span class="pull-left">View Details</span>
-     <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
-     <div class="clearfix"></div>
-    </div>
-   </a>
-  </div>
- </div>
+% }
+ </div></div>
 </div>
+% }
 
-<div class="row">
- <div class="col-lg-3 col-md-6">
-  <div class="panel panel-yellow">
-   <div class="panel-heading">
-    <div class="row">
-     <div class="col-xs-3">
-      <i class="fa fa-film fa-5x"></i>
-     </div>
-     <div class="col-xs-9 text-right">
-      <div class="huge"><%= $mm %></div>
-       <div><%= ($TEXT->{'addons_multimedia'}) %></div>
-      </div>
-     </div>
-    </div>
-    <a href="?action=addonslist&group=mm">
-     <div class="panel-footer">
-      <span class="pull-left">View Details</span>
-      <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
-      <div class="clearfix"></div>
-     </div>
-    </a>
-   </div>
- </div>
-
-<div class="col-lg-3 col-md-6">
- <div class="panel panel-primary">
-  <div class="panel-heading">
-   <div class="row">
-    <div class="col-xs-3">
-     <i class="fa fa-truck fa-5x"></i>
-    </div>
-    <div class="col-xs-9 text-right">
-     <div class="huge"><%= $app %></div>
-     <div><%= ($TEXT->{'addons_other'}) %></div>
-    </div>
-   </div>
+%# ================= Installed, grouped by category =================
+% for my $cat (sort keys %$by_cat) {
+<div class="panel panel-default">
+ <div class="panel-heading"><b><%= ($TEXT->{"addons_$cat"} || ucfirst $cat) %></b></div>
+ <div class="panel-body"><div class="row">
+% for my $a (@{$by_cat->{$cat}}) {
+  <div class="col-sm-3 col-xs-6 text-center" style="margin-bottom:20px">
+   <i class="<%= $a->{icon} %> fa-3x"></i>
+   <div style="margin-top:6px"><b><%= ucfirst $a->{name} %></b></div>
+   <div><small class="text-muted"><%= $a->{version} %></small></div>
+% if ($a->{program} ne "") {
+   <a class="btn btn-default btn-xs" style="margin-top:4px" href="/<%= $a->{program} %>"><%= ($TEXT->{'addons_open'} || 'Open') %></a>
+% }
+   <a class="btn btn-default btn-xs" style="margin-top:4px"
+      onclick="return confirm('<%= ($TEXT->{'addons_delete_confirm'} || 'Remove this add-on?') %>')"
+      href="?action=delete_addon&package=<%= $a->{pkg} %>"><i class="fa fa-trash"></i></a>
   </div>
-  <a href="?action=addonslist&group=app">
-   <div class="panel-footer">
-    <span class="pull-left">View Details</span>
-    <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
-    <div class="clearfix"></div>
-   </div>
-  </a>
- </div>
+% }
+ </div></div>
 </div>
+% }
 
-
-<div class="col-lg-3 col-md-6">
- <div class="panel panel-red">
-  <div class="panel-heading">
-   <div class="row">
-    <div class="col-xs-3">
-     <i class="fa fa-flag fa-5x"></i>
-    </div>
-    <div class="col-xs-9 text-right">
-     <div class="huge"><%= $lang %></div>
-     <div><%= ($TEXT->{'addons_lang'}) %></div>
-    </div>
-   </div>
-  </div>
-  <a href="?action=addonslist&group=lang">
-   <div class="panel-footer">
-    <span class="pull-left">View Details</span>
-    <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
-    <div class="clearfix"></div>
-   </div>
-  </a>
- </div>
-</div>
-</div>
+% unless (@$updates || keys %$by_cat) {
+<div class="alert alert-info"><%= ($TEXT->{'addons_none'} || 'No add-ons installed.') %></div>
+% }

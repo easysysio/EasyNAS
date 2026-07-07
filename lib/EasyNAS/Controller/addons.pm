@@ -37,61 +37,72 @@ sub view ($self) {
   update_addon($self);
  }
 
- ##### addonslist #####
- if ($action eq "addonslist") {
-  my $group=$self->param('group');
-  my %addons=addons_info();
-  $self->stash(group => $group,
-               addons => \%addons);
-  $self->render(template => 'easynas/addons_list');
-  return;
+#### update all addons #####
+ if ($action eq "update_all") {
+  update_all($self);
  }
 
- ##### menu #####
-  
- my %addons=addons_info();
- my $package;
- my $lang=0;
- my $srv=0;
- my $app=0;
- my $fs=0;
- my $stg=0;
- my $mm=0;
- foreach $package (keys %addons) {
-  if ($package =~ /easynas-lang/) 
-  {
-   $lang++;
-  }
-  if ($package =~ /easynas-srv/)
-  {
-   $srv++;
-  }
-  if ($package =~ /easynas-app/)
-  {
-   $app++;
-  }
-  if ($package =~ /easynas-stg/)
-  {
-   $stg++;
-  }
-  if ($package =~ /easynas-fs/)
-  {
-   $fs++;
-  }
-  if ($package =~ /easynas-mm/)
-  {
-   $mm++;
-  }
+ ##### menu (QNAP-style grid: updates on top, then by category) #####
+ my %addons=addons_info();               # package -> [name, group, desc, status, version]
+ my %upd=addon_updates();                # package -> new version (from easynas.updates)
+ my @updates;                            # addons with an available update
+ my %by_cat;                             # category -> [addon tiles]
+ foreach my $package (sort keys %addons) {
+  my ($name,$group,$desc,$status,$ver)=@{$addons{$package}};
+  next unless (defined $status && $status eq "up-to-date");   # installed only
+  my $info=get_addon_info($name) || {};
+  my $icon=($info->{icon} && $info->{icon} ne "") ? $info->{icon} : "fa fa-puzzle-piece";
+  my $cat =($info->{type}  && $info->{type} ne "" && $info->{type} ne "none") ? $info->{type} : $group;
+  my $tile={ pkg=>$package, name=>$name, icon=>$icon, cat=>$cat,
+             version=>$ver, desc=>$desc,
+             program=>($info->{program}//""), newver=>($upd{$package}//"") };
+  if ($upd{$package}) { push @updates,$tile; }
+  else                { push @{$by_cat{$cat}},$tile; }
  }
  $self->stash(result => $result,
-               msg => $msg,
-               fs => $fs,
-               mm => $mm,
-               srv => $srv,
-               lang => $lang,
-               stg => $stg,
-	       app => $app );
+              msg => $msg,
+              updates => \@updates,
+              by_cat => \%by_cat);
  $self->render(template => 'easynas/addons');
+}
+
+############## addon_updates ##############
+# Which easynas packages have an update, from the list check_update.pl writes
+# (zypper lu --xmlout). Returns package -> new edition.
+sub addon_updates {
+ my %u;
+ my $file="/etc/easynas/easynas.updates";
+ return %u unless (-e $file);
+ my $dom;
+ eval { $dom = XML::LibXML->load_xml(location => $file) };
+ return %u if ($@ || !$dom);
+ foreach my $up ($dom->findnodes('/stream/update-status/update-list/update')) {
+  my $name=$up->findvalue('./@name');
+  $u{$name}=$up->findvalue('./@edition');
+ }
+ return %u;
+}
+
+############## update_all ##############
+# Update every EasyNAS package from the active channel. Runs in a transient
+# systemd unit (own cgroup): updating the base easynas restarts easynas.service,
+# which would otherwise kill this process mid-transaction. Progress shows via
+# the global update banner (update.status).
+sub update_all($self) {
+ my $repo="EasyNAS";
+ foreach (`/usr/bin/sudo /usr/bin/zypper --quiet lr -E 2>/dev/null`) {
+  if (/\bEasyNAS_Beta\b/) { $repo="EasyNAS_Beta"; last; }
+ }
+ system("/bin/echo updating | /usr/bin/sudo /usr/bin/tee /etc/easynas/update.status >/dev/null");
+ system("/usr/bin/sudo /usr/bin/systemd-run --collect --unit=easynas-update "
+       ."/bin/sh -c '"
+       ."/usr/bin/zypper -n --gpg-auto-import-keys update --repo $repo "
+       .">/var/log/easynas/update.log 2>&1 "
+       ."&& echo ready | /usr/bin/tee /etc/easynas/update.status "
+       ."|| echo failed | /usr/bin/tee /etc/easynas/update.status"
+       ."' >/dev/null 2>&1");
+ $result="success";
+ $msg=$TEXT{'addons_updating'} || "Updating add-ons in the background. The status banner shows progress.";
 }
 
 ############# install addon ###############
