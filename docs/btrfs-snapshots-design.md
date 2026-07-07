@@ -1,12 +1,26 @@
 # btrfs Snapshots — Bootable Upgrade Rollback
 
-Status: **Implemented (subvolume root + first-boot snapper)** — the only layout
-that builds in the Proxmox LXC. The image uses `filesystem="btrfs"` +
-`btrfs_root_is_subvolume="true"` (plain `@` root, no build-time snapper),
-`bootpartition="true"` (dedicated `/boot`), and configures snapper on first boot
-(`startup/firstboot.sh` → `setup_snapshots`).
+Status: **SHELVED — reverted to ext4 root.** This Proxmox LXC cannot produce a
+bootable btrfs image, so the image ships `filesystem="ext4"` (the config that
+built and booted on this host for months). Revisit btrfs snapshot rollback on a
+non-container build host (a real VM / bare-metal, or the future Gitea host-mode
+x86 runner), where openSUSE's standard `btrfs_root_is_snapshot` works.
 
-**Two independent problems, correctly separated:**
+**Why it doesn't work in the container (both layouts fail):**
+
+- `btrfs_root_is_snapshot` won't **build**: snapper's `installation-helper
+  --step filesystem` fails to create `/.snapshots` in the build chroot. A
+  container/chroot limitation, independent of the build fs (fails on ext4 too).
+- `btrfs_root_is_subvolume` **builds but won't boot**: GRUB can't resolve
+  `@`-relative paths — the prefix (`grub>` CLI) and the kernel/initrd in the menu
+  entries (`file '/vmlinuz-…' not found`). A dedicated `/boot` partition
+  (`bootpartition="true"`) did **not** fix the kernel-path resolution.
+
+The ext4 **build scratch** (`build.sh` `ensure_build_fs`) stays regardless: KIWI
+doesn't support ZFS as its build filesystem, and this is a ZFS-backed LXC. That
+is a separate issue from the boot problem above.
+
+**Original design (for the future non-container build), two independent points:**
 
 1. **`btrfs_root_is_snapshot` cannot build in this LXC.** That option runs
    `/usr/lib/snapper/installation-helper --step filesystem` inside the build
