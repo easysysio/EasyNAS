@@ -20,7 +20,7 @@
  <div class="panel-heading">
   <b><%= ($TEXT->{'addons_updates'} || 'Updates') %>: <%= scalar @$updates %></b>
   <a class="btn btn-success btn-xs pull-right"
-     onclick="return confirm('<%= ($TEXT->{'addons_update_all_confirm'} || 'Update all add-ons now?') %>')"
+     onclick="if(!confirm('<%= ($TEXT->{'addons_update_all_confirm'} || 'Update all add-ons now?') %>'))return false; return easynasBusy(this,'<%= ($TEXT->{'addons_updating_all'} || 'Updating all') %>')"
      href="?action=update_all"><i class="fa fa-refresh"></i> <%= ($TEXT->{'addons_update_all'} || 'Update all') %></a>
  </div>
  <div class="panel-body"><div class="row">
@@ -31,6 +31,7 @@
    <div><small class="text-muted"><%= ($TEXT->{"addons_$a->{cat}"} || ucfirst $a->{cat}) %></small></div>
    <div><small><%= $a->{version} %> &rarr; <b><%= $a->{newver} %></b></small></div>
    <a class="btn btn-success btn-xs" style="margin-top:4px"
+      onclick="return easynasBusy(this,'<%= ($TEXT->{'addons_updating_one'} || 'Updating') %>')"
       href="?action=update_addon&package=<%= $a->{pkg} %>"><i class="fa fa-refresh"></i> <%= ($TEXT->{'addons_update'} || 'Update') %></a>
   </div>
 % }
@@ -58,6 +59,7 @@
 % } else {
    <div><small class="text-muted"><%= ($TEXT->{'addons_not_installed'} || 'not installed') %></small></div>
    <a class="btn btn-primary btn-xs" style="margin-top:4px"
+      onclick="return easynasBusy(this,'<%= ($TEXT->{'addons_installing'} || 'Installing') %>')"
       href="?action=install_addon&package=<%= $a->{pkg} %>"><i class="fa fa-download"></i> <%= ($TEXT->{'addons_install'} || 'Install') %></a>
 % }
   </div>
@@ -69,3 +71,15 @@
 % unless (@$updates || keys %$by_cat) {
 <div class="alert alert-info"><%= ($TEXT->{'addons_none'} || 'No add-ons installed.') %></div>
 % }
+
+<script>
+// Flip an action button to a spinner + label and block re-clicks while the
+// page navigates to run the (synchronous) zypper action. Returns true so the
+// link's navigation still proceeds.
+function easynasBusy(el,label){
+  el.innerHTML='<i class="fa fa-spinner fa-spin"></i> '+label;
+  el.style.pointerEvents='none';
+  el.classList.add('disabled');
+  return true;
+}
+</script>
