@@ -508,6 +508,7 @@ $TEXT{'fs_raid0_info'} = "RAID 0 (also known as a stripe set or striped volume) 
 $TEXT{'fs_raid1_info'} = "RAID 1 consists of an exact copy (or mirror) of a set of data on two or more disks; a classic RAID 1 mirrored pair contains two disks. This configuration offers no parity, striping, or spanning of disk space across multiple disks";
 $TEXT{'fs_raid5_info'} = "RAID 5 consists of block-level striping with distributed parity. Parity information is distributed among the drives. It requires that all drives but one be present to operate. Upon failure of a single drive, subsequent reads can be calculated from the distributed parity such that no data is lost.RAID 5 requires at least three disks.";
 $TEXT{'fs_raid6_info'} = "RAID 6 extends RAID 5 by adding another parity block; thus, it uses block-level striping with two parity blocks distributed across all member disks.";
+$TEXT{'fs_raid10_info'} = "RAID 10 combines mirroring and striping: data is striped across mirrored pairs. It tolerates a single drive failure per mirror and requires at least four drives.";
 
 #### Volumes ####
 $TEXT{'vol_manager'} = "Volume Manager";

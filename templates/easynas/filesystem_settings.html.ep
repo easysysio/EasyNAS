@@ -66,6 +66,12 @@
 	   <td><%= ($TEXT->{'fs_raid6_info'}) %></td>
           </label>
           </tr>
+	  <tr><td><label class="radio-inline">
+           <input type="radio" name="raid" value="raid10" <%= ($current_raid eq "raid10") ? "checked" : "" %>></td>
+           <td><img src="/images/raid10.png" width="170" height="100"></td>
+	   <td><%= ($TEXT->{'fs_raid10_info'}) %></td>
+          </label>
+          </tr>
 	  %}
 	  </table>
           </div>
