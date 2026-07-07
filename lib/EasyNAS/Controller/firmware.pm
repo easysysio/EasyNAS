@@ -72,6 +72,7 @@ sub view ($self) {
   $self->stash(result => $result,
                msg => $msg,
 	       update_state => update_state(),
+	       core_available => core_update_available(),
 	       updates => \%updates);
   $self->render(template => 'easynas/firmware');
 }
@@ -94,6 +95,39 @@ sub active_repo {
   if (/\bEasyNAS_Beta\b/) { $repo="EasyNAS_Beta"; last; }
  }
  return $repo;
+}
+
+# Numeric version compare (handles dotted and dashed: 1.99.21 vs 1.99-20).
+# Returns 1 if $a is newer than $b, else 0.
+sub _newer {
+ my ($a,$b)=@_;
+ my @a = grep { length } split(/[^0-9]+/, $a // "");
+ my @b = grep { length } split(/[^0-9]+/, $b // "");
+ my $n = ($#a > $#b) ? $#a : $#b;
+ for my $i (0 .. $n) {
+  my $x = $a[$i] // 0;
+  my $y = $b[$i] // 0;
+  return 1 if $x > $y;
+  return 0 if $x < $y;
+ }
+ return 0;
+}
+
+# Core (RAW image) update check: fetch the channel's per-arch "latest" manifest
+# and return its version if it's newer than the running image (/etc/ImageVersion),
+# else "". Best-effort (short timeout); the download/apply is a later phase.
+sub core_update_available {
+ my $cur=`/bin/cat /etc/ImageVersion 2>/dev/null`;
+ chomp $cur;
+ $cur =~ s/^EasyNAS-//;
+ my $arch=`/bin/uname -m`;
+ chomp $arch;
+ my $channel=(active_repo() eq "EasyNAS_Beta") ? "testing" : "stable";
+ my $manifest=`/usr/bin/curl -fsSL --max-time 10 https://repo.easysys.io/easynas/$channel/RAW/latest.$arch 2>/dev/null`;
+ return "" unless $manifest;
+ my ($ver) = $manifest =~ /^version=(\S+)/m;
+ return "" unless defined $ver;
+ return _newer($ver,$cur) ? $ver : "";
 }
 
 sub write_update_list {

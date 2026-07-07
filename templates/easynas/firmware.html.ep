@@ -32,6 +32,15 @@
   (<%= ($TEXT->{'firmware_see_log'} || 'see /var/log/easynas/update.log') %>)</div>
 % }
 
+%# ---- core (OS image) update availability ----
+% if ($core_available) {
+<div class="alert alert-info">
+  <i class="fa fa-hdd-o"></i>
+  <%= ($TEXT->{'firmware_core_available'} || 'A core (OS) update is available') %>: <b><%= $core_available %></b>.
+  <small>(<%= ($TEXT->{'firmware_core_soon'} || 'Core update install is coming soon.') %>)</small>
+</div>
+% }
+
 <div class="row">
                         <div class="col-lg-12">
                                 <!-- /.panel-heading -->
