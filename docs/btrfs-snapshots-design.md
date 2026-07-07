@@ -1,13 +1,25 @@
 # btrfs Snapshots — Bootable Upgrade Rollback
 
-Status: **Re-testing** — KIWI btrfs snapshot root + snapper plugins re-applied.
-The first build failed with `creating btrfs subvolume /<root-prefix>/.snapshots
-failed`, but an isolated probe (`tools/btrfs-subvol-test.sh`) showed the LXC build
-host *can* create nested btrfs subvolumes — with the warning
-`failed to open /dev/btrfs-control`. That device is missing from the container;
-KIWI's snapshot setup (inside a chroot with a minimal /dev) needs it. Fix on the
-Proxmox host: allow + bind-mount `/dev/btrfs-control` (major:minor 10:234), then
-rebuild. If it still fails, capture the fuller KIWI error and revert to ext4.
+Status: **Implemented (subvolume root + first-boot snapper)**. The image ships a
+plain `@` subvolume root (`btrfs_root_is_subvolume="true"`) and snapper is
+configured on first boot instead of at image-build time.
+
+**Why not `btrfs_root_is_snapshot` at build:** that KIWI option runs
+`/usr/lib/snapper/installation-helper --step filesystem` inside the build chroot
+to create `/.snapshots`. In our privileged-LXC-on-ZFS build host that helper
+fails (`creating /<root-prefix>/.snapshots failed`) — plain `btrfs subvolume
+create @` succeeds, but snapper's helper can't validate the bind-mounted target
+as a btrfs mount inside the chroot (host `/proc`, bind mount). This is a snapper
+limitation, not fixable via `/dev/btrfs-control` or any LXC cgroup/apparmor
+tweak. So we skip it and set snapper up on the running appliance
+(`startup/firstboot.sh` → `setup_snapshots`), where the real kernel makes
+subvolume creation work.
+
+**Rollback caveat:** this delivers snapshot-before-upgrade and the GRUB "boot
+from snapshot" recovery menu (Level 1 below). openSUSE's one-click permanent
+`snapper rollback` wants the build-time snapshot-root layout; with a subvolume
+root, recovery is booting a snapshot read-only and restoring. Full transactional
+rollback would require building on a VM / bare-metal host.
 Author: Yariv Hakim
 
 Give every OS upgrade an automatic, bootable safety net: a snapshot is taken
@@ -105,9 +117,10 @@ during bootstrap, data pool thereafter.
 
 Apply uniformly to all five profiles (one payload principle):
 
-- `<type filesystem="btrfs" ... btrfs_root_is_snapshot="true">`
-  (replaces `filesystem="ext4"`). This lays root out as
-  `@/.snapshots/1/snapshot`, snapper-compatible.
+- `<type filesystem="btrfs" ... btrfs_root_is_subvolume="true">`
+  (replaces `filesystem="ext4"`). Root is the plain `@` subvolume; the
+  `.snapshots` layout is created on first boot (see Status above), not at build,
+  because snapper's installation-helper can't run in the LXC build chroot.
 - `<systemdisk>` with the excluded volumes:
   ```xml
   <systemdisk>

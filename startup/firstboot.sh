@@ -76,4 +76,29 @@ chown -R easynas:easynas /var/log/easynas
 # nsswitch, Kerberos, resolver) must be reapplied. See realm-apply.sh.
 /easynas/startup/realm-apply.sh 2>/dev/null || true
 
+# --- btrfs root snapshots (set up here, not at image-build) -------------------
+# The image ships a plain '@' subvolume root (KIWI btrfs_root_is_subvolume),
+# NOT a snapper snapshot layout: KIWI's btrfs_root_is_snapshot runs snapper's
+# installation-helper, which cannot create /.snapshots inside our LXC build
+# chroot. So we configure snapper on the running system, where the real kernel
+# makes subvolume creation work. This gives snapshot-before-upgrade plus the
+# GRUB "boot from snapshot" recovery menu. See docs/btrfs-snapshots-design.md.
+# Idempotent: once /etc/snapper/configs/root exists we do nothing.
+setup_snapshots() {
+    command -v snapper >/dev/null 2>&1 || return 0
+    [ "$(stat -f -c %T / 2>/dev/null)" = "btrfs" ] || return 0
+    [ -e /etc/snapper/configs/root ] && return 0
+
+    snapper -c root create-config / || return 0
+    # Explicit, version-labeled upgrade snapshots are the model (see the design
+    # doc); silence timeline noise and keep number-based cleanup on.
+    snapper -c root set-config "TIMELINE_CREATE=no" "NUMBER_CLEANUP=yes" 2>/dev/null
+    # A known-good baseline to roll back to.
+    snapper -c root create --description "EasyNAS baseline" --cleanup number 2>/dev/null
+    # Regenerate GRUB so the "boot from snapshot" submenu appears.
+    [ -e /boot/grub2/grub.cfg ] && grub2-mkconfig -o /boot/grub2/grub.cfg 2>/dev/null
+    return 0
+}
+setup_snapshots
+
 exit 0
