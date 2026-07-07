@@ -1060,6 +1060,8 @@ sub fs_info
  my $free;
  my $percentage;
  my $devices;
+ my $devcount;
+ my $missing;
  my %filesystems;
  my $dir;
  my @filesystem_list = `/usr/bin/sudo /sbin/btrfs filesystem show`;
@@ -1073,6 +1075,8 @@ sub fs_info
 	    chop($fs);
 	    $fs = substr($fs, 1);
             $health = "good";
+            $devcount = 0;
+            $missing = 0;
             if ($fs eq "ROOT") {
              $dir="/";
             }
@@ -1081,13 +1085,16 @@ sub fs_info
             }
 	}
 
-       if ($_ =~ m/ Some devices missing/)
+       # A device is missing if btrfs says so, or if a devid line itself is
+       # flagged "missing" (some versions list it that way instead).
+       if ($_ =~ m/missing/i)
        {
-        $health = "degraded";
+        $missing = 1;
        }
-      
+
        if ($_ =~ m/devid/)
        {
+        $devcount++;
         (undef,undef,undef,undef,undef,undef,undef,$path) = split(' ',$_);
        }
 
@@ -1135,6 +1142,11 @@ sub fs_info
        else {
 	$percentage=0;
        }
+       # Degraded when a device is flagged missing, or fewer devices are present
+       # than the filesystem expects (Total devices). Recomputed every line; the
+       # last line of the fs block (with the full devid count) is what's stored.
+       $health = ($missing || (defined $devices && $devices ne "" && $devcount < $devices))
+                 ? "degraded" : "good";
        $filesystems{$fs}=[$uuid,$health,$size,$used,$free,$percentage,$devices,$path,$mounted,$raid,get_compress_status($fs)];
     }
     return (%filesystems);
