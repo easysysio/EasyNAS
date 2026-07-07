@@ -1,0 +1,20 @@
+% layout 'default';
+
+<div class="row">
+ <div class="col-lg-6">
+  <div class="panel panel-default">
+   <div class="panel-heading">
+    <%= ($TEXT->{'power_management'} || 'Power Management') %>
+   </div>
+   <div class="panel-body">
+    % if ($msg) {
+    <div class="alert alert-info"><%= $msg %></div>
+    % } else {
+    <p><%= ($TEXT->{'shutdown_restart'} || 'Shutdown / Restart') %></p>
+    <a class="btn btn-warning" onclick="return confirm('<%= ($TEXT->{'power_restart_confirm'} || 'Restart the appliance now?') %>')" href="?action=reboot"><i class="fa fa-rotate-right"></i>&nbsp;<%= ($TEXT->{'power_restart'} || 'Restart') %></a>
+    <a class="btn btn-danger" onclick="return confirm('<%= ($TEXT->{'power_shutdown_confirm'} || 'Shut down the appliance now?') %>')" href="?action=shutdown"><i class="fa fa-power-off"></i>&nbsp;<%= ($TEXT->{'power_shutdown'} || 'Shut Down') %></a>
+    % }
+   </div>
+  </div>
+ </div>
+</div>

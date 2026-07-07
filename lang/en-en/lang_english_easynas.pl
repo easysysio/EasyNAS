@@ -228,6 +228,12 @@ $TEXT{'network_band'} = "Network Bandwitdh";
 #### Power Managment ####
 $TEXT{'power_management'} = "Power Management";
 $TEXT{'shutdown_restart'} = "Shutdown / Restart";
+$TEXT{'power_restart'} = "Restart";
+$TEXT{'power_shutdown'} = "Shut Down";
+$TEXT{'power_restarting'} = "The appliance is restarting...";
+$TEXT{'power_shuttingdown'} = "The appliance is shutting down...";
+$TEXT{'power_restart_confirm'} = "Restart the appliance now?";
+$TEXT{'power_shutdown_confirm'} = "Shut down the appliance now?";
 $TEXT{'error_restart_demo'} = "Can't Restart in a demo site";
 $TEXT{'restart_system'} = "Restarting System......";
 $TEXT{'error_shutdown_demo'} = "Can't Shutdown in a demo site";

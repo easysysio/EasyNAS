@@ -239,6 +239,36 @@
 
         </div>
 
+	<!-- Restart / Shutdown confirmation modals (triggered from the top-nav menu).
+	     English is hardcoded because this chrome renders on every page. -->
+	<div class="modal fade" id="restart" tabindex="-1" role="dialog" aria-hidden="true">
+	  <div class="modal-dialog"><div class="modal-content">
+	    <div class="modal-header">
+	      <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+	      <h4 class="modal-title">Restart</h4>
+	    </div>
+	    <div class="modal-body">Restart the appliance now? Services stop and filesystems unmount cleanly during the reboot.</div>
+	    <div class="modal-footer">
+	      <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+	      <a class="btn btn-warning" href="/power?action=reboot"><i class="fa fa-rotate-right fa-fw"></i> Restart</a>
+	    </div>
+	  </div></div>
+	</div>
+
+	<div class="modal fade" id="shutdown" tabindex="-1" role="dialog" aria-hidden="true">
+	  <div class="modal-dialog"><div class="modal-content">
+	    <div class="modal-header">
+	      <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+	      <h4 class="modal-title">Shutdown</h4>
+	    </div>
+	    <div class="modal-body">Shut the appliance down now? Services stop and filesystems unmount cleanly during shutdown.</div>
+	    <div class="modal-footer">
+	      <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+	      <a class="btn btn-danger" href="/power?action=shutdown"><i class="fa fa-power-off fa-fw"></i> Shutdown</a>
+	    </div>
+	  </div></div>
+	</div>
+
 	<div class="modal fade" id="about" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
      <div class="modal-dialog">
       <div class="modal-content">
