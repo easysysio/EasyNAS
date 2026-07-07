@@ -107,7 +107,7 @@
                         </a>
                         <ul class="dropdown-menu dropdown-user">
                           % foreach my $lang (@lang_list){
-			  <li><a href="index.pl?action=language&menu=none&lang=<%= ($lang->{'name'}) %>"><img src="/images/<%= ($lang->{'flag'}) %>">&nbsp;<%= ($lang->{'name'}) %></a></li>
+			  <li><a href="/language?lang=<%= ($lang->{'symbol'}) %>"><img src="/images/<%= ($lang->{'flag'}) %>">&nbsp;<%= ($lang->{'name'}) %></a></li>
                           %}
                         </ul>
                     </li>

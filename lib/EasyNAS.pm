@@ -34,6 +34,7 @@ sub startup ($self) {
   $auth->get('/easynas')->to('dashboard#view');
   $auth->get('/easynas/firmware.pl')->to('dashboard#view');
   $auth->get('/firmware')->to('firmware#view');
+  $auth->get('/language')->to('language#view');
   foreach my $item (keys %addons) {
 	  $auth->get('/'.$addons{$item}{'program'})->to($addons{$item}{'program'}.'#view');
 

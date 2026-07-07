@@ -34,7 +34,8 @@ our @EXPORT    = qw( get_mount_dir get_conf_cron get_addons_file get_update_file
 		     write_log easynas_info addons_info fs_info vol_info users_info groups_info
                      disk_info health_info networks_info cpu_info memory_info
                      write_share_marker remove_share_marker rediscover_shares
-                     get_realm next_uid_number next_gid_number get_update_state raid_status);
+                     get_realm next_uid_number next_gid_number get_update_state raid_status
+                     set_current_lang);
 
 ############# Declarations #####################
 my $authentication_enable = 1;
@@ -481,8 +482,20 @@ sub current_lang
         return "en-en";
     }
 }
- 
- 
+
+
+######## set_current_lang ########
+# Persist the UI language (the directory code, e.g. "en-en"). Validated against
+# the shape AND an existing lang dir before it reaches the shell.
+sub set_current_lang
+{
+    my $lang=shift;
+    return unless defined $lang && $lang =~ /^[a-z]{2}-[a-z]{2}$/;
+    return unless -f $lang_dir."/".$lang."/iso.txt";
+    `/bin/echo "$lang" | /usr/bin/sudo /usr/bin/tee $lang_conf > /dev/null`;
+}
+
+
 ########### lang_list #############
 sub get_lang_list
 {
