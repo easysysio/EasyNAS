@@ -58,6 +58,13 @@ foreach (`/usr/bin/sudo /usr/bin/zypper --quiet lr -E 2>/dev/null`) {
 `/usr/bin/sudo /usr/bin/zypper --quiet --gpg-auto-import-keys refresh`;
 `/usr/bin/sudo /usr/bin/zypper --quiet --xmlout search easynas | /usr/bin/sudo /usr/bin/tee /etc/easynas/addons/easynas.addons`;
 `/usr/bin/sudo /usr/bin/zypper --quiet --xmlout lu -a --repo $repo | /usr/bin/sudo /usr/bin/tee  /etc/easynas/easynas.updates`;
+
+####### Core (firmware) image update #######
+# Fetch the channel's per-arch core-image manifest (version/date/file/sha256)
+# into easynas.core; the Firmware page reads this file (no live network call).
+my $channel = ($repo eq "EasyNAS_Beta") ? "testing" : "stable";
+`curl -s --connect-timeout 5 --max-time 15 https://repo.easysys.io/easynas/$channel/RAW/latest.$arc | /usr/bin/sudo /usr/bin/tee /etc/easynas/easynas.core >/dev/null`;
+
 if (-e $addons) {
   open my $fh, '<', $addons;
   binmode $fh; # drop all PerlIO layers possibly created by a use open pragma

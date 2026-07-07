@@ -113,17 +113,14 @@ sub _newer {
  return 0;
 }
 
-# Core (RAW image) update check: fetch the channel's per-arch "latest" manifest
-# and return its version if it's newer than the running image (/etc/ImageVersion),
-# else "". Best-effort (short timeout); the download/apply is a later phase.
+# Core (RAW image) update check: read the manifest that check_update.pl fetched
+# into /etc/easynas/easynas.core and return its version if it's newer than the
+# running image (/etc/ImageVersion), else "". No live network call here.
 sub core_update_available {
  my $cur=`/bin/cat /etc/ImageVersion 2>/dev/null`;
  chomp $cur;
  $cur =~ s/^EasyNAS-//;
- my $arch=`/bin/uname -m`;
- chomp $arch;
- my $channel=(active_repo() eq "EasyNAS_Beta") ? "testing" : "stable";
- my $manifest=`/usr/bin/curl -fsSL --max-time 10 https://repo.easysys.io/easynas/$channel/RAW/latest.$arch 2>/dev/null`;
+ my $manifest=`/bin/cat /etc/easynas/easynas.core 2>/dev/null`;
  return "" unless $manifest;
  my ($ver) = $manifest =~ /^version=(\S+)/m;
  return "" unless defined $ver;
