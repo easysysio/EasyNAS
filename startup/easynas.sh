@@ -142,12 +142,12 @@ while [[ true ]] ; do
 
 	"7" )
 	    read -p "Press Enter key to restart EasyNAS ..."
-	    sudo /usr/bin/systemctl reboot
+	    /easynas/startup/power.sh reboot
 	;;
 
 	"8" )
 	    read -p "Press Enter key to shutdown EasyNAS ..."
-	    sudo /usr/bin/systemctl poweroff
+	    /easynas/startup/power.sh shutdown
 	;;
 
 	"9" )
