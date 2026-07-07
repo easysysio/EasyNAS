@@ -31,7 +31,7 @@
        <table class="table">
        % if ($number_disks > 0) {
        <tr><td><label class="radio-inline">
-       <input type="radio" name="raid" value="single" checked></td>
+       <input type="radio" name="raid" value="single" <%= ($current_raid eq "single") ? "checked" : "" %>></td>
        <td><img src="/images/jbod.png" width="120" height="100"></td>
        <td><%= ($TEXT->{'fs_jbod_info'}) %></td>
        </label>
@@ -39,13 +39,13 @@
        %}
        % if ($number_disks > 1) {
        <tr><td><label class="radio-inline">
-       <input type="radio" name="raid" value="raid0"></td>
+       <input type="radio" name="raid" value="raid0" <%= ($current_raid eq "raid0") ? "checked" : "" %>></td>
        <td><img src="/images/raid0.png" width="120" height="100"></td>
        <td><%= ($TEXT->{'fs_raid0_info'}) %></td>
        </label>
        </tr>
        <tr><td><label class="radio-inline">
-       <input type="radio" name="raid" value="raid1"></td>
+       <input type="radio" name="raid" value="raid1" <%= ($current_raid eq "raid1") ? "checked" : "" %>></td>
        <td><img src="/images/raid1.png" width="120" height="100"></td>
        <td><%= ($TEXT->{'fs_raid1_info'}) %></td> 
        </label>
@@ -53,7 +53,7 @@
        %}
 	  % if ($number_disks > 2) {
 	  <tr><td><label class="radio-inline">
-           <input type="radio" name="raid" value="raid5"></td>
+           <input type="radio" name="raid" value="raid5" <%= ($current_raid eq "raid5") ? "checked" : "" %>></td>
            <td><img src="/images/raid5.png" width="170" height="100"></td>
           <td><%= ($TEXT->{'fs_raid5_info'}) %></td>
 	  </label>
@@ -61,7 +61,7 @@
 	  %}
 	  % if ($number_disks > 3) {
 	  <tr><td><label class="radio-inline">
-           <input type="radio" name="raid" value="raid6"></td>
+           <input type="radio" name="raid" value="raid6" <%= ($current_raid eq "raid6") ? "checked" : "" %>></td>
            <td><img src="/images/raid6.png" width="170" height="100"></td>
 	   <td><%= ($TEXT->{'fs_raid6_info'}) %></td>
           </label>

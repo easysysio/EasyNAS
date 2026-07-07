@@ -132,7 +132,10 @@ sub view($self) {
     if (defined $action && $action eq "settingsmenu") {
       my $fs=$self->param("fs");
       my $uuid=$self->param("uuid");
-      #my $raid = raid_status($fs);
+      # Current RAID profile, canonicalised to the radio values (single/raidN),
+      # so the RAID tab pre-selects the level the filesystem is actually on.
+      my $current_raid = lc(raid_status($fs) // "");
+      $current_raid = "single" if ($current_raid eq "jbod" || $current_raid eq "");
       my @disks = `/usr/bin/sudo /sbin/btrfs filesystem show $uuid | /usr/bin/grep devid`;
       my %health = health_info();
       my $number_disks = 0;
@@ -153,6 +156,7 @@ sub view($self) {
       $self->stash( fs_name => $fs,
 		    uuid => $uuid,
 		    number_disks => $number_disks,
+		    current_raid => $current_raid,
 		    fsdisks => \@fsdisks);
       $self->render(template => 'easynas/filesystem_settings');
       return;
