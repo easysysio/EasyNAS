@@ -49,15 +49,17 @@ sub view ($self) {
  my %by_cat;                             # category -> [addon tiles]
  foreach my $package (sort keys %addons) {
   my ($name,$group,$desc,$status,$ver)=@{$addons{$package}};
-  next unless (defined $status && $status eq "up-to-date");   # installed only
+  my $installed=(defined $status && $status eq "up-to-date") ? 1 : 0;
   my $info=get_addon_info($name) || {};
   my $icon=($info->{icon} && $info->{icon} ne "") ? $info->{icon} : "fa fa-puzzle-piece";
   my $cat =($info->{type}  && $info->{type} ne "" && $info->{type} ne "none") ? $info->{type} : $group;
   my $tile={ pkg=>$package, name=>$name, icon=>$icon, cat=>$cat,
-             version=>$ver, desc=>$desc,
+             version=>$ver, desc=>$desc, installed=>$installed,
              program=>($info->{program}//""), newver=>($upd{$package}//"") };
-  if ($upd{$package}) { push @updates,$tile; }
-  else                { push @{$by_cat{$cat}},$tile; }
+  # Installed with an update -> Updates section; otherwise (installed-current or
+  # not-installed) -> its category.
+  if ($installed && $upd{$package}) { push @updates,$tile; }
+  else                              { push @{$by_cat{$cat}},$tile; }
  }
  $self->stash(result => $result,
               msg => $msg,
