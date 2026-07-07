@@ -113,19 +113,21 @@ sub write_update_list {
 # shows a Reboot button when it reaches "ready".
 sub update($self) {
  system("/bin/echo updating | /usr/bin/sudo /usr/bin/tee $update_status >/dev/null");
- # Run the upgrade in a TRANSIENT systemd unit (its own cgroup) via systemd-run,
- # NOT as a child of easynas.service. The easynas RPM's %post restarts
- # easynas.service; if zypper ran inside that cgroup, systemd would tear it down
- # and kill zypper mid-transaction ("exiting as soon as possible"). A transient
- # unit is independent, so it survives the restart and finishes the upgrade.
- # The unit runs as root, so zypper/tee inside need no sudo; --collect cleans it
- # up when it exits.
- # (--allow-vendor-change: the image mixes vendors -- base openSUSE + the KIWI
- # build repo + EasyNAS -- so dup must consolidate onto the enabled repos;
- # --replacefiles handles the occasional file conflict on a full upgrade.)
+ # Update ONLY the EasyNAS packages: "zypper update --repo <EasyNAS repo>"
+ # restricts the transaction to packages with a newer version in the EasyNAS
+ # channel, so dracut, the kernel and the boot theme are left untouched. A full
+ # "dup" was wrong here -- it downgraded dracut-kiwi to the Tumbleweed versions
+ # and regenerated the initrd, which reset the Plymouth theme. (This matches the
+ # console's "Check for updates", which does zypper update 'easynas*'.)
+ #
+ # Run it in a TRANSIENT systemd unit (its own cgroup) via systemd-run, NOT as a
+ # child of easynas.service: the easynas RPM's %post restarts easynas.service,
+ # and inside that cgroup systemd would kill zypper mid-transaction. The unit
+ # runs as root, so zypper/tee need no sudo; --collect cleans it up on exit.
+ my $repo=active_repo();
  system("/usr/bin/sudo /usr/bin/systemd-run --collect --unit=easynas-update "
        ."/bin/sh -c '"
-       ."/usr/bin/zypper -n --gpg-auto-import-keys dup --allow-vendor-change --replacefiles "
+       ."/usr/bin/zypper -n --gpg-auto-import-keys update --repo $repo "
        .">/var/log/easynas/update.log 2>&1 "
        ."&& echo ready | /usr/bin/tee $update_status "
        ."|| echo failed | /usr/bin/tee $update_status"
