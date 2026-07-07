@@ -1,25 +1,27 @@
 # btrfs Snapshots — Bootable Upgrade Rollback
 
-Status: **Implemented (subvolume root + first-boot snapper)**. The image ships a
-plain `@` subvolume root (`btrfs_root_is_subvolume="true"`) and snapper is
-configured on first boot instead of at image-build time.
+Status: **Implemented (proper snapshot root)**. The image uses
+`filesystem="btrfs"` + `btrfs_root_is_snapshot="true"` (KIWI sets up snapper and
+the `@/.snapshots/N/snapshot` layout at build), `bootpartition="false"`. This is
+openSUSE's standard, tested update-safety layout — full `snapper rollback` and a
+GRUB "boot from snapshot" menu.
 
-**Why not `btrfs_root_is_snapshot` at build:** that KIWI option runs
-`/usr/lib/snapper/installation-helper --step filesystem` inside the build chroot
-to create `/.snapshots`. In our privileged-LXC-on-ZFS build host that helper
-fails (`creating /<root-prefix>/.snapshots failed`) — plain `btrfs subvolume
-create @` succeeds, but snapper's helper can't validate the bind-mounted target
-as a btrfs mount inside the chroot (host `/proc`, bind mount). This is a snapper
-limitation, not fixable via `/dev/btrfs-control` or any LXC cgroup/apparmor
-tweak. So we skip it and set snapper up on the running appliance
-(`startup/firstboot.sh` → `setup_snapshots`), where the real kernel makes
-subvolume creation work.
+**Root cause of the earlier failures (resolved):** the build kept failing —
+first `creating /<root-prefix>/.snapshots failed` at build, then a `grub>` CLI
+at boot after a `btrfs_root_is_subvolume` workaround. The real cause was **the
+KIWI build directory being on ZFS**: this is a ZFS-backed Proxmox LXC, and KIWI
+does not support ZFS as its build filesystem (support was removed years ago;
+confirmed by the KIWI maintainers). Its guard was bypassed locally, which only
+silenced the warning — the btrfs/loop/chroot/grub operations still misbehaved on
+ZFS-backed storage. Fix: `build.sh` now mounts a **loop-backed ext4 scratch**
+for the build dir (`ensure_build_fs`), so KIWI sees ext4 (the backing file may
+still live on ZFS). With that, the standard `btrfs_root_is_snapshot` path builds
+and boots correctly, and both container-era workarounds
+(`btrfs_root_is_subvolume`, a separate `/boot` partition) were reverted.
 
-**Rollback caveat:** this delivers snapshot-before-upgrade and the GRUB "boot
-from snapshot" recovery menu (Level 1 below). openSUSE's one-click permanent
-`snapper rollback` wants the build-time snapshot-root layout; with a subvolume
-root, recovery is booting a snapshot read-only and restoring. Full transactional
-rollback would require building on a VM / bare-metal host.
+`startup/firstboot.sh` → `setup_snapshots` remains as a harmless guarded
+fallback: on a properly built snapshot image KIWI has already created
+`/etc/snapper/configs/root`, so it no-ops.
 Author: Yariv Hakim
 
 Give every OS upgrade an automatic, bootable safety net: a snapshot is taken
