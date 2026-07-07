@@ -22,14 +22,12 @@ built before Phase 4:
 - [x] **Restart / Shutdown** — v1 `power.pl`. Done: `power.pm` (reboot/shutdown
       via systemctl, detached) + `#restart`/`#shutdown` modal bodies. (commit 21c787d)
 - [x] **Language switcher** -- done: /language route + set_current_lang, link fixed to pass the dir code. (commit 6e3e761)
-- [ ] **Global search** — v1 `search.pl` (313 loc). The sidebar search box is inert.
+- [~] **Global search** (deferred) -- v1 `search.pl` (313 loc). Sidebar box left inert for now.
 
 ## B. Ported controllers with partial parity
 
-- [ ] **settings** (v1 399 → v2 80 loc): date/time (`setdate`), SSL cert upload
-      (`upload_crt`), ACL config (`acl`).
-- [ ] **samba**: edit share (`change`/`change_share`), NetBIOS/nmbd toggle
-      (`nmboff`/`nmbon`).
+- [~] **settings**: date/time (setdate, 2a43f40) + cert upload (upload_crt, 5f96b6e) DONE. ACL deferred (needs Mojo-native auth-gate impl; v1 lighttpd approach obsolete).
+- [x] **samba**: edit-share done (editmenu/change + apply_share, 1d02ec4). nmbd toggle: already bundled with sambaon/off (not ported separately).
 - [ ] **groups**: edit group settings (`changesetting`).
 - [ ] **filesystem**: balance/scrub pause/resume/cancel (`bpause`/`bresume`/
       `bcancel`/`scancel`), replace-cancel, `ChangeMount`. (Ties into the live
