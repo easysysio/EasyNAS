@@ -46,7 +46,12 @@
  </div>
  <div class="panel-body"><div class="row">
 % for my $a (@$updates) {
-  <div class="col-sm-3 col-xs-6 text-center" style="margin-bottom:20px">
+  <div class="col-sm-3 col-xs-6 text-center" style="margin-bottom:20px;position:relative">
+   <a class="addon-info" title="<%= ($TEXT->{'addons_details'} || 'Details') %>"
+      data-name="<%= ucfirst $a->{name} %>" data-icon="<%= $a->{icon} %>"
+      data-cat="<%= ($TEXT->{"addons_$a->{cat}"} || ucfirst $a->{cat}) %>"
+      data-version="<%= $a->{version} %>" data-newver="<%= $a->{newver} %>"
+      data-desc="<%= $a->{desc} %>"><i class="fa fa-info-circle text-muted"></i></a>
    <i class="<%= $a->{icon} %> fa-3x"></i>
    <div style="margin-top:6px"><b><%= ucfirst $a->{name} %></b></div>
    <div><small class="text-muted"><%= ($TEXT->{"addons_$a->{cat}"} || ucfirst $a->{cat}) %></small></div>
@@ -66,7 +71,12 @@
  <div class="panel-heading"><b><%= ($TEXT->{"addons_$cat"} || ucfirst $cat) %></b></div>
  <div class="panel-body"><div class="row">
 % for my $a (@{$by_cat->{$cat}}) {
-  <div class="col-sm-3 col-xs-6 text-center" style="margin-bottom:20px">
+  <div class="col-sm-3 col-xs-6 text-center" style="margin-bottom:20px;position:relative">
+   <a class="addon-info" title="<%= ($TEXT->{'addons_details'} || 'Details') %>"
+      data-name="<%= ucfirst $a->{name} %>" data-icon="<%= $a->{icon} %>"
+      data-cat="<%= ($TEXT->{"addons_$a->{cat}"} || ucfirst $a->{cat}) %>"
+      data-version="<%= $a->{version} %>" data-newver="<%= $a->{newver} %>"
+      data-desc="<%= $a->{desc} %>"><i class="fa fa-info-circle text-muted"></i></a>
    <i class="<%= $a->{icon} %> fa-3x"<%= $a->{installed} ? '' : ' style="opacity:0.45"' %>></i>
    <div style="margin-top:6px"><b><%= ucfirst $a->{name} %></b></div>
 % if ($a->{installed}) {
@@ -95,12 +105,34 @@
 </div>%# /row
 % }
 
+%# ================= Addon details modal (populated by the (i) click) =========
+<div class="modal fade" id="addonInfoModal" tabindex="-1" role="dialog">
+ <div class="modal-dialog" role="document"><div class="modal-content">
+  <div class="modal-header">
+   <button type="button" class="close" data-dismiss="modal">&times;</button>
+   <h4 class="modal-title"><i id="ai-icon"></i> <span id="ai-name"></span></h4>
+  </div>
+  <div class="modal-body">
+   <p><span class="label label-default" id="ai-cat"></span></p>
+   <p id="ai-verline"><b><%= ($TEXT->{'addons_version'} || 'Version') %>:</b> <span id="ai-version"></span></p>
+   <p id="ai-desc"></p>
+  </div>
+  <div class="modal-footer">
+   <button type="button" class="btn btn-default" data-dismiss="modal"><%= ($TEXT->{'addons_close'} || 'Close') %></button>
+  </div>
+ </div></div>
+</div>
+
 <style>
 /* Sticky category nav on the left; offset anchors below the fixed navbar. */
 .easynas-catnav { margin-bottom:20px; }
 .easynas-catnav .badge { background-color:#5cb85c; }
 .easynas-cat { scroll-margin-top:70px; }
 @media (min-width:768px){ .easynas-catnav { position:sticky; top:70px; } }
+/* Info (i) button in the top-right corner of each tile. */
+.addon-info { position:absolute; top:0; right:14px; cursor:pointer; }
+.addon-info .fa-info-circle { opacity:0.5; }
+.addon-info:hover .fa-info-circle { opacity:1; }
 </style>
 
 <script>
@@ -113,4 +145,21 @@ function easynasBusy(el,label){
   el.classList.add('disabled');
   return true;
 }
+
+// Populate the details modal from the clicked tile's (i) data-* and show it.
+document.addEventListener('click', function(e){
+  var el = e.target.closest ? e.target.closest('.addon-info') : null;
+  if (!el) return;
+  var d = el.dataset;
+  document.getElementById('ai-icon').className = d.icon + ' fa-lg';
+  document.getElementById('ai-name').textContent = d.name;
+  document.getElementById('ai-cat').textContent = d.cat;
+  var ver = d.version || '';
+  if (ver && d.newver) ver += ' → ' + d.newver;
+  document.getElementById('ai-version').textContent = ver;
+  document.getElementById('ai-verline').style.display = ver ? '' : 'none';
+  document.getElementById('ai-desc').textContent =
+    d.desc || '<%= ($TEXT->{'addons_nodesc'} || 'No description available.') %>';
+  $('#addonInfoModal').modal('show');   // Bootstrap 3 modal (jQuery)
+});
 </script>
