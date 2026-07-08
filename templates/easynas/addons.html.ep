@@ -46,12 +46,7 @@
  </div>
  <div class="panel-body"><div class="row">
 % for my $a (@$updates) {
-  <div class="col-sm-3 col-xs-6 text-center" style="margin-bottom:20px;position:relative">
-   <a class="addon-info" title="<%= ($TEXT->{'addons_details'} || 'Details') %>"
-      data-name="<%= ucfirst $a->{name} %>" data-icon="<%= $a->{icon} %>"
-      data-cat="<%= ($TEXT->{"addons_$a->{cat}"} || ucfirst $a->{cat}) %>"
-      data-version="<%= $a->{version} %>" data-newver="<%= $a->{newver} %>"
-      data-desc="<%= $a->{desc} %>"><i class="fa fa-info-circle text-muted"></i></a>
+  <div class="col-sm-3 col-xs-6 text-center" style="margin-bottom:20px">
    <i class="<%= $a->{icon} %> fa-3x"></i>
    <div style="margin-top:6px"><b><%= ucfirst $a->{name} %></b></div>
    <div><small class="text-muted"><%= ($TEXT->{"addons_$a->{cat}"} || ucfirst $a->{cat}) %></small></div>
@@ -59,6 +54,11 @@
    <a class="btn btn-success btn-xs" style="margin-top:4px"
       onclick="return easynasBusy(this,'<%= ($TEXT->{'addons_updating_one'} || 'Updating') %>')"
       href="?action=update_addon&package=<%= $a->{pkg} %>"><i class="fa fa-refresh"></i> <%= ($TEXT->{'addons_update'} || 'Update') %></a>
+   <a class="btn btn-default btn-xs addon-info" style="margin-top:4px" title="<%= ($TEXT->{'addons_details'} || 'Details') %>"
+      data-name="<%= ucfirst $a->{name} %>" data-icon="<%= $a->{icon} %>"
+      data-cat="<%= ($TEXT->{"addons_$a->{cat}"} || ucfirst $a->{cat}) %>"
+      data-version="<%= $a->{version} %>" data-newver="<%= $a->{newver} %>"
+      data-desc="<%= $a->{desc} %>"><i class="fa fa-info-circle"></i></a>
   </div>
 % }
  </div></div>
@@ -71,12 +71,7 @@
  <div class="panel-heading"><b><%= ($TEXT->{"addons_$cat"} || ucfirst $cat) %></b></div>
  <div class="panel-body"><div class="row">
 % for my $a (@{$by_cat->{$cat}}) {
-  <div class="col-sm-3 col-xs-6 text-center" style="margin-bottom:20px;position:relative">
-   <a class="addon-info" title="<%= ($TEXT->{'addons_details'} || 'Details') %>"
-      data-name="<%= ucfirst $a->{name} %>" data-icon="<%= $a->{icon} %>"
-      data-cat="<%= ($TEXT->{"addons_$a->{cat}"} || ucfirst $a->{cat}) %>"
-      data-version="<%= $a->{version} %>" data-newver="<%= $a->{newver} %>"
-      data-desc="<%= $a->{desc} %>"><i class="fa fa-info-circle text-muted"></i></a>
+  <div class="col-sm-3 col-xs-6 text-center" style="margin-bottom:20px">
    <i class="<%= $a->{icon} %> fa-3x"<%= $a->{installed} ? '' : ' style="opacity:0.45"' %>></i>
    <div style="margin-top:6px"><b><%= ucfirst $a->{name} %></b></div>
 % if ($a->{installed}) {
@@ -95,6 +90,11 @@
       onclick="return easynasBusy(this,'<%= ($TEXT->{'addons_installing'} || 'Installing') %>')"
       href="?action=install_addon&package=<%= $a->{pkg} %>"><i class="fa fa-download"></i> <%= ($TEXT->{'addons_install'} || 'Install') %></a>
 % }
+   <a class="btn btn-default btn-xs addon-info" style="margin-top:4px" title="<%= ($TEXT->{'addons_details'} || 'Details') %>"
+      data-name="<%= ucfirst $a->{name} %>" data-icon="<%= $a->{icon} %>"
+      data-cat="<%= ($TEXT->{"addons_$a->{cat}"} || ucfirst $a->{cat}) %>"
+      data-version="<%= $a->{version} %>" data-newver="<%= $a->{newver} %>"
+      data-desc="<%= $a->{desc} %>"><i class="fa fa-info-circle"></i></a>
   </div>
 % }
  </div></div>
@@ -129,10 +129,8 @@
 .easynas-catnav .badge { background-color:#5cb85c; }
 .easynas-cat { scroll-margin-top:70px; }
 @media (min-width:768px){ .easynas-catnav { position:sticky; top:70px; } }
-/* Info (i) button in the top-right corner of each tile. */
-.addon-info { position:absolute; top:0; right:14px; cursor:pointer; }
-.addon-info .fa-info-circle { opacity:0.5; }
-.addon-info:hover .fa-info-circle { opacity:1; }
+/* Info (i) button, inline next to each tile's action button. */
+.addon-info { cursor:pointer; }
 </style>
 
 <script>
