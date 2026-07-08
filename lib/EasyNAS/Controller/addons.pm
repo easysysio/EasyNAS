@@ -114,24 +114,55 @@ sub addon_updates {
  return %u;
 }
 
-############## update_all ##############
-# Update every EasyNAS package from the active channel. Runs in a transient
-# systemd unit (own cgroup): updating the base easynas restarts easynas.service,
-# which would otherwise kill this process mid-transaction. Progress shows via
-# the global update banner (update.status).
-sub update_all($self) {
+############## active_channel_repo ##############
+# The enabled EasyNAS channel repo (stable "EasyNAS" or testing "EasyNAS_Beta").
+sub active_channel_repo {
  my $repo="EasyNAS";
  foreach (`/usr/bin/sudo /usr/bin/zypper --quiet lr -E 2>/dev/null`) {
   if (/\bEasyNAS_Beta\b/) { $repo="EasyNAS_Beta"; last; }
  }
+ return $repo;
+}
+
+############## refresh_update_list ##############
+# Regenerate /etc/easynas/easynas.updates from the live rpmdb so the pending-
+# update count (dashboard banner + sidebar badge) recomputes immediately after
+# an addon action, instead of waiting for the 6-hourly check_update.pl.
+sub refresh_update_list {
+ my $repo=active_channel_repo();
+ `/usr/bin/sudo /usr/bin/zypper --quiet --xmlout lu -a --repo $repo | /usr/bin/sudo /usr/bin/tee /etc/easynas/easynas.updates >/dev/null`;
+}
+
+############## run_bg_update ##############
+# Update EasyNAS packages in a transient systemd unit (own cgroup): updating the
+# base easynas restarts easynas.service, which would otherwise kill this process
+# mid-transaction. $pkg empty => update the whole channel; else that one package.
+#
+# Addon/app updates are INSTANT and need NO reboot, so unlike the firmware track
+# this never sets update.status="ready" (which the layout renders as a "reboot
+# to apply" banner). On success it refreshes easynas.updates and clears
+# update.status, so both the "update running" spinner and the "updates
+# available" message disappear; on failure it leaves "failed" for the banner.
+sub run_bg_update {
+ my ($pkg)=@_;
+ my $repo=active_channel_repo();
+ my $target = ($pkg && $pkg ne "") ? $pkg : "--repo $repo";
  system("/bin/echo updating | /usr/bin/sudo /usr/bin/tee /etc/easynas/update.status >/dev/null");
  system("/usr/bin/sudo /usr/bin/systemd-run --collect --unit=easynas-update "
        ."/bin/sh -c '"
-       ."/usr/bin/zypper -n --gpg-auto-import-keys update --repo $repo "
+       ."/usr/bin/zypper -n --gpg-auto-import-keys update $target "
        .">/var/log/easynas/update.log 2>&1 "
-       ."&& echo ready | /usr/bin/tee /etc/easynas/update.status "
+       ."&& { /usr/bin/zypper --quiet --xmlout lu -a --repo $repo "
+       ."| /usr/bin/tee /etc/easynas/easynas.updates >/dev/null; "
+       ."/bin/rm -f /etc/easynas/update.status; } "
        ."|| echo failed | /usr/bin/tee /etc/easynas/update.status"
        ."' >/dev/null 2>&1");
+}
+
+############## update_all ##############
+# Update every EasyNAS package from the active channel (detached; no reboot).
+sub update_all($self) {
+ run_bg_update("");
  $result="success";
  $msg=$TEXT{'addons_updating'} || "Updating add-ons in the background. The status banner shows progress.";
 }
@@ -160,6 +191,7 @@ sub install_addon($self) {
   $result="success";
   $msg=$TEXT{'addons_installed'};
   `/usr/bin/sudo /usr/bin/zypper --xmlout info $package | /usr/bin/sudo /usr/bin/tee $addons_update_dir/$package.addon`;
+  refresh_update_list();
  }
  else
  {
@@ -192,6 +224,7 @@ sub delete_addon($self) {
  if ($deleted)
  {
   `/usr/bin/sudo /usr/bin/zypper --xmlout info $package | /usr/bin/sudo /usr/bin/tee $addons_update_dir/$package.addon`;
+  refresh_update_list();
   $result="success";
   $msg=$TEXT{'addons_deleted'};
  }
@@ -214,6 +247,15 @@ sub update_addon($self) {
  my $info2;
  my $rc;
  my $updated=0;
+ # The base easynas package restarts easynas.service on update, which would
+ # kill this request -- run it detached (like update_all). Regular addons
+ # update in place, so keep them synchronous for immediate feedback.
+ if ($package eq "easynas") {
+  run_bg_update("easynas");
+  $result="success";
+  $msg=$TEXT{'addons_updating'} || "Updating in the background. The status banner shows progress.";
+  return;
+ }
  $rc = `sudo /usr/bin/zypper -n update $package`;
  @info=`sudo /usr/bin/zypper info $package`;
  foreach(@info)
@@ -226,6 +268,7 @@ sub update_addon($self) {
    }
  if ($updated) {
   `/usr/bin/sudo /usr/bin/zypper --xmlout info $package | /usr/bin/sudo /usr/bin/tee $addons_update_dir/$package.addon`;
+  refresh_update_list();   # clear this addon from the pending-update count
   $result="success";
   $msg=$TEXT{'addons_updated'};
  }
