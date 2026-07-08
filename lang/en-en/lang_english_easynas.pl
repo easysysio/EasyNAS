@@ -308,6 +308,7 @@ $TEXT{'addons_delete?'} = "Delete Addon ?";
 $TEXT{'addons_info'} = "Information";
 $TEXT{'addons_installed'} = "Addon installed successfully";
 $TEXT{'addons_not_installed'} = "Error installing addon";
+$TEXT{'addons_notinst'} = "not installed";
 $TEXT{'addons_deleted'} = "Addon deleted successfully";
 $TEXT{'addons_not_deleted'} = "Error deleting Addon";
 $TEXT{'addons_updated'} = "Addon updated successfully";

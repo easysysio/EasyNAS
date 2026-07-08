@@ -57,7 +57,7 @@
       onclick="return confirm('<%= ($TEXT->{'addons_delete_confirm'} || 'Remove this add-on?') %>')"
       href="?action=delete_addon&package=<%= $a->{pkg} %>"><i class="fa fa-trash"></i></a>
 % } else {
-   <div><small class="text-muted"><%= ($TEXT->{'addons_not_installed'} || 'not installed') %></small></div>
+   <div><small class="text-muted"><%= ($TEXT->{'addons_notinst'} || 'not installed') %></small></div>
    <a class="btn btn-primary btn-xs" style="margin-top:4px"
       onclick="return easynasBusy(this,'<%= ($TEXT->{'addons_installing'} || 'Installing') %>')"
       href="?action=install_addon&package=<%= $a->{pkg} %>"><i class="fa fa-download"></i> <%= ($TEXT->{'addons_install'} || 'Install') %></a>
