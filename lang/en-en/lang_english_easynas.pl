@@ -314,6 +314,9 @@ $TEXT{'addons_not_deleted'} = "Error deleting Addon";
 $TEXT{'addons_updated'} = "Addon updated successfully";
 $TEXT{'addons_not_updated'} = "Error updating addon";
 $TEXT{'addons_close'} = "Close";
+$TEXT{'addons_details'} = "Details";
+$TEXT{'addons_version'} = "Version";
+$TEXT{'addons_nodesc'} = "No description available.";
 
 
 $TEXT{'firmware_upgrade'} = "Firmware Upgrade";
