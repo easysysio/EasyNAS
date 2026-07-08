@@ -50,12 +50,14 @@
    <div style="margin-top:6px"><b><%= ucfirst $a->{name} %></b></div>
 % if ($a->{installed}) {
    <div><small class="text-muted"><%= $a->{version} %></small></div>
-%   if ($a->{program} ne "") {
+%   if (!$a->{core}) {
+%     if ($a->{program} ne "") {
    <a class="btn btn-default btn-xs" style="margin-top:4px" href="/<%= $a->{program} %>"><%= ($TEXT->{'addons_open'} || 'Open') %></a>
-%   }
+%     }
    <a class="btn btn-default btn-xs" style="margin-top:4px"
       onclick="return confirm('<%= ($TEXT->{'addons_delete_confirm'} || 'Remove this add-on?') %>')"
       href="?action=delete_addon&package=<%= $a->{pkg} %>"><i class="fa fa-trash"></i></a>
+%   }
 % } else {
    <div><small class="text-muted"><%= ($TEXT->{'addons_notinst'} || 'not installed') %></small></div>
    <a class="btn btn-primary btn-xs" style="margin-top:4px"

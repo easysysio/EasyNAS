@@ -63,6 +63,17 @@ sub view ($self) {
   if ($installed && $upd{$package}) { push @updates,$tile; }
   else                              { push @{$by_cat{$cat}},$tile; }
  }
+ # The base easynas package itself gets its own "easynas" category tile: always
+ # installed, updatable, but no install/remove (it's the core).
+ my $ever=`/usr/bin/rpm -q --qf '%{VERSION}-%{RELEASE}' easynas 2>/dev/null`;
+ chomp $ever;
+ if ($ever ne "") {
+  my $etile={ pkg=>"easynas", name=>"EasyNAS", icon=>"fa fa-server", cat=>"easynas",
+              version=>$ever, desc=>"", installed=>1, core=>1,
+              program=>"", newver=>($upd{"easynas"}//"") };
+  if ($upd{"easynas"}) { push @updates,$etile; }
+  else                 { push @{$by_cat{"easynas"}},$etile; }
+ }
  $self->stash(result => $result,
               msg => $msg,
               updates => \@updates,
