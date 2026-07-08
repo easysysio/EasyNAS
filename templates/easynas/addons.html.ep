@@ -14,9 +14,30 @@
 </div>
  %}
 
+% unless (@$updates || keys %$by_cat) {
+<div class="alert alert-info"><%= ($TEXT->{'addons_none'} || 'No add-ons installed.') %></div>
+% }
+
+% if (@$updates || keys %$by_cat) {
+<div class="row">
+
+%# ================= Category nav (jumps to each section) =================
+<div class="col-sm-3 col-md-2">
+ <ul class="nav nav-pills nav-stacked easynas-catnav">
+% if (@$updates) {
+  <li><a href="#cat-updates"><i class="fa fa-refresh"></i> <%= ($TEXT->{'addons_updates'} || 'Updates') %> <span class="badge"><%= scalar @$updates %></span></a></li>
+% }
+% for my $cat (sort keys %$by_cat) {
+  <li><a href="#cat-<%= $cat %>"><%= ($TEXT->{"addons_$cat"} || ucfirst $cat) %></a></li>
+% }
+ </ul>
+</div>
+
+<div class="col-sm-9 col-md-10">
+
 %# ================= Updates (pinned on top) =================
 % if (@$updates) {
-<div class="panel panel-default">
+<div class="panel panel-default easynas-cat" id="cat-updates">
  <div class="panel-heading">
   <b><%= ($TEXT->{'addons_updates'} || 'Updates') %>: <%= scalar @$updates %></b>
   <a class="btn btn-success btn-xs pull-right"
@@ -41,7 +62,7 @@
 
 %# ================= Installed, grouped by category =================
 % for my $cat (sort keys %$by_cat) {
-<div class="panel panel-default">
+<div class="panel panel-default easynas-cat" id="cat-<%= $cat %>">
  <div class="panel-heading"><b><%= ($TEXT->{"addons_$cat"} || ucfirst $cat) %></b></div>
  <div class="panel-body"><div class="row">
 % for my $a (@{$by_cat->{$cat}}) {
@@ -70,9 +91,17 @@
 </div>
 % }
 
-% unless (@$updates || keys %$by_cat) {
-<div class="alert alert-info"><%= ($TEXT->{'addons_none'} || 'No add-ons installed.') %></div>
+</div>%# /content column
+</div>%# /row
 % }
+
+<style>
+/* Sticky category nav on the left; offset anchors below the fixed navbar. */
+.easynas-catnav { margin-bottom:20px; }
+.easynas-catnav .badge { background-color:#5cb85c; }
+.easynas-cat { scroll-margin-top:70px; }
+@media (min-width:768px){ .easynas-catnav { position:sticky; top:70px; } }
+</style>
 
 <script>
 // Flip an action button to a spinner + label and block re-clicks while the
