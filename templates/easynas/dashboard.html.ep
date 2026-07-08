@@ -60,6 +60,10 @@
 
 </div></div></div><div class="panel-footer"><span class="pull-left"><i class="fa fa-arrow-circle-right" style="color:red"></i></span><span class="pull-left">&nbsp;Failed</span><br><span class="pull-left"><i class="fa fa-arrow-circle-right" style="color:green"></i></span><span class="pull-left">&nbsp;Used</span><br><span class="pull-left"><i class="fa fa-arrow-circle-right" style="color:blue"></i></span><span class="pull-left">&nbsp;System</span><br><span class="pull-left"><i class="fa fa-arrow-circle-right" style="color:gray"></i></span><span class="pull-left">&nbsp;Free</span><div class="clearfix"></div></div></div></div>
 
+<!-- close the first panel row (CPU|Disk) so the uneven panel heights don't
+     make the next pair (Memory|File System) float-catch into a gap -->
+<div class="clearfix"></div>
+
 <div class="col-lg-6"><div class="panel panel-default"><div class="panel-heading"><div class="row"><div class="col-xs-3"><%= ($TEXT->{'dashboard_memory'}) %></div><div class="panel-body">
 <i id="mem-icon" class="fa fa-memory fa-3x" style="color:<%= $memory->{percentage} > 90 ? "red" : "green" %>"></i>
 &nbsp;<span id="mem-usedtotal"><%= $memory->{used} %> / <%= $memory->{total} %></span>
