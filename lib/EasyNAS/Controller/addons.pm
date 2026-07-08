@@ -52,7 +52,9 @@ sub view ($self) {
   my $installed=(defined $status && $status eq "up-to-date") ? 1 : 0;
   my $info=get_addon_info($name) || {};
   my $icon=($info->{icon} && $info->{icon} ne "") ? $info->{icon} : "fa fa-puzzle-piece";
-  my $cat =($info->{type}  && $info->{type} ne "" && $info->{type} ne "none") ? $info->{type} : $group;
+  # Category = the package group code (fs/mm/srv/stg/lang); the template maps it
+  # to a friendly label (File Sharing / Multimedia / Service / Storage).
+  my $cat = $group;
   my $tile={ pkg=>$package, name=>$name, icon=>$icon, cat=>$cat,
              version=>$ver, desc=>$desc, installed=>$installed,
              program=>($info->{program}//""), newver=>($upd{$package}//"") };

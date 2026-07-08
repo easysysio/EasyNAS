@@ -284,6 +284,12 @@ $TEXT{'addons_sharing'} = "File Sharing";
 $TEXT{'addons_storage'} = "Storage&Backup";
 $TEXT{'addons_multimedia'} = "Multimedia";
 $TEXT{'addons_services'} = "Services";
+# Addon grid category labels, keyed by package group code (easynas-<group>-*).
+$TEXT{'addons_fs'}  = "File Sharing";
+$TEXT{'addons_mm'}  = "Multimedia";
+$TEXT{'addons_srv'} = "Service";
+$TEXT{'addons_stg'} = "Storage";
+$TEXT{'addons_lang'} = "Language";
 $TEXT{'addons_lang'} = "Language";
 $TEXT{'addons_other'} = "Other Apps";
 $TEXT{'addons_name'} = "Addon Name";
