@@ -38,6 +38,7 @@ my $timestamp=localtime();
 # All external calls are bounded by timeouts so a slow or unreachable endpoint
 # can never hang the update check.
 my $version=`cat /etc/ImageVersion`;
+chomp($version);   # else a trailing newline garbles the stats POST 'ver' field
 my $ip=`curl -s --connect-timeout 5 --max-time 10 https://ifconfig.io/ip`;
 chop($ip);
 my $arc=`/usr/bin/uname -m`;
@@ -63,7 +64,19 @@ foreach (`/usr/bin/sudo /usr/bin/zypper --quiet lr -E 2>/dev/null`) {
 # Fetch the channel's per-arch core-image manifest (version/date/file/sha256)
 # into easynas.core; the Firmware page reads this file (no live network call).
 my $channel = ($repo eq "EasyNAS_Beta") ? "testing" : "stable";
-`curl -s --connect-timeout 5 --max-time 15 https://repo.easysys.io/easynas/$channel/RAW/latest.$arc | /usr/bin/sudo /usr/bin/tee /etc/easynas/easynas.core >/dev/null`;
+# Fetch with --fail to a temp file and only replace easynas.core on success, so
+# a missing manifest (e.g. an empty channel -> HTTP 404) or an offline check
+# can't overwrite the previous manifest with a 404 body or an empty file.
+my $core_tmp="/etc/easynas/easynas.core.new";
+# curl writes the file itself (-o) rather than via a pipe, so $core_rc reflects
+# curl's own exit status -- a piped 'tee' would always exit 0 and mask --fail.
+my $core_rc=system("curl -fs --connect-timeout 5 --max-time 15 -o $core_tmp "
+                  ."https://repo.easysys.io/easynas/$channel/RAW/latest.$arc");
+if ($core_rc == 0 && -s $core_tmp) {
+  `/bin/mv $core_tmp /etc/easynas/easynas.core`;
+} else {
+  `/bin/rm -f $core_tmp`;
+}
 
 if (-e $addons) {
   open my $fh, '<', $addons;
