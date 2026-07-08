@@ -1161,6 +1161,39 @@ sub fs_info
                  ? "degraded" : "good";
        $filesystems{$fs}=[$uuid,$health,$size,$used,$free,$percentage,$devices,$path,$mounted,$raid,get_compress_status($fs)];
     }
+
+ # Second pass -- refine health with the two extra signals the appliance cares
+ # about beyond a missing device:
+ #   (1) any btrfs I/O/corruption error counter on a member disk ("disk_errors")
+ #   (2) fewer disks than the RAID profile is meant to run on ("insufficient")
+ # A missing device ("degraded", set above) is the most severe and wins over both.
+ # Both checks need a mountpoint to probe, so unmounted volumes keep their
+ # first-pass health.
+ my %raid_min = ( RAID0=>2, RAID1=>2, RAID10=>4, RAID5=>3, RAID6=>4,
+                  RAID1C3=>3, RAID1C4=>4 );        # JBOD/single/DUP default to 1
+ foreach my $fs (keys %filesystems)
+    {
+     next if ($filesystems{$fs}[1] eq "degraded");     # already critical
+     next unless ($filesystems{$fs}[8] eq "Mounted");  # need a mount to probe
+     my $d = ($fs eq "ROOT") ? "/" : $mount_dir."/".$fs;
+
+     # (1) Disk errors: any non-zero *_errs counter across the member devices.
+     my $err = 0;
+     foreach (`/usr/bin/sudo /sbin/btrfs device stats $d 2>/dev/null`)
+        {
+         if (/_errs\s+(\d+)/ && $1 > 0) { $err = 1; last; }
+        }
+     if ($err) { $filesystems{$fs}[1] = "disk_errors"; next; }
+
+     # (2) Under-provisioned RAID: fewer disks than the profile expects. When
+     # not degraded the present-device count equals Total devices ([6]).
+     my $need = $raid_min{ $filesystems{$fs}[9] } // 1;
+     my $have = $filesystems{$fs}[6];
+     if (defined $have && $have ne "" && $have < $need)
+        {
+         $filesystems{$fs}[1] = "insufficient";
+        }
+    }
     return (%filesystems);
 }
 

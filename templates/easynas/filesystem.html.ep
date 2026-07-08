@@ -38,7 +38,10 @@
                                                 <tr>
                                                     <td><a href="?action=settingsmenu&fs=<%= $fs %>"><i class="fa fa-database fa-2x" title="Settings"></i></a></td>
 						    <td><a href="?action=settingsmenu&fs=<%= $fs %>"><%= $fs %></a></td>
-						    <td><%= ($TEXT->{$filesystems->{$fs}[1]}) %></td>
+						    <td>
+% my $h=$filesystems->{$fs}[1];
+% my %hc=(good=>'success', insufficient=>'warning', disk_errors=>'danger', degraded=>'danger');
+<span class="label label-<%= ($hc{$h} || 'default') %>"><%= ($TEXT->{$h} || $h) %></span></td>
 						    <td><%= $filesystems->{$fs}[2] %></td>
 						    <td><%= $filesystems->{$fs}[6] %></td>
 						    <td><%= $filesystems->{$fs}[8] %></td>
