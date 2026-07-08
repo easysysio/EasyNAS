@@ -601,49 +601,54 @@ sub mount($self)
 
 ######## changesettings ########
 sub changesettings($self) {
- my $fs = $self->param("fs");
- my $uuid = $self->param("uuid");
- my $compress = $self->param("compress");
- my $options = $self->param("options");
- my $ssd = $self->param("ssd");
- my $defrag = $self->param("defrag");
- my $mount_dir = get_mount_dir; 
+ my $fs        = $self->param("fs");
+ my $compress  = $self->param("compress");
+ my $access    = $self->param("mount");       # "readonly" | "read&write"
+ my $ssd       = $self->param("ssd");
+ my $defrag    = $self->param("defrag");
+ my $automount = $self->param("automount");
+ my $mount_dir = get_mount_dir;
+ my $dir       = "$mount_dir/$fs";
  my $rc;
 
- if ($ssd)
- {
-  $ssd = "ssd,discard,noatime";
+ # The form doesn't carry the UUID -- read it from btrfs (needed for fstab).
+ my $btrfs = `/usr/bin/sudo /sbin/btrfs filesystem show $fs 2>/dev/null | /usr/bin/grep uuid`;
+ (undef,undef,undef,my $uuid) = split(" ", $btrfs);
+
+ # Build the option list from only the parts that are set, so an unchecked
+ # ssd/defrag never leaves an empty ",," option (which mount rejects).
+ my @opt;
+ push @opt, (defined $access && $access eq "readonly") ? "ro" : "rw";
+ push @opt, "compress=$compress"
+   if (defined $compress && $compress ne "" && $compress ne "none");
+ push @opt, "ssd", "discard", "noatime" if ($ssd);
+ push @opt, "autodefrag"                if ($defrag);
+ my $optstr = join(",", @opt);
+
+ if (!-d $dir) {
+  $rc = system("/usr/bin/sudo /bin/mkdir $dir");
+  if ($rc != 0) { $result="fail"; $msg=$TEXT{'fs_failed_creating_dir'}; return; }
  }
- else 
- {
-  $ssd="";
+
+ # Drop any existing fstab entry for this mountpoint, then (when auto-mount is
+ # on) write the new one -- appending blindly would pile up duplicate lines.
+ `/usr/bin/sudo /bin/sed -i '$mount_dir.$fs /d' /etc/fstab`;
+ if ($automount) {
+  `/bin/echo "UUID=$uuid $dir btrfs $optstr 0 0" | /usr/bin/sudo /usr/bin/tee -a /etc/fstab >/dev/null`;
  }
- if ($defrag)
- {
-  $defrag = "autodefrag";
+
+ # Apply live: remount in place when already mounted (you can't plain-mount an
+ # already-mounted fs), otherwise a fresh mount.
+ if (mounted($fs) eq "Mounted") {
+  $rc = system("/usr/bin/sudo /usr/bin/mount -o remount,$optstr $dir >/dev/null 2>&1");
+ } else {
+  $rc = system("/usr/bin/sudo /usr/bin/mount -t btrfs -o $optstr $dir >/dev/null 2>&1");
  }
-  else
- {
-  $defrag = "";
+ if ($rc != 0) {
+  $result="fail";
+  $msg=$TEXT{"fs_failed_mounting"};
+  return;
  }
- if (!(-e $mount_dir/$fs))
-    {
-     $rc = system("/usr/bin/sudo /bin/mkdir $mount_dir/$fs");
-     if ($rc ne 0)
-     {
-      $result="fail";
-      $msg=$TEXT{'fs_failed_creating_dir'};
-     }
-    }
-    $rc = system("/bin/echo \"UUID=$uuid $mount_dir/$fs btrfs $options,compress=$compress,$ssd,$defrag 0 0\" | /usr/bin/sudo /usr/bin/tee -a /etc/fstab > /dev/null");
-    $rc = system("/usr/bin/sudo /usr/bin/mount -t btrfs -o $options,compress=$compress,,$ssd,$defrag $mount_dir/$fs > /dev/null");
-    if ($rc ne 0)
-    {
-     $result="fail";
-     $msg=$TEXT{"fs_failed_mounting"};
-     $rc = system("/usr/bin/sudo /bin/sed -i '$mount_dir.$fs /d' /etc/fstab > /dev/null");
-     return;
-    }
  $result="success";
  $msg=$TEXT{'fs_mounted'};
 }
