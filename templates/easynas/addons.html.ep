@@ -101,8 +101,8 @@
 </div>
 % }
 
-</div>%# /content column
-</div>%# /row
+</div><!-- /content column -->
+</div><!-- /row -->
 % }
 
 %# ================= Addon details modal (populated by the (i) click) =========
