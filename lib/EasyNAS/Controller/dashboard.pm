@@ -52,6 +52,7 @@ sub view ($self) {
 		addon => $addon,
 		TEXT =>\%TEXT,
 		missing_update => $missing_update,
+		update_count => get_update_count(),
 		addons =>\%addons,
 		filesystems => \%fs,
 		disks => \%disks,

@@ -53,6 +53,8 @@ $TEXT{'login_remember_me'} = "Remember me";
 ######  Dashboard ######
 $TEXT{'dashboard'} = "Dashboard";
 $TEXT{'dashboard_view_details'} = "View Details";
+$TEXT{'dashboard_update_available'} = "Updates are available for EasyNAS and its add-ons.";
+$TEXT{'dashboard_update_here'} = "Open Add-ons";
 $TEXT{'dashboard_drives'} = "Drives";
 $TEXT{'dashboard_filesystems'} = "File Systems";
 $TEXT{'dashboard_users'} = "Users";

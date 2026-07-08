@@ -1,9 +1,15 @@
 % layout 'default';
 
 
-% if ($missing_update) { 
+% if ($missing_update) {
 <div class="alert alert-info alert-dismissable">
-<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button><%= ($TEXT->{'firmware_update_available'}) %><a href="firmware" ><%= ($TEXT->{'firmware_here'}) %></a></div>
+<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+<i class="fa fa-arrow-circle-up"></i>
+<%= ($TEXT->{'dashboard_update_available'} || 'Updates are available for EasyNAS and its add-ons.') %>
+% if ($update_count) {
+(<%= $update_count %>)
+% }
+<a href="<%= ($addons->{'addons'}->{program} || 'addons') %>" class="alert-link"><%= ($TEXT->{'dashboard_update_here'} || 'Open Add-ons') %></a></div>
 %}
 <div class="row"><div class="col-lg-3 col-md-6"><div class="panel panel-green"><div class="panel-heading"><div class="row"><div class="col-xs-3"><i class="fa-regular fa-hard-drive fa-5x"></i></div><div class="col-xs-9 text-right"><div class="huge"><%= $disk_number %></div><div><%= ($TEXT->{'dashboard_drives'}) %></div></div></div></div><a href="<%= ($addons->{disk}->{program}) %>"><div class="panel-footer"><span class="pull-left"><%= ($TEXT->{'dashboard_view_details'}) %></span><span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span><div class="clearfix"></div></div></a></div></div><div class="col-lg-3 col-md-6"><div class="panel panel-primary"><div class="panel-heading">
 
