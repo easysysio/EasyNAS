@@ -209,7 +209,7 @@
 
 %# ---- global system-update banner (shown on every page) ----
 % if ($update_state eq "updating") {
-                    <div class="alert alert-info"><i class="fa fa-spinner fa-spin"></i>
+                    <div class="alert alert-info" style="margin-top:15px"><i class="fa fa-spinner fa-spin"></i>
                       <%= ($TEXT->{'firmware_updating'} || 'System update running in the background...') %></div>
                     <script>
                     // While updating, poll the status and refresh once it changes
@@ -222,13 +222,13 @@
                     })();
                     </script>
 % } elsif ($update_state eq "ready") {
-                    <div class="alert alert-success">
+                    <div class="alert alert-success" style="margin-top:15px">
                       <i class="fa fa-check"></i> <%= ($TEXT->{'firmware_update_done'} || 'Update complete. Reboot to apply it.') %>
                       <a class="btn btn-warning btn-xs" onclick="return confirm('<%= ($TEXT->{'firmware_reboot_confirm'} || 'Reboot the appliance now?') %>')"
                          href="/firmware?action=reboot"><i class="fa fa-power-off"></i> <%= ($TEXT->{'firmware_reboot'} || 'Reboot now') %></a>
                     </div>
 % } elsif ($update_state =~ /^failed/) {
-                    <div class="alert alert-danger">
+                    <div class="alert alert-danger" style="margin-top:15px">
                       <i class="fa fa-exclamation-triangle"></i>
                       <%= ($TEXT->{'firmware_update_failed'} || 'The last update failed.') %>
                       <a href="/firmware"><%= ($TEXT->{'firmware'} || 'Updates') %></a></div>
