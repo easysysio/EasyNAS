@@ -196,7 +196,12 @@ EOF
 %config(noreplace) /etc/easynas/easynas.conf
 %config(noreplace) /etc/easynas/addons/easynas.addons
 %config(noreplace) /var/log/easynas/easynas.log
-/etc/zypp/repos.d
+# The channel repos ship enabled=1 (stable) / enabled=0 (testing), but the image
+# flips them per channel (config.sh) and the user can switch. noreplace keeps
+# that choice on upgrade -- otherwise every update resets a testing box back to
+# stable and breaks its own update source.
+%config(noreplace) /etc/zypp/repos.d/EasyNAS.repo
+%config(noreplace) /etc/zypp/repos.d/EasyNAS_Beta.repo
 /etc/sudoers.d/easynas
 /etc/ImageVersion
 /usr/lib/systemd/system/easynas.service
