@@ -35,7 +35,6 @@ mkdir -p %{buildroot}/easynas
 mkdir -p %{buildroot}/etc/easynas/addons
 mkdir -p %{buildroot}/etc/cron.d
 mkdir -p %{buildroot}/etc/sudoers.d
-mkdir -p %{buildroot}/etc/zypp/repos.d
 mkdir -p %{buildroot}/var/log/easynas
 mkdir -p %{buildroot}/usr/lib/systemd/system
 
@@ -80,27 +79,9 @@ cat > %{buildroot}/etc/easynas/addons/easynas.addons << 'EOF'
 </stream>
 EOF
 
-cat > %{buildroot}/etc/zypp/repos.d/EasyNAS.repo << 'EOF'
-[EasyNAS]
-enabled=1
-autorefresh=1
-baseurl=https://repo.easysys.io/easynas/stable/RPMS
-type=rpm-md
-gpgcheck=1
-gpgkey=https://repo.easysys.io/easysys.gpg
-keeppackages=0
-EOF
-
-cat > %{buildroot}/etc/zypp/repos.d/EasyNAS_Beta.repo << 'EOF'
-[EasyNAS_Beta]
-enabled=0
-autorefresh=1
-baseurl=https://repo.easysys.io/easynas/testing/RPMS
-type=rpm-md
-gpgcheck=1
-gpgkey=https://repo.easysys.io/easysys.gpg
-keeppackages=0
-EOF
+# The channel repo (EasyNAS or EasyNAS_Beta) is NOT shipped by this RPM. It is
+# baked into the image by KIWI (imageinclude), one channel per image, so an RPM
+# update never resets which channel the appliance updates from.
 
 cat > %{buildroot}/usr/lib/systemd/system/easynas.service << 'EOF'
 [Unit]
@@ -196,12 +177,6 @@ EOF
 %config(noreplace) /etc/easynas/easynas.conf
 %config(noreplace) /etc/easynas/addons/easynas.addons
 %config(noreplace) /var/log/easynas/easynas.log
-# The channel repos ship enabled=1 (stable) / enabled=0 (testing), but the image
-# flips them per channel (config.sh) and the user can switch. noreplace keeps
-# that choice on upgrade -- otherwise every update resets a testing box back to
-# stable and breaks its own update source.
-%config(noreplace) /etc/zypp/repos.d/EasyNAS.repo
-%config(noreplace) /etc/zypp/repos.d/EasyNAS_Beta.repo
 /etc/sudoers.d/easynas
 /etc/ImageVersion
 /usr/lib/systemd/system/easynas.service
