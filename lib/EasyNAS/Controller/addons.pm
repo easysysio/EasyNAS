@@ -60,18 +60,28 @@ sub view ($self) {
  my %upd=addon_updates();                # package -> new version (from easynas.updates)
  my @updates;                            # addons with an available update
  my %by_cat;                             # category -> [addon tiles]
+ # Flag image per installed language (keyed by lower-cased name), so language
+ # addons render their country flag instead of a generic icon.
+ my %lang_flag;
+ foreach my $l (get_lang_list()) {
+  $lang_flag{lc $l->{name}} = $l->{flag} if ($l->{flag});
+ }
  foreach my $package (sort keys %addons) {
   my ($name,$group,$desc,$status,$ver)=@{$addons{$package}};
   my $installed=(defined $status && $status eq "up-to-date") ? 1 : 0;
   my $info=get_addon_info($name) || {};
+  # Icons are stored WITHOUT the "fa" family prefix (as in the .easynas files,
+  # e.g. "fa-refresh" or "fa-brands fa-windows"); the template prepends "fa ".
   # Installed -> the addon's own .easynas icon; not installed -> the fallback
-  # map (its .easynas isn't on disk yet); unknown -> a generic icon.
+  # map; language addons default to a flag icon; otherwise a generic icon.
   my $icon=($info->{icon} && $info->{icon} ne "") ? $info->{icon}
-          : ($addon_icon{$name} // "fa fa-puzzle-piece");
+          : ($addon_icon{$name} // ($group eq "lang" ? "fa-flag" : "fa-puzzle-piece"));
+  # A language addon shows its country flag image when we know it (installed).
+  my $flag=($group eq "lang") ? ($lang_flag{lc $name} // "") : "";
   # Category = the package group code (fs/mm/srv/stg/lang); the template maps it
   # to a friendly label (File Sharing / Multimedia / Service / Storage).
   my $cat = $group;
-  my $tile={ pkg=>$package, name=>$name, icon=>$icon, cat=>$cat,
+  my $tile={ pkg=>$package, name=>$name, icon=>$icon, flag=>$flag, cat=>$cat,
              version=>$ver, desc=>$desc, installed=>$installed,
              program=>($info->{program}//""), newver=>($upd{$package}//"") };
   # Installed with an update -> Updates section; otherwise (installed-current or
@@ -84,7 +94,7 @@ sub view ($self) {
  my $ever=`/usr/bin/rpm -q --qf '%{VERSION}-%{RELEASE}' easynas 2>/dev/null`;
  chomp $ever;
  if ($ever ne "") {
-  my $etile={ pkg=>"easynas", name=>"EasyNAS", icon=>"fa fa-server", cat=>"easynas",
+  my $etile={ pkg=>"easynas", name=>"EasyNAS", icon=>"fa-server", flag=>"", cat=>"easynas",
               version=>$ever, desc=>"", installed=>1, core=>1,
               program=>"", newver=>($upd{"easynas"}//"") };
   if ($upd{"easynas"}) { push @updates,$etile; }

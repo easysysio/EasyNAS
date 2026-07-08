@@ -47,7 +47,11 @@
  <div class="panel-body"><div class="row">
 % for my $a (@$updates) {
   <div class="col-sm-3 col-xs-6 text-center" style="margin-bottom:20px">
-   <i class="<%= $a->{icon} %> fa-3x"></i>
+% if ($a->{flag}) {
+   <img src="/images/<%= $a->{flag} %>" alt="" style="height:44px">
+% } else {
+   <i class="fa <%= $a->{icon} %> fa-3x"></i>
+% }
    <div style="margin-top:6px"><b><%= ucfirst $a->{name} %></b></div>
    <div><small class="text-muted"><%= ($TEXT->{"addons_$a->{cat}"} || ucfirst $a->{cat}) %></small></div>
    <div><small><%= $a->{version} %> &rarr; <b><%= $a->{newver} %></b></small></div>
@@ -72,7 +76,11 @@
  <div class="panel-body"><div class="row">
 % for my $a (@{$by_cat->{$cat}}) {
   <div class="col-sm-3 col-xs-6 text-center" style="margin-bottom:20px">
-   <i class="<%= $a->{icon} %> fa-3x"<%= $a->{installed} ? '' : ' style="opacity:0.45"' %>></i>
+% if ($a->{flag}) {
+   <img src="/images/<%= $a->{flag} %>" alt="" style="height:44px<%= $a->{installed} ? '' : ';opacity:0.45' %>">
+% } else {
+   <i class="fa <%= $a->{icon} %> fa-3x"<%= $a->{installed} ? '' : ' style="opacity:0.45"' %>></i>
+% }
    <div style="margin-top:6px"><b><%= ucfirst $a->{name} %></b></div>
 % if ($a->{installed}) {
    <div><small class="text-muted"><%= $a->{version} %></small></div>
@@ -149,7 +157,7 @@ document.addEventListener('click', function(e){
   var el = e.target.closest ? e.target.closest('.addon-info') : null;
   if (!el) return;
   var d = el.dataset;
-  document.getElementById('ai-icon').className = d.icon + ' fa-lg';
+  document.getElementById('ai-icon').className = 'fa ' + d.icon + ' fa-lg';
   document.getElementById('ai-name').textContent = d.name;
   document.getElementById('ai-cat').textContent = d.cat;
   var ver = d.version || '';
