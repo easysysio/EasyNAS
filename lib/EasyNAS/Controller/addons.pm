@@ -10,6 +10,19 @@ my $result;
 my $addon = get_addon_info("addons");
 my %TEXT=get_lang_text($addon->{'name'});
 
+# Icon fallback for addons whose .easynas ships with the subpackage (so it's
+# absent until installed). Lets the grid show the real icon before install.
+# Keep in sync with the addons/*.easynas <icon> fields.
+my %addon_icon = (
+ afp     => "fa-brands fa-apple",   ftp    => "fa-file",
+ nfs     => "fa-brands fa-linux",   rsyncd => "fa-refresh",
+ samba   => "fa-brands fa-windows", ssh    => "fa-terminal",
+ tftp    => "fa-file-code",         dlna   => "fa-file-video",
+ plex    => "fa-film",              lxc    => "fa-desktop",
+ mariadb => "fa-file-text",         radius => "fa-circle",
+ iscsi   => "fa-external-link",
+);
+
 
 sub view ($self) {
   if (!($self->session('is_auth'))) {
@@ -51,7 +64,10 @@ sub view ($self) {
   my ($name,$group,$desc,$status,$ver)=@{$addons{$package}};
   my $installed=(defined $status && $status eq "up-to-date") ? 1 : 0;
   my $info=get_addon_info($name) || {};
-  my $icon=($info->{icon} && $info->{icon} ne "") ? $info->{icon} : "fa fa-puzzle-piece";
+  # Installed -> the addon's own .easynas icon; not installed -> the fallback
+  # map (its .easynas isn't on disk yet); unknown -> a generic icon.
+  my $icon=($info->{icon} && $info->{icon} ne "") ? $info->{icon}
+          : ($addon_icon{$name} // "fa fa-puzzle-piece");
   # Category = the package group code (fs/mm/srv/stg/lang); the template maps it
   # to a friendly label (File Sharing / Multimedia / Service / Storage).
   my $cat = $group;
