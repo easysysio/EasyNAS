@@ -10,6 +10,8 @@
  # Only surface the update banner to a logged-in admin (the login page uses this
  # layout too, and the banner carries a reboot link).
  my $update_state = $username ? get_update_state() : "";
+ # Pending EasyNAS package updates, for the sidebar Addons badge.
+ my $addon_updates = $username ? get_update_count() : 0;
 
 %>
 
@@ -184,7 +186,11 @@
 			    <ul class="nav nav-second-level">
 				    % foreach my $item (@{$categorie->{addons}}) {	
    			     <li>
-				     <a href="<%= $item->{program} %>" class="active"><i class="fa <%= $item->{icon} %>"></i> <%= ($TEXT->{$item->{name}}) %></a>
+				     <a href="<%= $item->{program} %>" class="active"><i class="fa <%= $item->{icon} %>"></i> <%= ($TEXT->{$item->{name}}) %>\
+% if ($item->{program} eq "addons" && $addon_updates > 0) {
+ <span class="badge" style="background-color:#5cb85c"><%= $addon_updates %></span>\
+% }
+</a>
    			     </li>
    		   	    % }
    			    </ul>

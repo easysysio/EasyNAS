@@ -28,7 +28,7 @@ use Exporter;
 use Number::Bytes::Human qw(format_bytes parse_bytes);
 our @ISA = qw(Exporter);
 our @EXPORT_OK = qw();
-our @EXPORT    = qw( get_mount_dir get_conf_cron get_addons_file get_update_file get_categories mounted 
+our @EXPORT    = qw( get_mount_dir get_conf_cron get_addons_file get_update_file get_update_count get_categories mounted
                      get_group_default get_conf_webui get_conf_hosts  get_lang_list get_addons_update_dir 
 		     get_lang_text get_service_status get_menu get_addons get_addon_info 
 		     write_log easynas_info addons_info fs_info vol_info users_info groups_info
@@ -304,6 +304,18 @@ sub get_addons_update_dir
 sub get_update_file
 {
  return($update_file);
+}
+
+############# get_update_count ###############
+# Number of pending EasyNAS package updates (base + addons), from the list
+# check_update.pl writes (zypper lu --xmlout: one <update .../> per package).
+# Used for the sidebar Addons badge. Plain grep -- no XML dependency here.
+sub get_update_count
+{
+ return 0 unless (-e $update_file);
+ my $c=`/bin/grep -c '<update ' $update_file 2>/dev/null`;
+ chomp $c;
+ return ($c =~ /^\d+$/) ? $c+0 : 0;
 }
 
 ############# get_conf_hosts ################
