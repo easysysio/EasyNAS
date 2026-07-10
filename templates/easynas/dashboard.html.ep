@@ -20,7 +20,11 @@
 <div class="row"><div class="col-xs-3"><i class="fa fa-users fa-5x"></i></div><div class="col-xs-9 text-right"><div class="huge"><%= $user_number %></div><div><%= ($TEXT->{'dashboard_users'}) %></div></div></div></div><a href="<%= ($addons->{'users'}->{program}) %>"><div class="panel-footer"><span class="pull-left"><%= ($TEXT->{'dashboard_view_details'}) %></span><span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span><div class="clearfix"></div></div></a></div></div>
 
 
-<div class="col-lg-6"><div class="panel panel-default"><div class="panel-heading"><div class="row"><div class="col-xs-3"><%= ($TEXT->{'dashboard_cpu'}) %></div><div class="panel-body">
+%# Two real column containers so each column stacks independently (no float
+%# catching between uneven panel heights): gauges on the left, tables on the right.
+<div class="col-lg-6">
+
+<div class="panel panel-default"><div class="panel-heading"><div class="row"><div class="col-xs-3"><%= ($TEXT->{'dashboard_cpu'}) %></div><div class="panel-body">
 <i id="cpu-icon" class="fa fa-microchip fa-3x" style="color:<%= $cpu->{usage} > 90 ? "red" : "green" %>"></i>
 &nbsp;<%= $cpu->{model} %> (<%= $cpu->{cores} %> <%= ($TEXT->{'dashboard_cores'}) %>)
 <div style="text-align:center">
@@ -31,9 +35,31 @@
 </svg>
 </div>
 <%= ($TEXT->{'dashboard_load'}) %>: <span id="cpu-load"><%= $cpu->{load1} %> / <%= $cpu->{load5} %> / <%= $cpu->{load15} %></span>
-</div></div></div><div class="panel-footer"><span class="pull-left"><%= ($TEXT->{'dashboard_load'}) %>&nbsp;1/5/15&nbsp;min</span><div class="clearfix"></div></div></div></div>
+</div></div></div><div class="panel-footer"><span class="pull-left"><%= ($TEXT->{'dashboard_load'}) %>&nbsp;1/5/15&nbsp;min</span><div class="clearfix"></div></div></div>
 
-<div class="col-lg-6"><div class="panel panel-default"><div class="panel-heading"><div class="row"><div class="col-xs-3">Disk</div><div class="panel-body">
+<div class="panel panel-default"><div class="panel-heading"><div class="row"><div class="col-xs-3"><%= ($TEXT->{'dashboard_memory'}) %></div><div class="panel-body">
+<i id="mem-icon" class="fa fa-memory fa-3x" style="color:<%= $memory->{percentage} > 90 ? "red" : "green" %>"></i>
+&nbsp;<span id="mem-usedtotal"><%= $memory->{used} %> / <%= $memory->{total} %></span>
+<div style="text-align:center">
+<svg viewBox="0 0 120 68" style="width:170px;max-width:100%" role="img" aria-label="memory usage">
+ <path d="M10 60 A50 50 0 0 1 110 60" fill="none" stroke="#e5e5e5" stroke-width="11" stroke-linecap="round"/>
+ <path id="mem-gauge" d="M10 60 A50 50 0 0 1 110 60" fill="none" stroke="<%= $memory->{percentage} > 90 ? "#d9534f" : "#5cb85c" %>" stroke-width="11" stroke-linecap="round" stroke-dasharray="157.08" stroke-dashoffset="<%= sprintf('%.1f', 157.08*(1-$memory->{percentage}/100)) %>"/>
+ <text id="mem-gauge-text" x="60" y="55" text-anchor="middle" font-size="22" font-weight="bold" fill="#666"><%= $memory->{percentage} %>%</text>
+</svg>
+</div>
+% if ($memory->{has_swap}) {
+<%= ($TEXT->{'dashboard_swap'}) %>: <%= $memory->{swap_used} %> / <%= $memory->{swap_total} %>
+<div class="progress" role="progressbar" aria-label="swap usage" aria-valuenow="<%= $memory->{swap_percentage} %>" aria-valuemin="0" aria-valuemax="100">
+ <%= $memory->{swap_percentage} %>%<div class="progress-bar" style="width: <%= $memory->{swap_percentage} %>%"></div>
+</div>
+% }
+</div></div></div><div class="panel-footer"><span class="pull-left"><%= ($TEXT->{'dashboard_memory_available'}) %>:&nbsp;<span id="mem-available"><%= $memory->{available} %></span></span><div class="clearfix"></div></div></div>
+
+</div><!-- /left column -->
+
+<div class="col-lg-6">
+
+<div class="panel panel-default"><div class="panel-heading"><div class="row"><div class="col-xs-3">Disk</div><div class="panel-body">
 <table>
 <tr>
 % foreach my $disk (keys (%$disks)) {
@@ -58,31 +84,9 @@
 </tr>
 </table>
 
-</div></div></div><div class="panel-footer"><span class="pull-left"><i class="fa fa-arrow-circle-right" style="color:red"></i></span><span class="pull-left">&nbsp;Failed</span><br><span class="pull-left"><i class="fa fa-arrow-circle-right" style="color:green"></i></span><span class="pull-left">&nbsp;Used</span><br><span class="pull-left"><i class="fa fa-arrow-circle-right" style="color:blue"></i></span><span class="pull-left">&nbsp;System</span><br><span class="pull-left"><i class="fa fa-arrow-circle-right" style="color:gray"></i></span><span class="pull-left">&nbsp;Free</span><div class="clearfix"></div></div></div></div>
+</div></div></div><div class="panel-footer"><span class="pull-left"><i class="fa fa-arrow-circle-right" style="color:red"></i></span><span class="pull-left">&nbsp;Failed</span><br><span class="pull-left"><i class="fa fa-arrow-circle-right" style="color:green"></i></span><span class="pull-left">&nbsp;Used</span><br><span class="pull-left"><i class="fa fa-arrow-circle-right" style="color:blue"></i></span><span class="pull-left">&nbsp;System</span><br><span class="pull-left"><i class="fa fa-arrow-circle-right" style="color:gray"></i></span><span class="pull-left">&nbsp;Free</span><div class="clearfix"></div></div></div>
 
-<!-- close the first panel row (CPU|Disk) so the uneven panel heights don't
-     make the next pair (Memory|File System) float-catch into a gap -->
-<div class="clearfix"></div>
-
-<div class="col-lg-6"><div class="panel panel-default"><div class="panel-heading"><div class="row"><div class="col-xs-3"><%= ($TEXT->{'dashboard_memory'}) %></div><div class="panel-body">
-<i id="mem-icon" class="fa fa-memory fa-3x" style="color:<%= $memory->{percentage} > 90 ? "red" : "green" %>"></i>
-&nbsp;<span id="mem-usedtotal"><%= $memory->{used} %> / <%= $memory->{total} %></span>
-<div style="text-align:center">
-<svg viewBox="0 0 120 68" style="width:170px;max-width:100%" role="img" aria-label="memory usage">
- <path d="M10 60 A50 50 0 0 1 110 60" fill="none" stroke="#e5e5e5" stroke-width="11" stroke-linecap="round"/>
- <path id="mem-gauge" d="M10 60 A50 50 0 0 1 110 60" fill="none" stroke="<%= $memory->{percentage} > 90 ? "#d9534f" : "#5cb85c" %>" stroke-width="11" stroke-linecap="round" stroke-dasharray="157.08" stroke-dashoffset="<%= sprintf('%.1f', 157.08*(1-$memory->{percentage}/100)) %>"/>
- <text id="mem-gauge-text" x="60" y="55" text-anchor="middle" font-size="22" font-weight="bold" fill="#666"><%= $memory->{percentage} %>%</text>
-</svg>
-</div>
-% if ($memory->{has_swap}) {
-<%= ($TEXT->{'dashboard_swap'}) %>: <%= $memory->{swap_used} %> / <%= $memory->{swap_total} %>
-<div class="progress" role="progressbar" aria-label="swap usage" aria-valuenow="<%= $memory->{swap_percentage} %>" aria-valuemin="0" aria-valuemax="100">
- <%= $memory->{swap_percentage} %>%<div class="progress-bar" style="width: <%= $memory->{swap_percentage} %>%"></div>
-</div>
-% }
-</div></div></div><div class="panel-footer"><span class="pull-left"><%= ($TEXT->{'dashboard_memory_available'}) %>:&nbsp;<span id="mem-available"><%= $memory->{available} %></span></span><div class="clearfix"></div></div></div></div>
-
-<div class="col-lg-6"><div class="panel panel-default"><div class="panel-heading"><div class="row"><div class="col-xs-3">File System</div><div class="panel-body">
+<div class="panel panel-default"><div class="panel-heading"><div class="row"><div class="col-xs-3">File System</div><div class="panel-body">
 <table style="border-collapse:separate;border-spacing:12px 10px">
 <tr>
 % foreach my $fs (keys (%$filesystems)) {
@@ -106,7 +110,9 @@
 %}
 </tr>
 </table>
-</div></div></div><div class="panel-footer"><span class="pull-left"><i class="fa fa-arrow-circle-right" style="color:red"></i></span><span class="pull-left">&nbsp;Degraded</span><br><span class="pull-left"><i class="fa fa-arrow-circle-right" style="color:green"></i></span><span class="pull-left">&nbsp;Good</span><br></div></div></div>  
+</div></div></div><div class="panel-footer"><span class="pull-left"><i class="fa fa-arrow-circle-right" style="color:red"></i></span><span class="pull-left">&nbsp;Degraded</span><br><span class="pull-left"><i class="fa fa-arrow-circle-right" style="color:green"></i></span><span class="pull-left">&nbsp;Good</span><br></div></div>
+
+</div><!-- /right column -->
 
 
 <script>
