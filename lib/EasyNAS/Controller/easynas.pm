@@ -402,7 +402,9 @@ sub mounted
     my $fs = $_[0];
     my $result="Mounted";
     
-    if ((`/usr/bin/sudo /bin/mount | /usr/bin/grep "$mount_dir/$fs"` eq "") && ($fs ne "ROOT"))
+    # Match the exact mountpoint ("on <dir> type"), not a prefix -- a bare
+    # grep for /mnt/Data also matches /mnt/Data2's mount line.
+    if ((`/usr/bin/sudo /bin/mount | /usr/bin/grep " on $mount_dir/$fs type "` eq "") && ($fs ne "ROOT"))
     {
         $result="UnMounted";
     }

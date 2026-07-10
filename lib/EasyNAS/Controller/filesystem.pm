@@ -551,10 +551,25 @@ sub unmount($self) {
       $msg=$TEXT{'fs_failed_unmounting_fs'};
       return;
     }
-    $rc = system("/usr/bin/sudo /usr/bin/umount -l $mount_dir/$fs > /dev/null");
-    if ($rc ne 0) {
+    # Plain umount, NOT lazy (-l): a lazy unmount "succeeds" while open files
+    # keep the super active in the kernel with every member device claimed --
+    # the mount table looks clean but label/raid changes then fail with
+    # "device busy" and nothing explains why. Fail honestly instead, and name
+    # the processes holding files open so the user can close them.
+    my $out = `/usr/bin/sudo /usr/bin/umount $mount_dir/$fs 2>&1`;
+    if ($? != 0) {
+      my $holders="";
+      foreach my $p (glob("/proc/[0-9]*")) {
+        my $fd=`/usr/bin/sudo /bin/ls -l $p/fd $p/cwd 2>/dev/null`;
+        if ($fd =~ m{\Q$mount_dir/$fs\E}) {
+          my $comm=`/bin/cat $p/comm 2>/dev/null`; chomp $comm;
+          $holders.=" ".$comm."(".substr($p,6).")";
+        }
+      }
+      chomp $out;
+      write_log("filesystem","ERROR","umount $mount_dir/$fs failed: $out; holders:".($holders||" none found"));
       $result="fail";
-      $msg=$TEXT{'fs_failed_unmounting_fs'};
+      $msg=$TEXT{'fs_failed_unmounting_fs'}.($holders ? ":".$holders : "");
       return;
     }
 #    $rc = system("/usr/bin/sudo /usr/bin/sed -i '$mount_dir.$fs /d' /etc/fstab > /dev/null");
@@ -660,14 +675,22 @@ sub changename($self) {
   my $fs    = $self->param("fs");
   my $newfs = $self->param("newfs");
   my $path=$fs_info{$fs}[7];
+  my $uuid=$fs_info{$fs}[0];
   my $mounted=mounted($fs);
   my $mount_dir=get_mount_dir();
-  my $rc;
-  print $path;
+
+  # The new label becomes a mountpoint path, a shell argument and a sed
+  # pattern for fstab -- restrict it to characters safe in all three.
+  if (!defined $newfs || $newfs !~ /^[A-Za-z0-9_-]+$/)
+  {
+   $result="fail";
+   $msg=$TEXT{'fs_invalid_name'};
+   return;
+  }
 
   if ($fs eq $newfs)
   {
-   $result="fail";	
+   $result="fail";
    $msg=$TEXT{'filesystem_not_changed'};
    return;
   }
@@ -679,16 +702,39 @@ sub changename($self) {
    return;
   }
 
-  if ($mounted eq "Mounted") 
+  if ($mounted eq "Mounted")
   {
    $msg=$TEXT{'fs_umount_first'};
    $result="fail";
    return;
   }
 
-  $rc = system("/usr/bin/sudo /sbin/btrfs filesystem label $path $newfs >/dev/null");
-  if ($rc ne 0)
+  # The mount table can be clean while the fs is still ACTIVE in the kernel
+  # (open files after a lazy unmount keep the super alive and every member
+  # device claimed); relabeling would fail with "device busy". The super is
+  # active exactly when /sys/fs/btrfs/<uuid> exists.
+  if (defined $uuid && $uuid ne "" && -e "/sys/fs/btrfs/$uuid")
   {
+   $result="fail";
+   $msg=$TEXT{'fs_busy'};
+   return;
+  }
+
+  if (!defined $path || $path eq "")
+  {
+   write_log("filesystem","ERROR","changename: no device path known for '$fs'");
+   $result="fail";
+   $msg=$TEXT{'fs_failed_changing_label'};
+   return;
+  }
+
+  # Capture stderr (stdout is discarded): on failure the real btrfs error
+  # lands in the easynas log instead of vanishing behind a generic message.
+  my $err = `/usr/bin/sudo /sbin/btrfs filesystem label $path $newfs 2>&1 >/dev/null`;
+  if ($? != 0)
+  {
+   chomp $err;
+   write_log("filesystem","ERROR","btrfs filesystem label $path $newfs failed: $err");
    $msg=$TEXT{'fs_failed_changing_label'};
    $result="fail";
    return;
