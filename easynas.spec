@@ -585,7 +585,7 @@ German Language for EasyNAS
 ##### Portuguese Language ####
 %package        lang-portuguese
 Version:        %{version}
-Release:        1
+Release:        2
 Summary:        Portuguese Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}

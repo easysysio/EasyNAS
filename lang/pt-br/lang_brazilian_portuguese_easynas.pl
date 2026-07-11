@@ -1,8 +1,8 @@
 
-# @FILE@
-# Version @PROJECT_VERSION@
+# lang_brazilian_portuguese_easynas.pl
+# Version 1.2.0
 #
-# @MYNAME_UC@ is free software: You can redistribute it and/or modify
+# EasyNAS is free software: You can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # any later version.
@@ -12,48 +12,80 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
-# This file is part of @MYNAME_UC@ (c) created by @PROJECT_AUTHOR@ 2012-@YEAR@
+# This file is part of EasyNAS (c) created by Yariv Hakim 2012-2022
 #
-# Homepage    : @PROJECT_URL@
-# Sourceforge : @PROJECT_SF_URL@
+# Homepage    : https://www.easynas.org
 #
 #########################################################################
 
-$TEXT{'username'} = "Usuário";
-$TEXT{'password'} = "Senha";
+
+$TEXT{'easynas'} = "EasyNAS";
+$TEXT{'yariv'} = "Yariv Hakim";
 $TEXT{'please_wait'} = "Por favor, aguarde...";
 $TEXT{'not_authorized'} = "Você não está autorizado a usar esta função";
 $TEXT{'edit'} = "Editar";
 $TEXT{'delete'} = "Eliminar";
 $TEXT{'about'} = "Sobre";
 $TEXT{'save'} = "Salvar";
+$TEXT{'reset'} = "Redefinir";
 $TEXT{'create'} = "Criar";
 $TEXT{'add'} = "Adicionar";
-$TEXT{'index_help'} = "<h1><center>EasyNAS</center></h1><br>
-                       <h3><center>$firmware_ver</center></h3><br><br>
-                       <center>Copyright &copy; 2013-2017</center><br>
-                       <h4><center><a href=\"http://www.easynas.org\"  target=\"new\" >http://www.easynas.org</a></center><h4>";
+$TEXT{'easynas_url'} = "https://www.easynas.org";
+$TEXT{'running'} = "Executando em";
+$TEXT{'close'} = "Fechar";
 
+#### Types ####
+$TEXT{'storage'} = "Armazenamento";
+$TEXT{'system'} = "Sistema";
+$TEXT{'sharing'} = "Compartilhamento de Arquivos";
+$TEXT{'services'} = "Serviços";
+$TEXT{'multimedia'} = "Multimídia";
+$TEXT{'realm'} = "Domínio (realm)";
+
+
+#####   Login #####
+$TEXT{'login'} = "Login";
+$TEXT{'login_to_easynas'} = "Entrar no EasyNAS";
+$TEXT{'login_username'} = "Nome de usuário";
+$TEXT{'login_password'} = "Senha";
+$TEXT{'login_remember_me'} = "Lembrar de mim";
+
+######  Dashboard ######
+$TEXT{'dashboard'} = "Painel";
+$TEXT{'dashboard_view_details'} = "Ver detalhes";
+$TEXT{'dashboard_update_available'} = "Há atualizações disponíveis para o EasyNAS e seus complementos.";
+$TEXT{'dashboard_update_here'} = "Abrir Complementos";
+$TEXT{'dashboard_drives'} = "Discos";
+$TEXT{'dashboard_filesystems'} = "Sistemas de arquivos";
+$TEXT{'dashboard_users'} = "Usuários";
+$TEXT{'dashboard_volumes'} = "Volumes";
+$TEXT{'dashboard_disk'} = "Disco";
+$TEXT{'dashboard_filesystem'} = "Sistema de arquivos";
+$TEXT{'dashboard_failed'} = "Com falha";
+$TEXT{'dashboard_used'} = "Usado";
+$TEXT{'dashboard_system'} = "Sistema";
+$TEXT{'dashboard_free'} = "Livre";
+$TEXT{'dashboard_good'} = "Bom";
+$TEXT{'dashboard_degreded'} = "Degradado";
+$TEXT{'dashboard_update_available'} = "Há atualizações disponíveis para o EasyNAS e seus complementos.";
+$TEXT{'dashboard_click_here'} = " clique aqui para atualizar";
+$TEXT{'dashboard_cpu'} = "CPU";
+$TEXT{'dashboard_cores'} = "núcleos";
+$TEXT{'dashboard_load'} = "Carga";
+$TEXT{'dashboard_memory'} = "Memória";
+$TEXT{'dashboard_memory_available'} = "Disponível";
+$TEXT{'dashboard_swap'} = "Swap";
 
 #### Search ####
 $TEXT{'search'} = "Pesquisa";
-$TEXT{'search_help'} = "Menu de pesquisa habilita você a pesquisar um texto em uma das seguintes seções:<br><br>
-                        Gerenciador de Sistema de Arquivos<br>
-                        Gerenciador de Volume<br>
-    			Usuários<br>
-			Grupos<br><br>
-			Você irá ver somente as linhas que contêm a sua pesquisa<br>
-			e será capaz de fazer qualquer ação como nos menus regulares.";
-			
 
 #### System Info ####
-$TEXT{'system_info'} = "Informação do Sistema";
+$TEXT{'sysinfo'} = "Informações do sistema";
 $TEXT{'cpu'} = "CPU";
 $TEXT{'vendor'} = "Fornecedor";
 $TEXT{'model'} = "Modelo";
 $TEXT{'cache_size'} = "Tamanho Cache";
 $TEXT{'speed'} = "Velocidade";
-$TEXT{'system'} = "Sistema";
 $TEXT{'os'} = "SO";
 $TEXT{'architecture'} = "Arquitetura";
 $TEXT{'firmware'} = "Firmware";
@@ -63,46 +95,81 @@ $TEXT{'total_memory'} = "Memória Total";
 $TEXT{'free_memory'} = "Memória Livre";
 $TEXT{'total_swap_memory'} = "Memória de Troca Total";
 $TEXT{'free_swap_memory'} = "Memória de Troca Livre";
-$TEXT{'storage'} = "Armazenamento";
-$TEXT{'sysinfo_help'} = "<p>Este menu mostra informações do sistema como CPU, Memória, SO instalado e armazenamento.<p>";
-
 
 #### Settings ####
-$TEXT{'general_settings'} = "Configurações Gerais";
-$TEXT{'bad_system_port'} = "Porta do Sistema Errônea";
-$TEXT{'bad_secure_port'} = "Porta de Segurança Errônea";
-$TEXT{'bad_web_port'} = "Porta Web Errônea";
 $TEXT{'settings'} = "Configurações";
-$TEXT{'date_time'} = "Data / Hora";
-$TEXT{'access_list'} = "Lista de Acesso";
-$TEXT{'host_name'} = "Nome do Host";
-$TEXT{'system_port'} = "Porta do Sistema";
-$TEXT{'secure_port'} = "Porta de Segurança Sistema";
+$TEXT{'settings_date_time'} = "Data / Hora";
+$TEXT{'settings_date'} = "Data";
+$TEXT{'settings_time'} = "Hora";
+$TEXT{'settings_date_help'} = "O ajuste manual é para quando o NTP não está em uso; caso contrário o NTP ressincroniza o relógio.";
+$TEXT{'settings_date_set'} = "Data e hora atualizadas.";
+$TEXT{'settings_cert'} = "Certificado";
+$TEXT{'settings_cert_current'} = "Certificado atual";
+$TEXT{'settings_cert_file'} = "Certificado (PEM)";
+$TEXT{'settings_key_file'} = "Chave privada (PEM, opcional)";
+$TEXT{'settings_cert_help'} = "Envie um certificado e uma chave correspondentes. O servidor web reinicia para aplicá-los.";
+$TEXT{'settings_cert_uploaded'} = "Certificado enviado. Reiniciando para aplicar...";
+$TEXT{'no_cert'} = "Nenhum certificado localizado";
+$TEXT{'settings_repo'} = "Repositório";
+$TEXT{'settings_hostname'} = "Nome do host";
+$TEXT{'settings_port'} = "Porta";
+$TEXT{'settings_save'} = "Salvar";
+$TEXT{'settings_reset'} = "Redefinir";
+$TEXT{'settings_bad_port'} = "Porta inválida";
+$TEXT{'settings_saved'} = "As novas configurações foram salvas. Pode ser necessário reiniciar para que tenham efeito.";
+
 $TEXT{'change_settings_in_progress'} = "Alteração de configurações em progresso...";
-$TEXT{'certificate'} = "Certificado";
 $TEXT{'cert_details'} = "Detalhes do Certificado";
 $TEXT{'no_cert'} = "Nenhum certificado localizado";
+$TEXT{'bad_cert'} = "Certificado inválido";
 $TEXT{'upload'} = "Envio";
 $TEXT{'error_updating_date'} = "Atualização de Data/Hora errada";
-$TEXT{'settings_help'} = "<p>Este menu habilita você a alterar as configurações gerais da funcionalidade NAS.<br> 
-A alteração de qualquer configuração será salva mesmo reiniciando o sistema. <br><br>
-Altere as seguintes configurações: <br><br>
-Nome do Host - o nome do NAS na rede. <br>
-Porta do Sistema - o nro. da porta deste gerenciador GUI que irá ouvir. <br>
-Data - a data corrente. <br>
-Hora - a hora corrente. <br>
-Lista de Acesso - Previne o acesso não autorizado ao gerenciador web GUI.<br>
-Certificado - Permite alterar o certificado SSL padrão. </p>"; 
 $TEXT{'error_settings_demo'} = "Não é possivel alterar as configurações em site demonstração.";
+$TEXT{'enabled'} = "Ativado";
+$TEXT{'disabled'} = "Desativado";
+$TEXT{'enable'} = "Ativar";
+$TEXT{'disable'} = "Desativar";
 
+#### User Profile ####
+$TEXT{'user_profile'} = "Perfil do usuário";
+
+
+#### Backup ####
+$TEXT{'backup_restore'} = "Backup e Restauração";
+$TEXT{'backup'} = "Backup";
+$TEXT{'restore'} = "Restaurar";
+$TEXT{'file_name'} = "Nome do arquivo";
+$TEXT{'backup_failed'} = "Falha no backup";
+$TEXT{'backup_completed'} = "Backup concluído com sucesso";
+$TEXT{'restore_failed'} = "Falha na restauração";
+$TEXT{'testore_completed'} = "Restauração concluída";
 
 #### Network settings ####
 $TEXT{'network_setting'} = "Configurações de rede";
+$TEXT{'network_interface'} = "Interface";
+$TEXT{'network_type'} = "Tipo";
+$TEXT{'network_state'} = "Estado";
+$TEXT{'network_speed'} = "Velocidade";
+$TEXT{'network_connection_type'} = "Tipo de conexão";
+$TEXT{'network_ip'} = "Endereço IP";
+$TEXT{'network_subnet'} = "Máscara de sub-rede";
+$TEXT{'network_gateway'} = "Gateway";
+$TEXT{'network_dns1'} = "DNS primário";
+$TEXT{'network_dns2'} = "DNS secundário";
+$TEXT{'network_domain'} = "Domínio";
+$TEXT{'network_actions'} = "Ações";
+$TEXT{'network_edit'} = "Editar";
+$TEXT{'network_static'} = "Estático";
+$TEXT{'network_dhcp'} = "DHCP";
+$TEXT{'network_saved'} = "Endereço IP alterado";
+$TEXT{'network_failed_to_save'} = "Falha ao alterar as configurações de IP";
+$TEXT{'network_manager_down'} = "O gerenciador de rede não está em execução";
+$TEXT{'network_settings_can_not_change'} = "As configurações de rede não podem ser alteradas";
+$TEXT{'network_click_here_to_activate'} = "Clique aqui para ativar";
+
 $TEXT{'error_ip_demo'} = "Não pode alterar IP no site demonstração";
 $TEXT{'network_restart'} = "Reinicie o servidor EasyNAS para que as alterações sejam aceitas.";
-$TEXT{'network_help'} = "Este menu irá ajudá-lo a alterar as configurações de rede em sua placa de rede. <br>
-						 Selecione uma interface para ajustar os parâmetros IP. <br><br><br>
-						 Nota: As mesmas configurações também podem ser alteradas na console.";
+
 
 #### Scheduler ##########
 $TEXT{'scheduler'} = "Agendador";
@@ -121,8 +188,8 @@ $TEXT{'control_type'} = "Tipo de Controle";
 $TEXT{'error_restarting_sc'} = "Erro de inicialização do agendador";
 $TEXT{'delete_sc'} = "Eliminar Agendador";
 $TEXT{'error_deleting_sc'} = "Erro ao eliminar agendador";
-$TEXT{'update_sc'} = "Atualizar Agendador"; 
-$TEXT{'sc_name'} = "Nome da Agendador";
+$TEXT{'update_sc'} = "Atualizar Agendador";
+$TEXT{'sc_name'} = "Nome";
 $TEXT{'remote_system'} = "Sistema Remoto";
 $TEXT{'time'} = "Hora";
 $TEXT{'date'} = "Data";
@@ -131,100 +198,266 @@ $TEXT{'sc'} = "AGENDA";
 $TEXT{'scs'} = "Agendas";
 $TEXT{'sc_name'} = "Nome";
 $TEXT{'sc_task'} = "Tarefa";
-$TEXT{'vol_name'} = "Nome do Volume";
-$TEXT{'fs_name'} = "Nome Sistema de Arquivos";
+$TEXT{'vol_name'} = "Nome Volume";
+$TEXT{'fs_name'} = "Nome";
+$TEXT{'fs_delete'} = "Excluir sistema de arquivos";
 $TEXT{'weekday'} = "Dia Semana";
 $TEXT{'delete_sc?'} = "Tem certeza de que deseja eliminar o agendador ?";
-$TEXT{'schedule_help'} = "A agenda pode criar tarefas em tempo hábil<br>
-						  Crie uma agenda para cada dia, mês, ano, hora, dia da semana ou qualquer combinação entre eles<br>
- 			  Tipos de agendas que podem se criadas:<br>
-                          Snapshot - O snapshot irá ser criado automaticamente com o nome: Volume.Data<br>
- 			  Scrub - Encontrar erros no sistema de arquivos e corrigí-los";
+
+### NETWORK ###
+$TEXT{'network_settings'} = "Configurações de rede";
+$TEXT{'network_interfaces'} = "Interface de rede";
+$TEXT{'interface'} = "Interface";
+$TEXT{'state'} = "Estado";
+$TEXT{'broadcast'} = "Broadcast";
+$TEXT{'net_mask'} = "Máscara";
+$TEXT{'hardware_mac'} = "Endereço MAC";
+$TEXT{'dhcp'} = "DHCP";
+$TEXT{'static'} = "Estático";
+$TEXT{'ip_address'} = "Endereço IP";
+$TEXT{'subnet_mask'} = "Máscara de sub-rede";
+$TEXT{'gateway'} = "Gateway";
+$TEXT{'domain'} = "Domínio";
+$TEXT{'pri_dns'} = "DNS primário";
+$TEXT{'sec_dns'} = "DNS secundário";
+$TEXT{'state_up'} = "Ativa";
+$TEXT{'state_down'} = "Inativa";
+$TEXT{'error_ip_demo'} = "Não pode alterar IP no site demonstração";
+$TEXT{'network_restart'} = "Reinicie o servidor EasyNAS para que as alterações sejam aceitas.";
+
+#### Realm ####
+$TEXT{'computers'} = "Computadores";
+$TEXT{'computers_manager'} = "Gerenciador de computadores";
 
 
+#### Monitor ####
+$TEXT{'cpu'} = "CPU";
+$TEXT{'memory'} = "Memória";
+$TEXT{'disk_io'} = "E/S de disco";
+$TEXT{'network_band'} = "Largura de banda de rede";
 
- 
 
 #### Power Managment ####
 $TEXT{'power_management'} = "Gerenciamento de Energia";
 $TEXT{'shutdown_restart'} = "Desligar / Reiniciar";
+$TEXT{'power_restart'} = "Reiniciar";
+$TEXT{'power_shutdown'} = "Desligar";
+$TEXT{'power_restarting'} = "O dispositivo está reiniciando...";
+$TEXT{'power_shuttingdown'} = "O dispositivo está desligando...";
+$TEXT{'power_restart_confirm'} = "Reiniciar o dispositivo agora?";
+$TEXT{'power_shutdown_confirm'} = "Desligar o dispositivo agora?";
 $TEXT{'error_restart_demo'} = "Não é possivel reiniciar em site demonstração";
 $TEXT{'restart_system'} = "Reiniciando o sistema...";
 $TEXT{'error_shutdown_demo'} = "Não é possivel desligar em site demonstração";
 $TEXT{'shutdown_system'} = "Desligando o sistema...";
 $TEXT{'execute_immediately'} = "Execute a reinicialização/desligamento do sistema imediatamente!";
-$TEXT{'poewer_help'} = "Use este menu para desligar ou reiniciar o seu NAS";
-
+$TEXT{'restart'} = "Reiniciar";
+$TEXT{'shutdown'} = "Desligar";
+$TEXT{'close_service'} = "Encerrando serviços.....";
+$TEXT{'close_fs'} = "Desmontando sistemas de arquivos.....";
+$TEXT{'restart_are_u_sure'} = "Tem certeza de que deseja reiniciar?";
+$TEXT{'restart_help'} = "Você está prestes a reiniciar o EasyNAS<br>Salve todos os seus arquivos e feche os serviços abertos<br><br>Clique em Reiniciar quando estiver pronto";
+$TEXT{'shutdown_help'} = "Você está prestes a desligar o EasyNAS<br>Salve todos os seus arquivos e feche os serviços abertos<br><br>Clique em Desligar quando estiver pronto";
 
 #### Firmware ####
-$TEXT{'firmware_ugpgrade'} = "Atualização do Firmware";
 $TEXT{'firmware'} = "Firmware";
+$TEXT{'firmware_name'} = "Nome";
+$TEXT{'firmware_desc'} = "Descrição";
+$TEXT{'firmware_new'} = "Nova versão";
+$TEXT{'firmware_current'} = "Versão atual";
+$TEXT{'firmware_actions'} = "Ações";
+$TEXT{'firmware_update_r_u_sure'} = "Tem certeza de que deseja atualizar?";
+$TEXT{'firmware_update'} = "Atualizar";
+$TEXT{'firmware_update_available'} = "Novas atualizações disponíveis";
+$TEXT{'firmware_here'} = " clique aqui para atualizar";
+$TEXT{'firmware_refresh'} = "Recarregar";
+$TEXT{'firmware_refreshed'} = "Repositórios recarregados";
+$TEXT{'firmware_noupdate'} = "Nenhuma atualização disponível";
+$TEXT{'firmware_update_success'} = "Atualização concluída com sucesso";
+$TEXT{'firmware_update_failed'} = "Falha na atualização";
+$TEXT{'firmware_updating'} = "Atualização do sistema em execução em segundo plano...";
+$TEXT{'firmware_phase_down'} = "baixando";
+$TEXT{'firmware_phase_inst'} = "instalando";
+$TEXT{'firmware_phase_prep'} = "preparando";
+
+#### Addons #####
+$TEXT{'addons'} = "Complementos";
+$TEXT{'addons_sharing'} = "Compartilhamento de Arquivos";
+$TEXT{'addons_storage'} = "Armazenamento e Backup";
+$TEXT{'addons_multimedia'} = "Multimídia";
+$TEXT{'addons_services'} = "Serviços";
+# Addon grid category labels, keyed by package group code (easynas-<group>-*).
+$TEXT{'addons_fs'} = "Compartilhamento de Arquivos";
+$TEXT{'addons_mm'} = "Multimídia";
+$TEXT{'addons_srv'} = "Serviço";
+$TEXT{'addons_stg'} = "Armazenamento";
+$TEXT{'addons_easynas'} = "EasyNAS";
+$TEXT{'addons_lang'} = "Idioma";
+$TEXT{'addons_other'} = "Outros aplicativos";
+$TEXT{'addons_name'} = "Nome do complemento";
+$TEXT{'addons_version'} = "Versão";
+$TEXT{'addons_update'} = "Atualizar";
+$TEXT{'addons_delete'} = "Excluir";
+$TEXT{'addons_status'} = "Status";
+$TEXT{'addons_desc'} = "Descrição";
+$TEXT{'addons_actions'} = "Ações";
+$TEXT{'addons_install'} = "Instalar";
+$TEXT{'addons_delete'} = "Excluir";
+$TEXT{'addons_update'} = "Atualizar";
+$TEXT{'addons_install?'} = "Instalar o complemento?";
+$TEXT{'addons_update?'} = "Atualizar o complemento?";
+$TEXT{'addons_delete?'} = "Excluir o complemento?";
+$TEXT{'addons_info'} = "Informações";
+$TEXT{'addons_installed'} = "Complemento instalado com sucesso";
+$TEXT{'addons_not_installed'} = "Erro ao instalar o complemento";
+$TEXT{'addons_notinst'} = "não instalado";
+$TEXT{'addons_deleted'} = "Complemento removido com sucesso";
+$TEXT{'addons_not_deleted'} = "Erro ao remover o complemento";
+$TEXT{'addons_updated'} = "Complemento atualizado com sucesso";
+$TEXT{'addons_not_updated'} = "Erro ao atualizar o complemento";
+$TEXT{'addons_close'} = "Fechar";
+$TEXT{'addons_details'} = "Detalhes";
+$TEXT{'addons_version'} = "Versão";
+$TEXT{'addons_nodesc'} = "Nenhuma descrição disponível.";
+
+
+$TEXT{'firmware_upgrade'} = "Atualização de firmware";
+$TEXT{'lang'} = "Idioma";
+$TEXT{'other_apps'} = "Outros aplicativos";
+$TEXT{'component'} = "Componente";
+$TEXT{'author'} = "Autor";
+$TEXT{'version'} = "Versão";
+$TEXT{'current_version'} = "Versão atual";
+$TEXT{'new_version'} = "Nova versão";
+$TEXT{'package_name'} = "Nome do pacote";
+$TEXT{'update'} = "Atualizar";
+$TEXT{'refresh'} = "Recarregar";
+$TEXT{'refresh_failed'} = "Falha ao recarregar";
+$TEXT{'installed_version'} = "Versão instalada";
+$TEXT{'current_version'} = "Versão atual";
+$TEXT{'install_addon'} = "Instalar complemento";
+$TEXT{'uninstall_addon'} = "Desinstalar complemento";
+$TEXT{'upgrade_addon'} = "Atualizar complemento";
+$TEXT{'check_for_update'} = "Verifique por atualização";
+$TEXT{'cheking_firmware_availble'} = "Verificando firmware mais recente disponível em EasyNAS...";
+$TEXT{'latest_firmware'} = "Seu sistema possui a última versão disponível do firmware";
+$TEXT{'download_latest_version_here'} = "Baixe a última versão <a href=http://www.easynas.org/download target=New_Page>aqui</a>";
 $TEXT{'upgrade_in_progress'} = "Atualização em progresso...";
 $TEXT{'downloading_firmware'} = "Baixando o firmware...";
 $TEXT{'installing_new_firmware'} = "Instalando novo firmware...";
 $TEXT{'firmware_upgraded'} = "Atualização do firmware com sucesso!";
 $TEXT{'error_upgrading'} = "Erro na atualização do firmware - Tente novamente mais tarde, por favor.";
-$TEXT{'check_for_update'} = "Verifique por atualização";
-$TEXT{'cheking_firmware_availble'} = "Verificando firmware mais recente disponível em EasyNAS...";
-$TEXT{'could_not_get_connection'} = "Não foi possível obter conexão com servidores EasyNAS.";
-$TEXT{'latest_firmware'} = "Seu sistema possui a última versão disponível do firmware";
-$TEXT{'download_latest_version_here'} = "Baixe a última versão <a href=http://www.easynas.org/download target=New_Page>aqui</a>";
-$TEXT{'firmware_help'} = "Recurso de atualização de firmware estará habilitado para atualização de nova versão recente. <br>
-Sua versão atual será verificada contra a versão recente da EasyNAS, e você saberá se uma atualização está disponível. <br>
-A atualização requer conexão direta com a internet. Não é necessário a reinicialização após a atualização. <br>
-Versão principal inclui, normalmente, atualização do kernel; então nova instalação será necessária."; 
-
-
+$TEXT{'error_connecting'} = "Erro ao conectar ao repositório do EasyNAS, tente novamente mais tarde";
+$TEXT{'failed_to_refresh_repo'} = "Falha ao recarregar o repositório do EasyNAS. Tente novamente mais tarde";
+$TEXT{'failed_to_install_addon'} = "Falha ao instalar o complemento";
+$TEXT{'refresh_repo'} = "Recarregar repositório";
+$TEXT{'failed_to_delete_addon'} = "Falha ao remover o complemento";
+$TEXT{'install_addon?'} = "Instalar o complemento?";
+$TEXT{'update_addon?'} = "Atualizar o complemento?";
+$TEXT{'delete_addon?'} = "Excluir o complemento?";
+$TEXT{'update_all'} = "Atualizar tudo";
+$TEXT{'firmware_refreshed'} = "Repositórios recarregados";
+$TEXT{'firmware_not_refreshed'} = "Erro ao recarregar os repositórios";
 
 #### Disk ####
-$TEXT{'free'} = "Livre";
-$TEXT{'used'} = "Usado";
-$TEXT{'system'} = "Sistema";
-$TEXT{'failed'} = "Falhado";
 $TEXT{'disk_manager'} = "Gerenciador de Disco";
-$TEXT{'disk_performace'} = "Desempenho do Disco";
-$TEXT{'testing'} = "Teste";
-$TEXT{'rerun_test'} = "Reexecução Teste";
-$TEXT{'disk_performance_help'} = " Teste de desempenho de disco verificará o desempenho de leitura de um disco.";
-$TEXT{'error_updating_param'} = "Erro na atualização dos parâmetros de disco";
-$TEXT{'physical_disks'} = "Discos Físicos";
 $TEXT{'disk'} = "Disco";
-$TEXT{'size'} = "Tamanho";
-$TEXT{'status'} = "Estado";
-$TEXT{'model_number'} = "Nro. Modelo";
-$TEXT{'serial_number'} = "Nro. Serial";
-$TEXT{'firmware_version'} = "Versão Firmware";
-$TEXT{'actions'} = "Ações";
-$TEXT{'test_performance'} = "Teste de Desempenho";
-$TEXT{'disk_distribution'} = "Distribuição do Disco";
+$TEXT{'disk_size'} = "Tamanho";
+$TEXT{'disk_status'} = "Status";
+$TEXT{'disk_type'} = "Tipo";
+$TEXT{'disk_health'} = "Saúde";
+$TEXT{'disk_model'} = "Modelo";
+$TEXT{'disk_serial'} = "Número de série";
+$TEXT{'disk_firmware'} = "Firmware";
+$TEXT{'disk_actions'} = "Ações";
+$TEXT{'disk_free'} = "Livre";
+$TEXT{'disk_used'} = "Usado";
+$TEXT{'disk_system'} = "Sistema";
+$TEXT{'disk_bad'} = "Defeituoso";
+$TEXT{'disk_good'} = "Bom";
+$TEXT{'disk_format'} = "Formatar";
 $TEXT{'disk_settings'} = "Configurações de Disco";
-$TEXT{'multi_count'} = "Multi Count:";
-$TEXT{'io_supprt'} = "Suporte de E/S:";
-$TEXT{'read_only'} = "Somente Leitura:";
-$TEXT{'read_ahead'} = "Read Ahead:";
-$TEXT{'disk_help1'} = "Selecione um disco para alterar as configurações padrão";
-$TEXT{'disk_help2'} = "Alterar a configuração do disco: <br><br>
-                       Read Ahead - Contagem de setor de sistema de arquivos (software) de leitura antecipada. <br>
-                       Isto é usado para melhorar o desempenho em leituras sequenciais de arquivos 
-					   grandes, por pré-busca antecipada deste blocos adicionais
-					   sendo necessário para a tarefa em execução. Diversos discos IDE possuem uma 
-					   função read-ahead construída em separado, o qual aumenta esta função read-ahead
-					   no sistema de arquivos (software)..";
-                      
+$TEXT{'disk_format_success'} = "Disco formatado com sucesso";
+$TEXT{'disk_format_failed'} = "Falha ao formatar o disco";
+$TEXT{'disk_write_io_errs'} = "Erros de gravação";
+$TEXT{'disk_read_io_errs'} = "Erros de leitura";
+$TEXT{'disk_flush_io_errs'} = "Erros de flush";
+$TEXT{'disk_corruption_errs'} = "Erros de corrupção";
+$TEXT{'disk_generation_errs'} = "Erros de geração";
+$TEXT{'disk_clean_errs'} = "Limpar erros";
+$TEXT{'disk_clean_errs_success'} = "Erros limpos";
+$TEXT{'disk_clean_errs_failed'} = "Falha ao limpar os erros";
+$TEXT{'disk_close'} = "Fechar";
 
 #### File System ####
 $TEXT{'fs'} = "Sistema de Arquivos";
+$TEXT{'fs_create'} = "Criar sistema de arquivos";
+$TEXT{'fs_name'} = "Nome";
+$TEXT{'fs_raid_level'} = "Nível de RAID";
+$TEXT{'fs_compression'} = "Compressão";
+$TEXT{'fs_ssd_optimization'} = "Otimização para SSD";
+$TEXT{'fs_auto_defrag'} = "Desfragmentação automática";
+$TEXT{'fs_auto_mount'} = "Montagem automática";
+$TEXT{'fs_add'} = "Adicionar sistema de arquivos";
+$TEXT{'fs_reset'} = "Redefinir";
+$TEXT{'fs_used'} = "Usado";
+$TEXT{'fs_status'} = "Status";
+$TEXT{'fs_drives'} = "Discos";
+$TEXT{'fs_health'} = "Saúde";
+$TEXT{'fs_readonly'} = "Somente leitura";
+$TEXT{'fs_read&write'} = "Leitura e gravação";
+$TEXT{'fs_filesystem_contain_vol'} = "O sistema de arquivos contém volumes";
+$TEXT{'fs_failed_changing_label'} = "Não foi possível alterar o rótulo do sistema de arquivos";
+$TEXT{'fs_invalid_name'} = "Nome inválido: use apenas letras, dígitos, hífen e sublinhado";
+$TEXT{'fs_busy'} = "O sistema de arquivos ainda está em uso (arquivos abertos). Feche-os ou reinicie os serviços de compartilhamento e tente novamente";
+$TEXT{'fs_name_changed'} = "O nome do sistema de arquivos foi alterado";
+$TEXT{'fs_umount_first'} = "O sistema de arquivos precisa ser desmontado antes de alterar o nome";
+$TEXT{'fs_failed_formating_disk'} = "Falha ao formatar os discos";
+$TEXT{'fs_failed_creating_dir'} = "Falha ao criar o diretório";
+$TEXT{'fs_failed_mounting'} = "Falha ao montar o sistema de arquivos";
+$TEXT{'fs_mounted'} = "Sistema de arquivos montado";
+$TEXT{'fs_size'} = "Tamanho";
+$TEXT{'fs_better'} = "Melhor";
+$TEXT{'fs_faster'} = "Mais rápida";
+$TEXT{'fs_optimized'} = "Otimizada";
+$TEXT{'fs_none'} = "Nenhuma";
+$TEXT{'fs_mount'} = "Montar";
+$TEXT{'fs_unmount'} = "Desmontar";
+$TEXT{'fs_delete?'} = "Excluir o sistema de arquivos?";
+$TEXT{'fs_change_settings'} = "Alterar configurações";
+
+$TEXT{'cancel'} = "Cancelar";
+$TEXT{'resume'} = "Retomar";
+$TEXT{'snapshot'} = "Snapshot";
+$TEXT{'filesystems'} = "Sistemas de arquivos";
 $TEXT{'fs_manager'} = "Gerenciador Sistema de Arquivos";
+$TEXT{'better'} = "Melhor";
+$TEXT{'faster'} = "Mais rápida";
+$TEXT{'none'} = "Nenhuma";
+$TEXT{'health'} = "Saúde";
+$TEXT{'logs'} = "Registros";
+$TEXT{'good'} = "Bom";
+$TEXT{'degraded'} = "Degradado";
+$TEXT{'disk_errors'} = "Erros de disco";
+$TEXT{'insufficient'} = "Discos insuficientes";
 $TEXT{'remove_hd'} = "Remover HD";
+$TEXT{'replace_hd'} = "Substituir disco";
+$TEXT{'source_hd'} = "Disco de origem";
+$TEXT{'target_hd'} = "Disco de destino";
 $TEXT{'failed_to_remove_hd'} = "Falha ao remover HD";
-$TEXT{'add_hd'} = "Adicionar HD";
+$TEXT{'fs_hd_removed'} = "Disco removido com sucesso";
+$TEXT{'fs_hd_added'} = "Disco adicionado com sucesso";
+$TEXT{'fs_hd_replaced'} = "Disco substituído com sucesso";
+$TEXT{'fs_failed_to_replace'} = "Falha ao substituir o disco";
+$TEXT{'add_hd'} = "Adiciona Disco Rígido";
 $TEXT{'failed_to_add_HD'} = "Falha ao adicionar HD";
 $TEXT{'repair_hd'} = "Reparar HD";
 $TEXT{'fs_need_to_be_unmounted'} = "Sistema de Arquivos necessita ser desmontado";
+$TEXT{'fs_need_to_be_mounted'} = "O sistema de arquivos precisa estar montado";
 $TEXT{'check&repair_hd'} = "Verifica e Repara HD";
 $TEXT{'create_fs'} = "Criar Sistema de Arquivos";
+$TEXT{'fs_deleted'} = "Sistema de arquivos excluído com sucesso";
 $TEXT{'no_disks_were_selected'} = "Discos não foram selecionados";
-$TEXT{'create_fs'} = "Cria Sistema de Arquivos";
 $TEXT{'no_fs_name_was_entered'} = "Nenhum nome de Sistema de Arquivos foi introduzido";
 $TEXT{'reserved_fs'} = "O ROOT é um nome reservado";
 $TEXT{'raid_0_require_two'} = "Raid 0 requer ao menos dois discos";
@@ -232,15 +465,29 @@ $TEXT{'raid_1_require_two'} = "Raid 1 requer ao menos dois discos";
 $TEXT{'raid_10_require_four'} = "Raid 10 requer ao menos quatro discos";
 $TEXT{'raid_5_require_three'} = "Raid 5 requer ao menos três discos";
 $TEXT{'raid_6_require_four'} = "Raid 6 requer ao menos quatro discos";
+$TEXT{'raid_the_same'} = "O nível de RAID é o mesmo, nenhuma ação necessária.";
+$TEXT{'raid_require_force'} = "Mudar o nível de RAID reduz a integridade; é preciso forçar esta alteração.";
+$TEXT{'raid_converting'} = "Convertendo o sistema de arquivos para o novo nível de RAID em segundo plano. Isso pode demorar.";
+$TEXT{'fs_not_mounted'} = "O sistema de arquivos precisa estar montado para esta ação.";
+$TEXT{'fs_balancing'} = "Balanceando o sistema de arquivos em segundo plano.";
+$TEXT{'fs_scrubbing'} = "Verificação (scrub) iniciada; o sistema de arquivos está sendo verificado.";
+$TEXT{'fs_repairing'} = "Reparo iniciado: o scrub reconstrói blocos defeituosos a partir da redundância.";
+$TEXT{'fs_removing_disk'} = "Removendo o disco em segundo plano; os dados estão sendo migrados.";
+$TEXT{'fs_disk_added'} = "Disco adicionado. Execute o balanceamento para distribuir os dados.";
+$TEXT{'fs_failed_adding_disk'} = "Falha ao adicionar o disco.";
+$TEXT{'fs_replacing_disk'} = "Substituindo o disco em segundo plano.";
+$TEXT{'fs_add_disk'} = "Adicionar disco rígido";
+$TEXT{'fs_replace_disk'} = "Substituir disco rígido";
+$TEXT{'fs_replace_from'} = "Disco a substituir";
+$TEXT{'fs_select_disk'} = "Selecione um disco livre";
+$TEXT{'fs_apply'} = "Aplicar";
 $TEXT{'failed_creating_directory'} = "Falha na criação de um diretório.";
 $TEXT{'failed_creating_fs'} = "Falha na criação de um Sistema de Arquivos.";
 $TEXT{'failed_mounting_fs'} = "Falha na montagem de um Sistema de Arquivos.";
 $TEXT{'mount_fs'} = "Montagem Sistema de Arquivos";
 $TEXT{'unmount_fs'} = "Desmontagem Sistema de Arquivos";
-$TEXT{'failed_unmounting_fs'} = "Falha na desmontagem Sistema de Arquivos.";
-$TEXT{'create_fs'} = "Cria Sistema de Arquivos";
+$TEXT{'fs_failed_unmounting_fs'} = "Falha ao desmontar um sistema de arquivos.";
 $TEXT{'no_free_disk'} = "Não há discos livres!";
-$TEXT{'fs_name'} = "Nome";
 $TEXT{'raid_profile'} = "Perfil de Raid";
 $TEXT{'compression'} = "Compressão";
 $TEXT{'disks'} = "Discos";
@@ -249,70 +496,80 @@ $TEXT{'auto_mount'} = "Montagem automática";
 $TEXT{'auto_defrag'} = "Defragmentação automática";
 $TEXT{'mount_option'} = "Opções de Montagem";
 $TEXT{'file_system_name'} = "Nome Sistema de Arquivos";
-$TEXT{'raid_level'} = "Nível de Raid";
+$TEXT{'fs_raidlevel'} = "Nível de RAID";
 $TEXT{'raid_profile'} = "Perfil de Raid";
 $TEXT{'force_raid_change'} = "Alteração de Raid forçada";
 $TEXT{'change_raid'} = "Alterar Raid";
+$TEXT{'fs_change_name'} = "Alterar nome";
 $TEXT{'fs_mount_options'} = "Opções de Montagem";
 $TEXT{'fs_disks'} = "Discos";
 $TEXT{'number'} = "Número";
 $TEXT{'disk'} = "Disco";
 $TEXT{'total_size'} = "Tamanho Total";
-$TEXT{'used'} = "Usado";
 $TEXT{'status'} = "Estado";
 $TEXT{'remove_hd?'} = "Tem certeza que deseja remover o disco rígido ?";
 $TEXT{'repair_hd?'} = "Tem certeza que deseja reparar o disco rígido ?";
+$TEXT{'check_repair_complete'} = "Verificação e reparo concluídos";
 $TEXT{'add_hd'} = "Adiciona Disco Rígido";
 $TEXT{'no_free_disks_available'} = "Não há discos livres disponíveis!";
 $TEXT{'drives'} = "Discos";
-$TEXT{'create_fs'} = "Criar Sistema de Arquivos";
 $TEXT{'fs_limit'} = "Limite de quota no Sistema de Arquivos";
 $TEXT{'0_no_limit'} = "(Entre 0 para sem limites)";
 $TEXT{'failed_limit'} = "Falha na limitação de quota no Sistema de Arquivos";
-$TEXT{'fs_help1'} = "Um Sistema de Arquivos consiste de um ou mais discos. <br>
-		     Cada Sistema de Arquivos pode ter características como: Compressão, Redundância e Disponibilidade. <br>
-                     O Sistema de Arquivos não poderá ser eliminado se este contiver volumes.";
-$TEXT{'fs_help2'} = "Adicione um novo Sistema de Arquivos <br><br>
-                     Nome do Sistema de Arquivos - O nome do Sistema de Arquivos <br> 
-                     JBOD (Just Bunch Of Disks): Flexibility without redundancy <br>
-					 Perfil de Raid - Considerando o ganho de desempenho e redundâcia extra, escolha o nível de Raid que deseja:<br>
-		     RAID 0  (Disk Striping - Distribuição em discos).: Ganho de desempenho mas sem redundância (proteção) <br>
-		     RAID 1  (Disk Mirroring - Espelhamento de discos): Permite falha em um disco <br>
-		     RAID 10 (Disk Mirroring and Striping - Espelhamento e distribuição em discos): Permite falha de um disco em cada par de RAID 1 <br>
-		     RAID 5  (Disk Striping with parity - Distribuição em discos com paridade): Permite falha de um disco <br>
-		     RAID 6  (Disk Striping with double parity - Distribuição em discos com dupla paridade): Permite falha em dois discos <br>
-	
-		     Compressão (Compression) - Reduz o tamanho dos dados com a seleção: Melhor (Better), Faster (Rápido) ou None (Nenhum). <br>
-		     Discos (Disks) - Lista de discos disponíveis que podem ser usados para este Sistema de Arquivos. <br>
-		     Otimização SSD (SSD Optimization) - Ao usar disco SSD, esta opção irá otimizar o uso para uma vida mais longa. <br> 
-             Defragmentação automática (Auto Defrag) - Irá detectar gravações aleatórias em arquivos existentes e começará a defragmentar em segundo plano. <br>
-		     Montagem Automática (Auto Mount) - Esta opção irá montar automaticamente um Sistema de Arquivos";	
-$TEXT{'fs_help3'} = "Altere as configurações do Sistema de Arquivos:<br><br>
-                     Altere o Nome -  Mude o nome e as ligações do Sistema de Arquivos e de quaisquer volumes conectado a ele.<br>
-		     Altere o Raid - Mude o nivel de raid que o Sistema de Arquivos tem. No caso de haver uma redução na integridade, você deverá selecionar forçar a alteração do raid. <br>
-		     Opções de Montagem - Monte ou desmonte um Sistema de Arquivos com ou sem compressão ou otimização SSD.<br>
-		     Discos do Sistema de Arquivos - Balanceie, corrija, ajuste ou remova um disco de um conjunto de discos do Sistema de Arquivos.<br>";
+$TEXT{'filesystem_contain_vol'} = "O sistema de arquivos contém volumes";
+$TEXT{'filesystem_not_changed'} = "O nome do sistema de arquivos não foi alterado";
+$TEXT{'fs_created'} = "Sistema de arquivos criado com sucesso";
 
+$TEXT{'fs_jbod_info'} = "JBOD (just a bunch of disks) combina um grupo de discos em um único volume lógico, sem redundância e sem striping.";
+$TEXT{'fs_raid0_info'} = "RAID 0 (striping) distribui os dados uniformemente entre dois ou mais discos, sem paridade ou redundância. A falha de um único disco derruba toda a matriz, pois os dados estão distribuídos em todos os discos.";
+$TEXT{'fs_raid1_info'} = "RAID 1 mantém uma cópia exata (espelho) dos dados em dois ou mais discos; um par clássico de RAID 1 tem dois discos. Sem paridade e sem striping.";
+$TEXT{'fs_raid5_info'} = "RAID 5 usa striping em nível de bloco com paridade distribuída. Após a falha de um único disco, os dados podem ser reconstruídos a partir da paridade. RAID 5 exige pelo menos três discos.";
+$TEXT{'fs_raid6_info'} = "RAID 6 estende o RAID 5 com um segundo bloco de paridade: striping em nível de bloco com dois blocos de paridade distribuídos entre todos os discos.";
+$TEXT{'fs_raid10_info'} = "RAID 10 combina espelhamento e striping: os dados são distribuídos em pares espelhados. Tolera a falha de um disco por espelho e exige pelo menos quatro discos.";
 
 #### Volumes ####
 $TEXT{'vol_manager'} = "Gerenciador de Volume";
-$TEXT{'create_vol'} = "Criar Volume";
-$TEXT{'no_vol_name'} = "Nenhum volume foi digitado";
-$TEXT{'no_fs_selected'} = "Nenhum Sistema de Arquivos foi selecionado";
-$TEXT{'delete_vol'} = "Elimina Volume";
-$TEXT{'faild_to_delete_vol'} = "Falha ao eliminar volume";
-$TEXT{'create_snapshot'} = "Criar Snapshot";
-$TEXT{'no_snapshot_name'} = "Nenhum nome de Snapshot foi digitado";
-$TEXT{'failed_to_add_snapshot'} = "Falha ao adicionar snapshot";
+$TEXT{'vol_create'} = "Criar volume";
+$TEXT{'vol_name'} = "Nome Volume";
+$TEXT{'vol_filesystem'} = "Sistema de arquivos";
+$TEXT{'vol_user_owner'} = "Proprietário (usuário)";
+$TEXT{'vol_group_owner'} = "Proprietário (grupo)";
+$TEXT{'vol_no_vol_name'} = "Nenhum nome de volume foi informado";
+$TEXT{'vol_no_fs_selected'} = "Nenhum sistema de arquivos foi selecionado";
+$TEXT{'vol_created'} = "Volume criado com sucesso";
+$TEXT{'vol_id'} = "ID";
+$TEXT{'vol_size'} = "Tamanho";
+$TEXT{'vol_fs'} = "Sistema de arquivos";
+$TEXT{'vol_actions'} = "Ações";
+$TEXT{'vol_delete'} = "Excluir volume";
+$TEXT{'vol_delete?'} = "Tem certeza de que deseja excluir o volume?";
+$TEXT{'vol_faild_to_delete'} = "Falha ao excluir o volume";
+$TEXT{'vol_deleted'} = "Volume excluído com sucesso";
+$TEXT{'vol_snapshot'} = "Snapshot";
+$TEXT{'vol_settings'} = "Configurações";
+$TEXT{'vol_permission'} = "Permissões do volume";
+$TEXT{'vol_user'} = "Usuário";
+$TEXT{'vol_group'} = "Grupo";
+$TEXT{'vol_others'} = "Outros";
+$TEXT{'vol_readonly'} = "Somente leitura";
+$TEXT{'vol_read&write'} = "Leitura e gravação";
+$TEXT{'vol_deny'} = "Negar";
+$TEXT{'vol_reset'} = "Redefinir";
+$TEXT{'vol_save'} = "Salvar";
+$TEXT{'vol_create_snapshot'} = "Criar snapshot";
+$TEXT{'vol_snapshot_name'} = "Nome do snapshot";
+$TEXT{'vol_no_snapshot_name'} = "Nenhum nome de snapshot foi informado";
+$TEXT{'vol_failed_to_add_snapshot'} = "Falha ao criar o snapshot";
+$TEXT{'vol_snapshot_created'} = "Snapshot criado com sucesso";
+$TEXT{'vol_saved'} = "Volume salvo com sucesso";
+$TEXT{'vol_no_fs'} = "Nenhum sistema de arquivos disponível";
+
 $TEXT{'failed_to_change_owner'} = "Falha ao alterar o proprietário";
 $TEXT{'failed_to_change_permission'} = "Falha ao alterar a permissão";
-$TEXT{'vol_name'} = "Nome Volume";
-$TEXT{'user_owner'} = "Usuário Proprietário";
 $TEXT{'group_owner'} = "Proprietário do Grupo";
 $TEXT{'user_permission'} = "Permissão do Usuário";
 $TEXT{'group_permission'} = "Permissão do Grupo";
 $TEXT{'others_permission'} = "Outras Permissões";
-$TEXT{'snapshot_name'} = "Nome Snapshot";
 $TEXT{'vols'} = "Volumes";
 $TEXT{'vol'} = "Volume";
 $TEXT{'id'} = "ID";
@@ -321,13 +578,8 @@ $TEXT{'size'} = "Tamanho";
 $TEXT{'delete_vol?'} = "Você tem certeza que deseja eliminar o volume ?";
 $TEXT{'no_schedule_name'} = "Nenhum nome de agendamento foi digitado.";
 $TEXT{'failed_add_vol'} = "Falha na adição de um volume.";
-$TEXT{'vol_help1'} = "Um ou mais volumes podem ser criados em um Sistema de Arquivos <br>
-	 	      O volume irá herdar as características de um Sistema de Arquivos como: Compressão, Redundância, Disponibilidade. <br>
-                      O volume estará disponível somente se o Sistema de Arquivos estiver montado.";
-$TEXT{'vol_help2'} = "Adicione ou altere as seguintes configurações:<br><br>
-		      Usuário e grupo proprietário irá determinar quem pode ler e gravar arquivos<br>
-		      Permissão nos arquivos irá determinar quais serão as permissões de usuário, grupo e outros.<br>
-                      Quota no Sistema de Arquivos irá limitar a quantidade máxima de armazenamento";
+$TEXT{'group_created'} = "Grupo criado com sucesso";
+$TEXT{'group_deleted'} = "Grupo excluído com sucesso";
 
 
 #### Sync ####
@@ -343,91 +595,66 @@ $TEXT{'sync_bad_user_password'} = "Falha ao sincronizar - Usuário ou senha inco
 $TEXT{'no_hostname'} = "Nome do Host não foi digitado";
 $TEXT{'no_rdir'} = "Diretório remoto não foi digitado";
 $TEXT{'no_vol'} = "Volume não foi selecionado";
-$TEXT{'sync_help'} = "Use a opção de sincronia para copiar a partir de um daemon rsync remoto um diretório completo<br>
-Use os seguintes parâmetros:<br><br>
-Nome do Host - O IP ou nome do host de um servidor remoto<br>
-Diretório Remoto - O nome do diretório do servidor remoto que você está indo sincronizar a partir dele.<br>
-Nome do Usuário - O usuário remoto<br>
-Senha - A senha remota<br>
-Sistema de Arquivos / Volume - O Nome do volume que você deseja copiar os dados<br>
-Opção de Sincronia - O protocolo usado para sincronia<br><br>
-Nota: O servidor remoto deve possuir instalado o RSync para usar esta opção";
 
 #### Users ####
 $TEXT{'users_manager'} = "Gerenciador de Usuários";
-$TEXT{'create_user'} = "Criar Usuário";
-$TEXT{'passwords_do_not_match'} = "Senhas não correspondem!";
-$TEXT{'failed_to_add_user'} = "Falha ao adicionar usuário";
-$TEXT{'failed_to_change_password'} = "Falha a alterar a senha";
-$TEXT{'failed_to_add_samba_user'} = "Falha ao adicionar o usuário ao Samba";
-$TEXT{'delete_user'} = "Eliminar Usuário";
-$TEXT{'user_admin_cant_be_delete'} = "Usuário admin não poderá ser eliminado.";
-$TEXT{'user_admin_cant_be_changed'} = "Usuário admin não poderá ser alterado.";
-$TEXT{'failed_to_delete_user'} = "Falha ao eliminar o usuário";
-$TEXT{'cant_change_admin_password'} = "Não pode alterar a senha do admin em um site demonstração";
-$TEXT{'passwords_do_not_match'} = "Senhas não correspondem!";
-$TEXT{'password_must_exist'} = "Senha deve existir";
-$TEXT{'change_password'} = "Alterar Senha";
-$TEXT{'one_group_needed'} = "Ao menos um grupo é necessário";
-$TEXT{'failed_to_change_samba_password'} = "Falha ao alterar a senha do Samba";
-$TEXT{'change_settings'} = "Mudar Configurações";
-$TEXT{'failed_to_change_settings'} = "Falha ao alterar as configurações.";
-$TEXT{'users'} = "Usuários";
-$TEXT{'user_name'} = "Nome Usuário";
-$TEXT{'name'} = "Nome";
-$TEXT{'desc'} = "Descrição";
-$TEXT{'uid'} = "UserID";
-$TEXT{'group'} = "Grupo";
-$TEXT{'groups'} = "Grupos";
-$TEXT{'password'} = "Senha";
-$TEXT{'password_again'} = "Senha novamente";
-$TEXT{'easynas_admin'} = "Administrador EasyNAS";
-$TEXT{'delete_user?'} = "Você tem certeza de que deseja eliminar o usuário ?";
-$TEXT{'user_settings'} = "CONFIGURAÇÕES DE USUÁRIO";
-$TEXT{'users_help'} = "Use este menu para adicionar/eliminar contas.";
-		      
+$TEXT{'users_create'} = "Criar usuário";
+$TEXT{'users_id'} = "ID";
+$TEXT{'users_name'} = "Nome de usuário";
+$TEXT{'users_desc'} = "Descrição";
+$TEXT{'users_groups'} = "Grupos";
+$TEXT{'users_actions'} = "Ações";
+$TEXT{'users_password'} = "Senha";
+$TEXT{'users_password_retype'} = "Repita a senha";
+$TEXT{'users_created'} = "Usuário criado com sucesso";
+$TEXT{'users_deleted'} = "Usuário excluído com sucesso";
+$TEXT{'users_add'} = "Adicionar usuário";
+$TEXT{'users_reset'} = "Redefinir";
+$TEXT{'users_delete'} = "Excluir usuário";
+$TEXT{'users_settings'} = "Configurações";
+$TEXT{'users_change_password'} = "Alterar senha";
+$TEXT{'users_passwords_do_no_match'} = "As senhas não coincidem";
+$TEXT{'users_password_must_exist'} = "A senha é obrigatória";
+$TEXT{'users_user_must_exist'} = "O usuário é obrigatório";
+$TEXT{'users_failed_to_add_user'} = "Falha ao adicionar o usuário";
+$TEXT{'users_failed_to_add_samba_user'} = "Falha ao adicionar o usuário Samba";
+$TEXT{'users_failed_to_add_samba_user'} = "Falha ao adicionar o usuário Samba";
+$TEXT{'users_failed_to_delete_user'} = "Falha ao excluir o usuário";
+$TEXT{'users_delete?'} = "Tem certeza de que deseja excluir o usuário?";
+$TEXT{'users_change_password'} = "Alterar senha";
+$TEXT{'users_save_password'} = "Salvar senha";
+$TEXT{'users_password_changed'} = "Senha alterada com sucesso";
+$TEXT{'users_save'} = "Salvar";
+$TEXT{'users_settings_failed_to_save'} = "Falha ao salvar as configurações";
+$TEXT{'users_settings_saved'} = "Configurações salvas com sucesso";
+
 
 #### Groups ####
 $TEXT{'groups_manager'} = "Gerenciador de Grupos";
-$TEXT{'create_group'} = "Criar Grupo";
-$TEXT{'failed_to_add_group'} = "Falha ao adicionar grupo";
-$TEXT{'delete_group'} = "Eliminar Grupo";
+$TEXT{'groups_create'} = "Criar grupo";
+$TEXT{'groups_failed_to_add'} = "Falha ao adicionar o grupo";
+$TEXT{'group_delete'} = "Excluir grupo";
 $TEXT{'group'} = "Grupo";
 $TEXT{'groups'} = "Grupos";
-$TEXT{'can_not_deleted'} = "Não pode ser eliminado";
-$TEXT{'failed_to_delete_group'} = "Falha ao eliminar o grupo";
+$TEXT{'group_can_not_delete'} = "não pode ser excluído";
+$TEXT{'groups_failed_to_delete'} = "Falha ao excluir o grupo";
 $TEXT{'group_name'} = "nome do Grupo";
 $TEXT{'access_permission'} = "Permissão de Acesso";
 $TEXT{'groups_settings'} = "Configurações de Grupos";
-$TEXT{'gid'} = "GroupID";
-$TEXT{'delete_group?'} = "Você tem certeza de que deseja eliminar o grupo ?";
-$TEXT{'groups_help'} = "Use este menu para adicionar/eliminar grupos.<br>
-                        ou para alterar as configurações do grupo";
-$TEXT{'groups_help2'} = "Digite o nome do grupo e os papéis que este grupo terá acesso:<br><br>
-                         SISTEMA (SYSTEM)           - Configurações gerais do NAS.<br>
-                         ARMAZENAMENTO (STORAGE)    - Permite adicionar/alterar/eliminar os Sistemas de Arquivos e os Volumes<br>
-                         USUÁRIOS (USERS)           - Gerencia usuário e grupos<br>
-                         COMPARTILHAMENTO (SHARING) - Configura os protocolos de compartilhamento de arquivos<br>
-                         SERVIÇOS (SERVICES)        - Configura os serviços de rede.";
+$TEXT{'groups_id'} = "ID do grupo";
+$TEXT{'groups_name'} = "Nome do grupo";
+$TEXT{'groups_actions'} = "Ações";
+$TEXT{'groups_delete?'} = "Tem certeza de que deseja excluir o grupo?";
+$TEXT{'groups_add'} = "Adicionar grupo";
+$TEXT{'groups_reset'} = "Redefinir";
+$TEXT{'groups_deleted'} = "Grupo excluído com sucesso";
+$TEXT{'groups_added'} = "Grupo adicionado com sucesso";
 
 
 
 #### Security ####
 $TEXT{'security'} = "Segurança";
 $TEXT{'access_control'} = "Controle de Acesso";
-$TEXT{'security_help'} = "";
+$TEXT{'security_help'} = "Controle de Acesso <br><br> Permitir ou negar o acesso ao menu de administração de IPs ou da rede<br><br> Permitir todas as conexões: Qualquer um pode acessar o menu de administração. <br> Negar conexão a partir da lista: Qualquer um da lista não pode acessar o menu de administração, o restante pode.<br> Permitir conexão a partir da lista: Qualquer um da lista pode acessar o menu de administração, o restante não pode.<br><br> A lista de IP/rede precisa estar no seguinte formato:<br> IP: x.y.z.w <br> Sub-rede (subnet):  x.y.z.w/[1-32] <br>";
 $TEXT{'enter_ip_or_network'} = "Digite o endereço IP ou a rede na qual as conexões para este servidor serão permitidas ou rejeitadas";
 $TEXT{'error_security_demo'} = "Não é possível alterar ACL em site demonstração";
-$TEXT{'security_help'} = "Controle de Acesso <br><br>
-						  Permitir ou negar o acesso ao menu de administração de IPs ou da rede<br><br>
-                          Permitir todas as conexões: Qualquer um pode acessar o menu de administração. <br>
-                          Negar conexão a partir da lista: Qualquer um da lista não pode acessar o menu de administração, o restante pode.<br>
-                          Permitir conexão a partir da lista: Qualquer um da lista pode acessar o menu de administração, o restante não pode.<br><br>
-                          A lista de IP/rede precisa estar no seguinte formato:<br>
-                          IP: x.y.z.w <br>
-                          Sub-rede (subnet):  x.y.z.w/[1-32] <br>";
-			
-
-1;
-
-
