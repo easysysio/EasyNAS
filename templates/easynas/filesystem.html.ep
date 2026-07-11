@@ -36,14 +36,15 @@
                                             <tbody>
 						% foreach my $fs (sort keys (%$filesystems)) {
                                                 <tr>
-                                                    <td><a href="?action=settingsmenu&fs=<%= $fs %>"><i class="fa fa-database fa-2x" title="Settings"></i></a></td>
-						    <td><a href="?action=settingsmenu&fs=<%= $fs %>"><%= $fs %></a></td>
+% my $fslink = $fs_ops->{$fs} ? "?action=progress&fs=$fs" : "?action=settingsmenu&fs=$fs";
+                                                    <td><a href="<%= $fslink %>"><i class="fa fa-database fa-2x" title="<%= $fs_ops->{$fs} ? 'Progress' : 'Settings' %>"></i></a></td>
+						    <td><a href="<%= $fslink %>"><%= $fs %></a></td>
 						    <td>
 % my $h=$filesystems->{$fs}[1];
 % my %hc=(good=>'success', insufficient=>'warning', disk_errors=>'danger', degraded=>'danger');
 <span class="label label-<%= ($hc{$h} || 'default') %>"><%= ($TEXT->{$h} || $h) %></span>
 % if ($fs_ops->{$fs}) {
-<br><span class="label label-info"><i class="fa fa-refresh fa-spin"></i> <%= $fs_ops->{$fs} %></span>
+<br><span class="label label-info"><i class="fa <%= $fs_ops->{$fs}{paused} ? 'fa-pause' : 'fa-refresh fa-spin' %>"></i> <%= $fs_ops->{$fs}{label} %></span>
 % }
 </td>
 						    <td><%= $filesystems->{$fs}[2] %></td>
@@ -52,15 +53,27 @@
 						    <td><%= $filesystems->{$fs}[9] %></td>
 						    <td><%= $filesystems->{$fs}[10] %></td>
 						    <td>
+% if ($fs_ops->{$fs}) {
+%# An operation is running: only pause/resume/stop are allowed.
+%  if ($fs_ops->{$fs}{type} eq 'balance') {
+%   if ($fs_ops->{$fs}{paused}) {
+  <a href="?action=resumeop&fs=<%= $fs %>"><i class="fa fa-play fa-2x" title="<%= ($TEXT->{'resume'} || 'Resume') %>"></i>&nbsp;</a>
+%   } else {
+  <a href="?action=pauseop&fs=<%= $fs %>"><i class="fa fa-pause fa-2x" title="<%= ($TEXT->{'fs_pause'} || 'Pause') %>"></i>&nbsp;</a>
+%   }
+%  }
+  <a onclick="return confirm('<%= ($TEXT->{'fs_stop_op?'} || 'Stop this operation?') %>')" href="?action=stopop&fs=<%= $fs %>"><i class="fa fa-stop fa-2x" title="<%= ($TEXT->{'fs_stop'} || 'Stop') %>"></i></a>
+% } else {
   <a href="?action=settingsmenu&fs=<%= $fs %>"><i class="fa fa-sliders fa-2x" title="<%= ($TEXT->{'settings'}) %>"></i>&nbsp;</a>
   %if ($fs ne "ROOT"){
-   %if ( $filesystems->{$fs}[8] eq "Mounted"){ 
+   %if ( $filesystems->{$fs}[8] eq "Mounted"){
      <a href=?action=unmount&fs=<%= $fs %>><i class="fa fa-unlink fa-2x" title="<%= $TEXT->{'fs_unmount'} %>"></i>&nbsp;</a>
    %}else{
     <a href=?action=mount&fs=<%= $fs %>><i class="fa fa-link fa-2x" title="<%= $TEXT->{'fs_mount'} %>"></i>&nbsp;</a>
     <a onclick="return confirm('<%= ($TEXT->{'fs_delete?'}) %>')" href="?action=deletefs&fs=<%= $fs %>&uuid=<%= $filesystems->{$fs}[0] %>"><i class="fa fa-trash fa-2x" title="<%= ($TEXT->{'delete'}) %>"></i></a>
    %}
  %}
+% }
 
 </td></tr>
 					 	%}

@@ -1,0 +1,50 @@
+% layout 'default';
+
+% if ($result eq "fail") {
+<div class="alert alert-danger alert-dismissable">
+<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button><%= $msg %></div>
+% }
+<div class="row">
+ <div class="col-lg-8">
+  <div class="panel panel-default">
+   <div class="panel-heading">
+    <i class="fa fa-database"></i> <b><%= $fs_name %></b> &mdash;
+    <%= ucfirst $op_type %>
+% if ($op_paused) {
+    <span class="label label-warning"><%= ($TEXT->{'fs_paused'} || 'paused') %></span>
+% }
+   </div>
+   <div class="panel-body">
+    <div class="progress">
+% if ($op_pct ne "") {
+     <div class="progress-bar progress-bar-striped <%= $op_paused ? '' : 'active' %>"
+          role="progressbar" aria-valuenow="<%= $op_pct %>" aria-valuemin="0" aria-valuemax="100"
+          style="width:<%= $op_pct %>%;min-width:2.5em"><%= $op_pct %>%</div>
+% } else {
+     <div class="progress-bar progress-bar-striped active" style="width:100%">
+      <%= ($TEXT->{'fs_op_working'} || 'working...') %></div>
+% }
+    </div>
+    <p class="text-muted"><%= ($TEXT->{'fs_op_locked'} || 'The filesystem settings are locked until this operation finishes.') %></p>
+% if ($op_type eq 'balance') {
+%  if ($op_paused) {
+    <a class="btn btn-default" href="?action=resumeop&fs=<%= $fs_name %>"><i class="fa fa-play"></i> <%= ($TEXT->{'resume'} || 'Resume') %></a>
+%  } else {
+    <a class="btn btn-default" href="?action=pauseop&fs=<%= $fs_name %>"><i class="fa fa-pause"></i> <%= ($TEXT->{'fs_pause'} || 'Pause') %></a>
+%  }
+% }
+    <a class="btn btn-danger" onclick="return confirm('<%= ($TEXT->{'fs_stop_op?'} || 'Stop this operation?') %>')"
+       href="?action=stopop&fs=<%= $fs_name %>"><i class="fa fa-stop"></i> <%= ($TEXT->{'fs_stop'} || 'Stop') %></a>
+    <a class="btn btn-default pull-right" href="/filesystem"><%= ($TEXT->{'close'} || 'Back') %></a>
+   </div>
+  </div>
+ </div>
+</div>
+
+% unless ($op_paused) {
+<script>
+// Track the operation live; when it finishes the controller falls back to
+// the filesystem list on the next reload.
+setTimeout(function(){ location.reload(); }, 5000);
+</script>
+% }

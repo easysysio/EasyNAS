@@ -54,30 +54,42 @@ sub fstab_remove {
  `/usr/bin/sudo /bin/sed -i '\\% $mount_dir/$fs %d' $file`;
 }
 
-####### fs_running_op #######
-# The background operation currently running on a filesystem -- "balance 42%",
-# "scrub 10%", "replace 55%" -- or "" when idle. Drives the in-progress
-# indicator on the filesystem list and locks settings/actions while a device
-# operation is rewriting the array.
-sub fs_running_op {
+####### fs_op_info #######
+# The background operation on a filesystem, as (type, percent, paused):
+# ("balance", 42, 0), ("scrub", 10, 0), ("replace", 55, 0), or () when idle.
+# A paused balance still counts as an operation (the array is mid-rewrite).
+sub fs_op_info {
  my $fs=shift;
- return "" unless (mounted($fs) eq "Mounted");
+ return () unless (mounted($fs) eq "Mounted");
  my $mount=fs_mount($fs);
  my $out=`/usr/bin/sudo /sbin/btrfs balance status $mount 2>/dev/null`;
- if ($out =~ /running/i) {
-  my $pct=($out =~ /(\d+)% left/) ? (100-$1)."%" : "";
-  return "balance".($pct ? " $pct" : "");
+ if ($out =~ /running|paused/i) {
+  my $pct=($out =~ /(\d+)% left/) ? (100-$1) : "";
+  return ("balance",$pct,($out =~ /paused/i) ? 1 : 0);
  }
  $out=`/usr/bin/sudo /sbin/btrfs scrub status $mount 2>/dev/null`;
  if ($out =~ /running/i) {
-  my $pct=($out =~ /\(([\d.]+)%\)/) ? sprintf("%d%%",$1) : "";
-  return "scrub".($pct ? " $pct" : "");
+  my $pct=($out =~ /\(([\d.]+)%\)/) ? int($1) : "";
+  return ("scrub",$pct,0);
  }
  $out=`/usr/bin/sudo /sbin/btrfs replace status -1 $mount 2>/dev/null`;
  if ($out =~ /([\d.]+)% done/ && $out !~ /finished|never started|canceled/i) {
-  return sprintf("replace %d%%",$1);
+  return ("replace",int($1),0);
  }
- return "";
+ return ();
+}
+
+####### fs_running_op #######
+# Human-readable form of fs_op_info -- "balance 42%", "scrub (paused)" -- or
+# "" when idle. Drives the in-progress badge and the deny_if_op lock.
+sub fs_running_op {
+ my $fs=shift;
+ my ($type,$pct,$paused)=fs_op_info($fs);
+ return "" unless (defined $type);
+ my $s=$type;
+ $s.=" $pct%" if ($pct ne "");
+ $s.=" (paused)" if ($paused);
+ return $s;
 }
 
 ####### deny_if_op #######
@@ -146,6 +158,38 @@ sub view($self) {
 #------- Balance / Scrub (whole filesystem) -------
    if (defined $action && $action eq "Balance") { &balance($self); }
    if (defined $action && $action eq "Scrub")   { &scrub($self);   }
+
+#------- Pause / Resume / Stop a running operation -------
+   if (defined $action && $action =~ /^(pauseop|resumeop|stopop)$/) {
+     &opcontrol($self,$action);
+     # Pause/resume keep the operation alive -- land back on its progress
+     # view; stop falls through to the filesystem list.
+     my $opfs=$self->param("fs");
+     if ($action ne "stopop" && defined $opfs
+         && $opfs =~ /^[A-Za-z0-9_-]{1,64}$/ && fs_running_op($opfs) ne "") {
+       $self->redirect_to("/filesystem?action=progress&fs=$opfs");
+       return;
+     }
+   }
+
+#------- Operation progress view -------
+# Clicking a filesystem that has a balance/scrub/replace running lands here
+# (instead of the locked settings page): a live progress bar with
+# pause/resume/stop controls, auto-refreshing until the operation ends.
+   if (defined $action && $action eq "progress") {
+     my $fs=$self->param("fs");
+     if (valid_fs($fs)) {
+       my ($type,$pct,$paused)=fs_op_info($fs);
+       if (defined $type) {
+         $self->stash(fs_name => $fs, op_type => $type,
+                      op_pct => $pct, op_paused => $paused,
+                      result => $result, msg => $msg);
+         $self->render(template => 'easynas/filesystem_progress');
+         return;
+       }
+       # Operation finished -- fall through to the normal list.
+     }
+   }
 
 #------- Per-disk actions -------
    if (defined $action && $action eq "removehd")  { &removehd($self);  }
@@ -218,7 +262,13 @@ sub view($self) {
       my $uuid=$self->param("uuid");
       # Both feed shell commands below (raid_status, btrfs show) -- on a bad
       # value fall through to the main menu with the standard fail message.
-      if (valid_fs($fs) && (!defined $uuid || $uuid eq "" || valid_uuid($uuid)) && !deny_if_op($fs)) {
+      # While a balance/scrub/replace runs, settings are locked: show the
+      # operation's progress view instead.
+      if (valid_fs($fs) && fs_running_op($fs) ne "") {
+        $self->redirect_to("/filesystem?action=progress&fs=$fs");
+        return;
+      }
+      if (valid_fs($fs) && (!defined $uuid || $uuid eq "" || valid_uuid($uuid))) {
       # Current RAID profile, canonicalised to the radio values (single/raidN),
       # so the RAID tab pre-selects the level the filesystem is actually on.
       my $current_raid = lc(raid_status($fs) // "");
@@ -271,12 +321,15 @@ sub view($self) {
 
 #------- Menu --------
    my %fs=fs_info();
-   # Running balance/scrub/replace per filesystem, for the in-progress
-   # indicator; the page auto-refreshes while any operation is active.
+   # Running balance/scrub/replace per filesystem, for the in-progress badge
+   # and the pause/resume/stop action set; the page auto-refreshes while any
+   # operation is active.
    my %fs_ops;
    foreach my $f (keys %fs) {
-     my $op=fs_running_op($f);
-     $fs_ops{$f}=$op if ($op ne "");
+     my ($type,$pct,$paused)=fs_op_info($f);
+     next unless (defined $type);
+     my $label=$type; $label.=" $pct%" if ($pct ne ""); $label.=" (paused)" if ($paused);
+     $fs_ops{$f}={ type=>$type, pct=>$pct, paused=>$paused, label=>$label };
    }
    $self->stash(filesystems =>\%fs);
    $self->stash(fs_ops => \%fs_ops);
@@ -443,6 +496,50 @@ sub require_mounted {
  $result="fail";
  $msg=$TEXT{'fs_not_mounted'} || "The filesystem must be mounted for this action.";
  return 0;
+}
+
+
+####### opcontrol #######
+# Pause / resume / stop the operation currently running on a filesystem.
+# balance supports all three; scrub and replace support cancel (a canceled
+# scrub checkpoints and a later Scrub start resumes from it).
+sub opcontrol {
+ my ($self,$what)=@_;
+ my $fs=$self->param("fs");
+ return unless valid_fs($fs);
+ my ($type)=fs_op_info($fs);
+ if (!defined $type) {
+  $result="fail";
+  $msg=$TEXT{'fs_no_op'} || "No operation is running on this filesystem.";
+  return;
+ }
+ my $mount=fs_mount($fs);
+ my $err="";
+ if ($type eq "balance") {
+  my %cmd=(pauseop=>"pause", resumeop=>"resume", stopop=>"cancel");
+  $err=`/usr/bin/sudo /sbin/btrfs balance $cmd{$what} $mount 2>&1 >/dev/null`;
+ }
+ elsif ($what eq "stopop" && $type eq "scrub") {
+  $err=`/usr/bin/sudo /sbin/btrfs scrub cancel $mount 2>&1 >/dev/null`;
+ }
+ elsif ($what eq "stopop" && $type eq "replace") {
+  $err=`/usr/bin/sudo /sbin/btrfs replace cancel $mount 2>&1 >/dev/null`;
+ }
+ else {
+  $result="fail";
+  $msg=$TEXT{'fs_op_no_pause'} || "This operation can only be stopped, not paused.";
+  return;
+ }
+ if ($? != 0) {
+  chomp $err;
+  write_log("filesystem","ERROR","opcontrol $what ($type) on $fs failed: $err");
+  $result="fail";
+  $msg=$TEXT{'fs_op_ctl_failed'} || "Could not control the operation.";
+  return;
+ }
+ write_log("filesystem","INFO","$type $what on $fs");
+ $result="success";
+ $msg=$TEXT{'fs_op_ctl_done'} || "Done.";
 }
 
 
