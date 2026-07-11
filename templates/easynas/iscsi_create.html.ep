@@ -1,0 +1,53 @@
+% layout 'default';
+
+<div class="row">
+ <div class="col-lg-6">
+  <div class="panel panel-default">
+   <div class="panel-heading">
+    <label><%= ($TEXT->{'iscsi_add'} || 'Add Target') %></label>
+   </div>
+   <div class="panel-body">
+        <form role="form">
+         <input type=hidden name="action" value="add">
+         <div class="form-group">
+          <label><%= ($TEXT->{'iscsi_target'} || 'Target name (IQN)') %></label>
+          <input class="form-control" name="target" placeholder="iqn.2026-07.org.easynas:disk1">
+         </div>
+         <div class="form-group">
+          <label><%= ($TEXT->{'iscsi_disk_name'} || 'Disk file name') %></label>
+          <input class="form-control" name="name">
+         </div>
+         <div class="form-group">
+          <label><%= ($TEXT->{'iscsi_vol'} || 'Volume') %></label>
+          <select class="form-control" name="vol">
+% foreach my $vol (sort keys %$volumes) {
+           <option value="<%= $vol %>"><%= $vol %></option>
+% }
+          </select>
+         </div>
+         <div class="form-group">
+          <label><%= ($TEXT->{'iscsi_size'} || 'Size') %></label>
+          <div class="row"><div class="col-xs-8">
+           <input class="form-control" name="size">
+          </div><div class="col-xs-4">
+           <select class="form-control" name="size_type">
+            <option value="G" selected>GB</option>
+            <option value="M">MB</option>
+           </select>
+          </div></div>
+         </div>
+         <div class="form-group">
+          <label><%= ($TEXT->{'iscsi_acl'} || 'Allowed initiator IP (empty = all)') %></label>
+          <input class="form-control" name="acl">
+         </div>
+   </div>
+   <div class="panel-footer">
+   <center>
+    <button type="submit" class="btn btn-default"><%= ($TEXT->{'iscsi_save'} || 'Save') %></button>
+    <button type="reset" class="btn btn-default"><%= ($TEXT->{'iscsi_reset'} || 'Reset') %></button>
+   </center>
+   </form>
+    </div>
+   </div>
+ </div>
+</div>

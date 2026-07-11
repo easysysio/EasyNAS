@@ -325,6 +325,8 @@ TFTP addon for EasyNAS
 
 %files fs-tftp
 /easynas/addons/tftp.easynas
+/easynas/lib/EasyNAS/Controller/tftp.pm
+/easynas/templates/easynas/tftp.html.ep
 /easynas/lang/en-en/lang_english_tftp.pl
 /easynas/lang/de-de/lang_german_tftp.pl
 /easynas/lang/pt-br/lang_brazilian_portuguese_tftp.pl
@@ -346,6 +348,9 @@ AFP addon for EasyNAS
 
 %files fs-afp
 /easynas/addons/afp.easynas
+/easynas/lib/EasyNAS/Controller/afp.pm
+/easynas/templates/easynas/afp.html.ep
+/easynas/templates/easynas/afp_create.html.ep
 /easynas/lang/en-en/lang_english_afp.pl
 /easynas/lang/de-de/lang_german_afp.pl
 /easynas/lang/pt-br/lang_brazilian_portuguese_afp.pl
@@ -367,6 +372,8 @@ FTP addon for EasyNAS
 
 %files fs-ftp
 /easynas/addons/ftp.easynas
+/easynas/lib/EasyNAS/Controller/ftp.pm
+/easynas/templates/easynas/ftp.html.ep
 /easynas/lang/en-en/lang_english_ftp.pl
 /easynas/lang/de-de/lang_german_ftp.pl
 /easynas/lang/pt-br/lang_brazilian_portuguese_ftp.pl
@@ -459,6 +466,8 @@ DLNA addon for EasyNAS
 
 %files mm-dlna
 /easynas/addons/dlna.easynas
+/easynas/lib/EasyNAS/Controller/dlna.pm
+/easynas/templates/easynas/dlna.html.ep
 /easynas/lang/en-en/lang_english_dlna.pl
 /easynas/lang/de-de/lang_german_dlna.pl
 /easynas/lang/pt-br/lang_brazilian_portuguese_dlna.pl
@@ -480,6 +489,8 @@ Plex Server addon for EasyNAS
 
 %files mm-plex
 /easynas/addons/plex.easynas
+/easynas/lib/EasyNAS/Controller/plex.pm
+/easynas/templates/easynas/plex.html.ep
 /easynas/lang/en-en/lang_english_plex.pl
 /easynas/lang/pl-pl/lang_polish_plex.pl
 
@@ -498,6 +509,9 @@ RSyncd addon for EasyNAS
 
 %files fs-rsyncd
 /easynas/addons/rsyncd.easynas
+/easynas/lib/EasyNAS/Controller/rsyncd.pm
+/easynas/templates/easynas/rsyncd.html.ep
+/easynas/templates/easynas/rsyncd_create.html.ep
 /easynas/lang/en-en/lang_english_rsync.pl
 /easynas/lang/de-de/lang_german_rsync.pl
 /easynas/lang/pt-br/lang_brazilian_portuguese_rsync.pl
@@ -519,6 +533,9 @@ Radius addon for EasyNAS
 
 %files srv-radius
 /easynas/addons/radius.easynas
+/easynas/lib/EasyNAS/Controller/radius.pm
+/easynas/templates/easynas/radius.html.ep
+/easynas/templates/easynas/radius_create.html.ep
 /easynas/lang/en-en/lang_english_radius.pl
 /easynas/lang/de-de/lang_german_radius.pl
 /easynas/lang/pt-br/lang_brazilian_portuguese_radius.pl
@@ -540,6 +557,9 @@ iSCSI addon for EasyNAS
 
 %files stg-iscsi
 /easynas/addons/iscsi.easynas
+/easynas/lib/EasyNAS/Controller/iscsi.pm
+/easynas/templates/easynas/iscsi.html.ep
+/easynas/templates/easynas/iscsi_create.html.ep
 /easynas/lang/en-en/lang_english_iscsi.pl
 /easynas/lang/pl-pl/lang_polish_iscsi.pl
 

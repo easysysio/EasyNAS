@@ -39,16 +39,16 @@ built before Phase 4:
 ## C. Not yet ported (no controller; addon `enable=false`)
 
 Sharing:
-- [ ] ftp (91)   - [ ] afp (196)   - [ ] rsyncd (234)   - [ ] tftp (187)
+- [x] ftp   - [x] afp   - [x] rsyncd   - [x] tftp (all ported to Mojolicious)
 
 Storage:
-- [ ] iscsi (250)
+- [x] iscsi (ported; tgt-based as in v1)
 
 Multimedia:
-- [ ] dlna (226)   - [ ] plex (144)
+- [x] dlna   - [x] plex (ported)
 
 Services:
-- [ ] radius (199)
+- [x] radius (ported)
 
 Data protection:
 - [ ] backup (178)   - [ ] sync (159)

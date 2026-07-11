@@ -1,5 +1,4 @@
 <addon>
- <enable>false</enable>
  <name>dlna</name>
  <description>dlna</description>
  <version>1.0.0</version>

@@ -1,6 +1,5 @@
 <addon>
  <name>plex</name>
- <enable>false</enable>
  <description>plex</description>
  <version>1.0.0</version>
  <author>Yariv Hakim</author>

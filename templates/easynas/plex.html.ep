@@ -1,0 +1,53 @@
+% layout 'default';
+
+% if ($result eq "fail") {
+<div class="alert alert-danger alert-dismissable">
+<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button><%= $msg %></div>
+% }
+<div class="row">
+ <div class="col-lg-8">
+  <div class="panel panel-default">
+   <div class="panel-heading">
+    <%= ($TEXT->{$addon->{'description'}}) %>
+   </div>
+   <div class="panel-body">
+    <ul class="nav nav-tabs">
+     <li class="active"><a href="#tabs-1" data-toggle="tab"><%= ($TEXT->{'plex_on_off'} || 'On / Off') %></a></li>
+     <li><a href="#tabs-2" data-toggle="tab"><%= ($TEXT->{'plex_media'} || 'Media') %></a></li>
+    </ul>
+   <div class="tab-content">
+    <div class="tab-pane fade in active" id="tabs-1">
+    <br><br><br>
+    <label><%= ($TEXT->{$addon->{'description'}}) %></label>
+    <br>
+    %if ($service_active) {
+     <a href="?action=plexoff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
+    %}
+    %else {
+     <a href="?action=plexon"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
+    %}
+    <p class="text-muted"><br><%= ($TEXT->{'plex_help'} || 'Manage libraries in the Plex web app on port 32400.') %></p>
+</div><!-- end of #tab1 -->
+<div class="tab-pane fade" id="tabs-2">
+<br>
+<p><b><%= ($TEXT->{'plex_current'} || 'Media home') %>:</b> <%= $media_dir || '-' %></p>
+<form role="form">
+ <input type=hidden name="action" value="update">
+ <div class="radio"><label><input type="radio" name="radio_sel" value="nas" <%= $sel_nas %>><%= ($TEXT->{'plex_all'} || 'Whole NAS') %></label></div>
+ <div class="radio"><label><input type="radio" name="radio_sel" value="fs" <%= $sel_fs %>><%= ($TEXT->{'plex_fs'} || 'File system') %></label>
+  <select class="form-control" name="fs">
+% foreach my $fs (sort keys %$filesystems) {
+   <option value="<%= $fs %>"><%= $fs %></option>
+% }
+  </select></div>
+ <div class="radio"><label><input type="radio" name="radio_sel" value="vol" <%= $sel_vol %>><%= ($TEXT->{'plex_vol'} || 'Volume') %></label>
+  <select class="form-control" name="vol">
+% foreach my $vol (sort keys %$volumes) {
+   <option value="<%= $vol %>"><%= $vol %></option>
+% }
+  </select></div>
+ <button type="submit" class="btn btn-default"><%= ($TEXT->{'plex_save'} || 'Save') %></button>
+</form>
+</div><!-- end of #tab2 -->
+ </div><!-- end of .tab_container -->
+ </div></div></div></div>

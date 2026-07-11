@@ -1,6 +1,5 @@
 <addon>
  <name>iscsi</name>
- <enable>false</enable>
  <description>iscsi</description>
  <version>1.0.0</version>
  <author>Yariv Hakim</author>

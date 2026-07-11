@@ -1,0 +1,37 @@
+% layout 'default';
+
+<div class="row">
+ <div class="col-lg-6">
+  <div class="panel panel-default">
+   <div class="panel-heading">
+    <label><%= ($TEXT->{'rsyncd_add'} || 'Add Module') %></label>
+   </div>
+   <div class="panel-body">
+        <form role="form">
+         <input type=hidden name="action" value="add">
+         <div class="form-group">
+          <label><%= ($TEXT->{'rsyncd_share_name'} || 'Module name') %></label>
+          <input class="form-control" name="name">
+         </div>
+         <div class="form-group">
+          <label><%= ($TEXT->{'rsyncd_vol'} || 'Volume') %></label>
+          <select class="form-control" name="vol">
+% foreach my $vol (sort keys %$volumes) {
+           <option value="<%= $vol %>"><%= $vol %></option>
+% }
+          </select>
+         </div>
+         <div class="checkbox">
+          <label><input type="checkbox" name="readonly" value="yes"><%= ($TEXT->{'rsyncd_readonly'} || 'Read only') %></label>
+         </div>
+   </div>
+   <div class="panel-footer">
+   <center>
+    <button type="submit" class="btn btn-default"><%= ($TEXT->{'rsyncd_save'} || 'Save') %></button>
+    <button type="reset" class="btn btn-default"><%= ($TEXT->{'rsyncd_reset'} || 'Reset') %></button>
+   </center>
+   </form>
+    </div>
+   </div>
+ </div>
+</div>

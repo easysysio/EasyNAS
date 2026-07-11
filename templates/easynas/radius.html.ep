@@ -1,0 +1,49 @@
+% layout 'default';
+
+% if ($result eq "fail") {
+<div class="alert alert-danger alert-dismissable">
+<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button><%= $msg %></div>
+% }
+<div class="row">
+ <div class="col-lg-8">
+  <div class="panel panel-default">
+   <div class="panel-heading">
+    <%= ($TEXT->{$addon->{'description'}}) %>
+   </div>
+   <div class="panel-body">
+    <ul class="nav nav-tabs">
+     <li class="active"><a href="#tabs-1" data-toggle="tab"><%= ($TEXT->{'radius_on_off'} || 'On / Off') %></a></li>
+     <li><a href="#tabs-2" data-toggle="tab"><%= ($TEXT->{'radius_clients'} || 'Clients') %></a></li>
+    </ul>
+   <div class="tab-content">
+    <div class="tab-pane fade in active" id="tabs-1">
+    <br><br><br>
+    <label><%= ($TEXT->{$addon->{'description'}}) %></label>
+    <br>
+    %if ($service_active) {
+     <a href="?action=radiusoff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
+    %}
+    %else {
+     <a href="?action=radiuson"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
+    %}
+</div><!-- end of #tab1 -->
+<div class="tab-pane fade" id="tabs-2">
+<table class="table table-bordered table-striped">
+ <thead>
+  <tr><th><%= ($TEXT->{'radius_client'} || 'Client') %></th><th><%= ($TEXT->{'radius_ip'} || 'IP') %></th><th><%= ($TEXT->{'radius_actions'} || 'Actions') %></th></tr>
+ </thead>
+ <tbody>
+% foreach my $c (@$clients) {
+  <tr>
+   <td><%= $c->{name} %></td>
+   <td><%= $c->{ip} %></td>
+   <td><a onclick="return confirm('<%= ($TEXT->{'radius_delete'} || 'Delete client?') %>')" href="?action=delete&client=<%= $c->{name} %>"><i class="fa fa-trash"></i></a></td>
+  </tr>
+% }
+ </tbody>
+</table>
+<br>
+<a href="?action=create">[<%= ($TEXT->{'radius_add'} || 'Add Client') %>]</a>
+</div><!-- end of #tab2 -->
+ </div><!-- end of .tab_container -->
+ </div></div></div></div>

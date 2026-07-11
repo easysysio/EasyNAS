@@ -1,0 +1,51 @@
+% layout 'default';
+
+% if ($result eq "fail") {
+<div class="alert alert-danger alert-dismissable">
+<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button><%= $msg %></div>
+% }
+<div class="row">
+ <div class="col-lg-8">
+  <div class="panel panel-default">
+   <div class="panel-heading">
+    <%= ($TEXT->{$addon->{'description'}}) %>
+   </div>
+   <div class="panel-body">
+    <ul class="nav nav-tabs">
+     <li class="active"><a href="#tabs-1" data-toggle="tab"><%= ($TEXT->{'tftp_on_off'} || 'On / Off') %></a></li>
+     <li><a href="#tabs-2" data-toggle="tab"><%= ($TEXT->{'tftp_shared_vol'} || 'Served directory') %></a></li>
+    </ul>
+   <div class="tab-content">
+    <div class="tab-pane fade in active" id="tabs-1">
+    <br><br><br>
+    <label><%= ($TEXT->{$addon->{'description'}}) %></label>
+    <br>
+    %if ($service_active) {
+     <a href="?action=tftpoff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
+    %}
+    %else {
+     <a href="?action=tftpon"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
+    %}
+</div><!-- end of #tab1 -->
+<div class="tab-pane fade" id="tabs-2">
+<br>
+% if ($current ne "") {
+<p><b><%= ($TEXT->{'tftp_current'} || 'Serving') %>:</b> <%= $current %>
+ <a onclick="return confirm('<%= ($TEXT->{'tftp_delete'} || 'Stop serving this directory?') %>')" href="?action=delete"><i class="fa fa-trash"></i></a></p>
+% } else {
+<form role="form">
+ <input type=hidden name="action" value="add">
+ <div class="form-group">
+  <label><%= ($TEXT->{'tftp_vol'} || 'Volume to serve') %></label>
+  <select class="form-control" name="vol">
+% foreach my $vol (sort keys %$volumes) {
+   <option value="<%= $vol %>"><%= $vol %></option>
+% }
+  </select>
+ </div>
+ <button type="submit" class="btn btn-default"><%= ($TEXT->{'tftp_save'} || 'Save') %></button>
+</form>
+% }
+</div><!-- end of #tab2 -->
+ </div><!-- end of .tab_container -->
+ </div></div></div></div>

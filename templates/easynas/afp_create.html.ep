@@ -1,0 +1,34 @@
+% layout 'default';
+
+<div class="row">
+ <div class="col-lg-6">
+  <div class="panel panel-default">
+   <div class="panel-heading">
+    <label><%= ($TEXT->{'afp_add'} || 'Add Share') %></label>
+   </div>
+   <div class="panel-body">
+        <form role="form">
+         <input type=hidden name="action" value="add">
+         <div class="form-group">
+          <label><%= ($TEXT->{'afp_share_name'} || 'Share name') %></label>
+          <input class="form-control" name="name">
+         </div>
+         <div class="form-group">
+          <label><%= ($TEXT->{'afp_vol'} || 'Volume') %></label>
+          <select class="form-control" name="vol">
+% foreach my $vol (sort keys %$volumes) {
+           <option value="<%= $vol %>"><%= $vol %></option>
+% }
+          </select>
+         </div>
+   </div>
+   <div class="panel-footer">
+   <center>
+    <button type="submit" class="btn btn-default"><%= ($TEXT->{'afp_save'} || 'Save') %></button>
+    <button type="reset" class="btn btn-default"><%= ($TEXT->{'afp_reset'} || 'Reset') %></button>
+   </center>
+   </form>
+    </div>
+   </div>
+ </div>
+</div>

@@ -1,6 +1,5 @@
 <addon>
  <name>radius</name>
- <enable>false</enable>
  <description>radius</description>
  <version>0.7.0</version>
  <author>Yariv Hakim</author>

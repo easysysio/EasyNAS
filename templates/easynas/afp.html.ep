@@ -1,0 +1,49 @@
+% layout 'default';
+
+% if ($result eq "fail") {
+<div class="alert alert-danger alert-dismissable">
+<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button><%= $msg %></div>
+% }
+<div class="row">
+ <div class="col-lg-8">
+  <div class="panel panel-default">
+   <div class="panel-heading">
+    <%= ($TEXT->{$addon->{'description'}}) %>
+   </div>
+   <div class="panel-body">
+    <ul class="nav nav-tabs">
+     <li class="active"><a href="#tabs-1" data-toggle="tab"><%= ($TEXT->{'afp_on_off'} || 'On / Off') %></a></li>
+     <li><a href="#tabs-2" data-toggle="tab"><%= ($TEXT->{'afp_shared_vol'} || 'Shares') %></a></li>
+    </ul>
+   <div class="tab-content">
+    <div class="tab-pane fade in active" id="tabs-1">
+    <br><br><br>
+    <label><%= ($TEXT->{$addon->{'description'}}) %></label>
+    <br>
+    %if ($service_active) {
+     <a href="?action=afpoff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
+    %}
+    %else {
+     <a href="?action=afpon"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
+    %}
+</div><!-- end of #tab1 -->
+<div class="tab-pane fade" id="tabs-2">
+<table class="table table-bordered table-striped">
+ <thead>
+  <tr><th><%= ($TEXT->{'afp_share_name'} || 'Share') %></th><th><%= ($TEXT->{'afp_path'} || 'Path') %></th><th><%= ($TEXT->{'afp_actions'} || 'Actions') %></th></tr>
+ </thead>
+ <tbody>
+% foreach my $share (@$shares) {
+  <tr>
+   <td><%= $share->{name} %></td>
+   <td><%= $share->{path} %></td>
+   <td><a onclick="return confirm('<%= ($TEXT->{'afp_delete'} || 'Delete share?') %>')" href="?action=delete&name=<%= $share->{name} %>&vol=<%= $share->{vol} %>"><i class="fa fa-trash"></i></a></td>
+  </tr>
+% }
+ </tbody>
+</table>
+<br>
+<a href="?action=create">[<%= ($TEXT->{'afp_add'} || 'Add Share') %>]</a>
+</div><!-- end of #tab2 -->
+ </div><!-- end of .tab_container -->
+ </div></div></div></div>

@@ -1,6 +1,5 @@
 <addon>
  <name>tftp</name>
- <enable>false</enable>
  <description>tftp</description>
  <version>1.0.0</version>
  <author>Yariv Hakim</author>

@@ -1,6 +1,5 @@
 <addon>
  <name>ftp</name>
- <enable>false</enable>
  <description>ftp</description>
  <version>1.0.0</version>
  <author>Yariv Hakim</author>

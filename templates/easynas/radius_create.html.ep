@@ -1,0 +1,34 @@
+% layout 'default';
+
+<div class="row">
+ <div class="col-lg-6">
+  <div class="panel panel-default">
+   <div class="panel-heading">
+    <label><%= ($TEXT->{'radius_add'} || 'Add Client') %></label>
+   </div>
+   <div class="panel-body">
+        <form role="form">
+         <input type=hidden name="action" value="add">
+         <div class="form-group">
+          <label><%= ($TEXT->{'radius_client'} || 'Client name') %></label>
+          <input class="form-control" name="client">
+         </div>
+         <div class="form-group">
+          <label><%= ($TEXT->{'radius_ip'} || 'IP address') %></label>
+          <input class="form-control" name="ip">
+         </div>
+         <div class="form-group">
+          <label><%= ($TEXT->{'radius_secret'} || 'Shared secret') %></label>
+          <input class="form-control" type="password" name="secret">
+         </div>
+   </div>
+   <div class="panel-footer">
+   <center>
+    <button type="submit" class="btn btn-default"><%= ($TEXT->{'radius_save'} || 'Save') %></button>
+    <button type="reset" class="btn btn-default"><%= ($TEXT->{'radius_reset'} || 'Reset') %></button>
+   </center>
+   </form>
+    </div>
+   </div>
+ </div>
+</div>
