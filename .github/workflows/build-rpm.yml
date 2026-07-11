@@ -2,12 +2,36 @@ name: Build RPMs
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
 
 jobs:
+  # Guard for the per-addon versioning: a push that changes an addon
+  # subpackage's files without bumping its Release in easynas.spec would
+  # publish new payload under the old NEVRA -- no appliance would ever see
+  # the update. Runs on branch pushes only; builds are tag/dispatch as before.
+  check-release-bumps:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check addon Release bumps
+        run: |
+          BEFORE="${{ github.event.before }}"
+          if [ -z "$BEFORE" ] || echo "$BEFORE" | grep -q '^0*$' \
+             || ! git cat-file -e "$BEFORE" 2>/dev/null; then
+            echo "No usable base commit (first push or force-push); skipping."
+            exit 0
+          fi
+          perl tools/check-addon-release-bumps.pl "$BEFORE..HEAD"
+
   build:
+    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
