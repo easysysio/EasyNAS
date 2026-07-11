@@ -279,6 +279,10 @@ $TEXT{'firmware_refreshed'} = "Repositories refreshed";
 $TEXT{'firmware_noupdate'} = "No Updates Available";
 $TEXT{'firmware_update_success'} = "Update Finished Succesfuly";
 $TEXT{'firmware_update_failed'} = "Update Failed";
+$TEXT{'firmware_updating'} = "System update running in the background...";
+$TEXT{'firmware_phase_down'} = "downloading";
+$TEXT{'firmware_phase_inst'} = "installing";
+$TEXT{'firmware_phase_prep'} = "preparing";
 
 #### Addons #####
 $TEXT{'addons'} = "Addons";

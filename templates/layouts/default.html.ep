@@ -209,16 +209,33 @@
 
 %# ---- global system-update banner (shown on every page) ----
 % if ($update_state eq "updating") {
-                    <div class="alert alert-info" style="margin-top:40px"><i class="fa fa-spinner fa-spin"></i>
-                      <%= ($TEXT->{'firmware_updating'} || 'System update running in the background...') %></div>
+                    <div class="alert alert-info" style="margin-top:40px">
+                      <i class="fa fa-spinner fa-spin"></i>
+                      <%= ($TEXT->{'firmware_updating'} || 'System update running in the background...') %>
+                      <span id="upd-phase" class="text-muted"></span>
+                      <div class="progress" style="margin:8px 0 0">
+                        <div id="upd-bar" class="progress-bar progress-bar-striped active"
+                             role="progressbar" aria-valuemin="0" aria-valuemax="100"
+                             style="width:3%;min-width:2.5em">0%</div>
+                      </div>
+                    </div>
                     <script>
-                    // While updating, poll the status and refresh once it changes
-                    // (ready/failed) so the reboot link appears on its own.
+                    // While updating, poll the progress endpoint: drive the bar,
+                    // and refresh once the state changes (ready/failed) so the
+                    // result banner appears on its own.
                     (function poll(){
-                      fetch('/firmware?action=status').then(function(r){return r.text();}).then(function(s){
-                        if (s.trim() !== 'updating') { location.reload(); }
-                        else { setTimeout(poll, 10000); }
-                      }).catch(function(){ setTimeout(poll, 10000); });
+                      var PHASE={downloading:'<%= ($TEXT->{'firmware_phase_down'} || 'downloading') %>',
+                                 installing:'<%= ($TEXT->{'firmware_phase_inst'} || 'installing') %>',
+                                 preparing:'<%= ($TEXT->{'firmware_phase_prep'} || 'preparing') %>'};
+                      fetch('/firmware?action=progress').then(function(r){return r.json();}).then(function(d){
+                        if (d.state !== 'updating') { location.reload(); return; }
+                        var b=document.getElementById('upd-bar');
+                        if (b) { b.style.width=d.percent+'%'; b.textContent=d.percent+'%';
+                                 b.setAttribute('aria-valuenow',d.percent); }
+                        var p=document.getElementById('upd-phase');
+                        if (p) p.textContent='('+(PHASE[d.phase]||d.phase)+')';
+                        setTimeout(poll, 3000);
+                      }).catch(function(){ setTimeout(poll, 5000); });
                     })();
                     </script>
 % } elsif ($update_state eq "ready") {

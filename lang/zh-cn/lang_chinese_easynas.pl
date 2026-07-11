@@ -275,6 +275,10 @@ $TEXT{'firmware_refreshed'} = "软件仓库已刷新";
 $TEXT{'firmware_noupdate'} = "没有可用更新";
 $TEXT{'firmware_update_success'} = "更新成功完成";
 $TEXT{'firmware_update_failed'} = "更新失败";
+$TEXT{'firmware_updating'} = "系统更新正在后台运行...";
+$TEXT{'firmware_phase_down'} = "下载中";
+$TEXT{'firmware_phase_inst'} = "安装中";
+$TEXT{'firmware_phase_prep'} = "准备中";
 
 #### Addons #####
 $TEXT{'addons'} = "附加组件";

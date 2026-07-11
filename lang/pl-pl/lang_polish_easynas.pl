@@ -275,6 +275,10 @@ $TEXT{'firmware_refreshed'} = "Repositoria odświeżone";
 $TEXT{'firmware_noupdate'} = "Brak dostępnych aktualizacji";
 $TEXT{'firmware_update_success'} = "Aktualizacja zakończona pomyślnie";
 $TEXT{'firmware_update_failed'} = "Aktualizacja nie powiodła się";
+$TEXT{'firmware_updating'} = "Aktualizacja systemu trwa w tle...";
+$TEXT{'firmware_phase_down'} = "pobieranie";
+$TEXT{'firmware_phase_inst'} = "instalowanie";
+$TEXT{'firmware_phase_prep'} = "przygotowanie";
 
 #### Addons #####
 $TEXT{'addons'} = "Dodatki";

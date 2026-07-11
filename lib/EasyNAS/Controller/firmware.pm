@@ -24,6 +24,26 @@ sub view ($self) {
     return;
   }
 
+  # Progress endpoint for the banner's progress bar: derive a percentage from
+  # zypper's step counters in update.log -- "Retrieving package ... (n/m)" is
+  # the download half (0-50%), "( n/m) Installing:" the install half (50-100%).
+  if (defined $action && $action eq "progress") {
+    my $state = update_state();
+    my ($pct,$phase) = (0,"");
+    if ($state eq "updating") {
+      my $log = `/usr/bin/sudo /bin/cat /var/log/easynas/update.log 2>/dev/null`;
+      my ($r_n,$r_m,$i_n,$i_m);
+      while ($log =~ /Retrieving(?: package)?:?\s+\S+\s+\(\s*(\d+)\/(\d+)\)/g) { ($r_n,$r_m)=($1,$2); }
+      while ($log =~ /\(\s*(\d+)\/(\d+)\)\s+Installing:/g)                    { ($i_n,$i_m)=($1,$2); }
+      if    (defined $i_n && $i_m) { $pct = 50 + int($i_n / $i_m * 50); $phase = "installing";  }
+      elsif (defined $r_n && $r_m) { $pct = int($r_n / $r_m * 50);      $phase = "downloading"; }
+      else                         { $pct = 3;                          $phase = "preparing";   }
+      $pct = 99 if ($pct > 99);   # 100% only when the state flips off "updating"
+    }
+    $self->render(json => { state => $state, percent => $pct, phase => $phase });
+    return;
+  }
+
   $msg="";
   $result="";
   $self->stash(addon => $addon,
