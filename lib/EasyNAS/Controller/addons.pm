@@ -178,36 +178,34 @@ sub update_all($self) {
 }
 
 ############# install addon ###############
+# Installs run detached in a transient systemd unit, like updates: the page
+# returns immediately and the global banner (update.status + update.log)
+# shows live progress on every page. On success the unit refreshes the
+# catalog/update files so the grid reflects the new state on reload.
 sub install_addon($self) {
  my $package=$self->param("package");
  my $addons_update_dir=get_addons_update_dir();
- my @info;
- my $info1;
- my $info2;
- my $rc; 
- my $installed=0;
- $rc = `sudo /usr/bin/zypper -n install $package`;
- @info=`sudo /usr/bin/zypper info $package`;
- foreach(@info)
- {
-   ($info1,$info2) = split /:/,$_;
-   if ($info1 =~ "Installed" && $info2 =~ "Yes")
-   {
-    $installed=1
-   }
- }
- if ($installed)
- {
-  $result="success";
-  $msg=$TEXT{'addons_installed'};
-  `/usr/bin/sudo /usr/bin/zypper --xmlout info $package | /usr/bin/sudo /usr/bin/tee $addons_update_dir/$package.addon`;
-  refresh_update_list();
- }
- else
- {
+ # The package name reaches a root shell command -- whitelist its shape.
+ unless (defined $package && $package =~ /^easynas-[a-z0-9-]{1,64}$/) {
   $result="fail";
   $msg=$TEXT{'addons_not_installed'};
+  return;
  }
+ my $repo=active_channel_repo();
+ system("/bin/echo updating | /usr/bin/sudo /usr/bin/tee /etc/easynas/update.status >/dev/null");
+ system("/usr/bin/sudo /usr/bin/systemd-run --collect --unit=easynas-install "
+       ."/bin/sh -c '"
+       ."/usr/bin/zypper -n --gpg-auto-import-keys install $package "
+       .">/var/log/easynas/update.log 2>&1 "
+       ."&& { /usr/bin/zypper --xmlout info $package "
+       ."| /usr/bin/tee $addons_update_dir/$package.addon >/dev/null; "
+       ."/usr/bin/zypper --quiet --xmlout lu -a --repo $repo "
+       ."| /usr/bin/tee /etc/easynas/easynas.updates >/dev/null; "
+       ."/bin/rm -f /etc/easynas/update.status; } "
+       ."|| echo failed | /usr/bin/tee /etc/easynas/update.status"
+       ."' >/dev/null 2>&1");
+ $result="success";
+ $msg=$TEXT{'addons_installing_bg'} || "Installing in the background. The status banner shows progress.";
  return;
 }
 

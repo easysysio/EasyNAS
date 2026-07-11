@@ -439,6 +439,7 @@ $TEXT{'better'} = "Better";
 $TEXT{'faster'} = "Faster";
 $TEXT{'none'} = "None";
 $TEXT{'health'} = "Health";
+$TEXT{'logs'} = "Logs";
 $TEXT{'good'} = "Good";
 $TEXT{'degraded'} = "Degraded";
 $TEXT{'disk_errors'} = "Disk errors";

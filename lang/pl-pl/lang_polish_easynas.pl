@@ -435,6 +435,7 @@ $TEXT{'better'} = "Lepszy";
 $TEXT{'faster'} = "Szybszy";
 $TEXT{'none'} = "Nic";
 $TEXT{'health'} = "Zdrowie";
+$TEXT{'logs'} = "Dzienniki";
 $TEXT{'good'} = "Dobry";
 $TEXT{'degraded'} = "Zdegradowany";
 $TEXT{'disk_errors'} = "Błędy dysku";

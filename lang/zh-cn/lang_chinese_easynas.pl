@@ -435,6 +435,7 @@ $TEXT{'better'} = "更高压缩";
 $TEXT{'faster'} = "更快";
 $TEXT{'none'} = "无";
 $TEXT{'health'} = "健康状况";
+$TEXT{'logs'} = "日志";
 $TEXT{'good'} = "良好";
 $TEXT{'degraded'} = "已降级";
 $TEXT{'disk_errors'} = "磁盘错误";

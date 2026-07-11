@@ -1,0 +1,11 @@
+<addon>
+ <name>logs</name>
+ <description>logs</description>
+ <version>1.0.0</version>
+ <author>Yariv Hakim</author>
+ <icon>fa-file-text</icon>
+ <type>system</type>
+ <program>logs</program>
+ <config></config>
+ <service></service>
+</addon>

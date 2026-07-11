@@ -54,6 +54,45 @@ sub fstab_remove {
  `/usr/bin/sudo /bin/sed -i '\\% $mount_dir/$fs %d' $file`;
 }
 
+####### fs_running_op #######
+# The background operation currently running on a filesystem -- "balance 42%",
+# "scrub 10%", "replace 55%" -- or "" when idle. Drives the in-progress
+# indicator on the filesystem list and locks settings/actions while a device
+# operation is rewriting the array.
+sub fs_running_op {
+ my $fs=shift;
+ return "" unless (mounted($fs) eq "Mounted");
+ my $mount=fs_mount($fs);
+ my $out=`/usr/bin/sudo /sbin/btrfs balance status $mount 2>/dev/null`;
+ if ($out =~ /running/i) {
+  my $pct=($out =~ /(\d+)% left/) ? (100-$1)."%" : "";
+  return "balance".($pct ? " $pct" : "");
+ }
+ $out=`/usr/bin/sudo /sbin/btrfs scrub status $mount 2>/dev/null`;
+ if ($out =~ /running/i) {
+  my $pct=($out =~ /\(([\d.]+)%\)/) ? sprintf("%d%%",$1) : "";
+  return "scrub".($pct ? " $pct" : "");
+ }
+ $out=`/usr/bin/sudo /sbin/btrfs replace status -1 $mount 2>/dev/null`;
+ if ($out =~ /([\d.]+)% done/ && $out !~ /finished|never started|canceled/i) {
+  return sprintf("replace %d%%",$1);
+ }
+ return "";
+}
+
+####### deny_if_op #######
+# Refuse an action while a balance/scrub/replace runs on the filesystem --
+# device operations rewrite the array and must not be stacked or reconfigured
+# mid-flight. Sets the standard fail message; returns 1 when denied.
+sub deny_if_op {
+ my $fs=shift;
+ my $op=fs_running_op($fs);
+ return 0 if ($op eq "");
+ $result="fail";
+ $msg=($TEXT{'fs_op_running'} || "A background operation is running on this filesystem; settings are locked until it finishes")." ($op)";
+ return 1;
+}
+
 
 sub view($self) {
     if (!($self->session('is_auth'))) {
@@ -179,7 +218,7 @@ sub view($self) {
       my $uuid=$self->param("uuid");
       # Both feed shell commands below (raid_status, btrfs show) -- on a bad
       # value fall through to the main menu with the standard fail message.
-      if (valid_fs($fs) && (!defined $uuid || $uuid eq "" || valid_uuid($uuid))) {
+      if (valid_fs($fs) && (!defined $uuid || $uuid eq "" || valid_uuid($uuid)) && !deny_if_op($fs)) {
       # Current RAID profile, canonicalised to the radio values (single/raidN),
       # so the RAID tab pre-selects the level the filesystem is actually on.
       my $current_raid = lc(raid_status($fs) // "");
@@ -230,9 +269,17 @@ sub view($self) {
     }
 
 
-#------- Menu --------    
+#------- Menu --------
    my %fs=fs_info();
+   # Running balance/scrub/replace per filesystem, for the in-progress
+   # indicator; the page auto-refreshes while any operation is active.
+   my %fs_ops;
+   foreach my $f (keys %fs) {
+     my $op=fs_running_op($f);
+     $fs_ops{$f}=$op if ($op ne "");
+   }
    $self->stash(filesystems =>\%fs);
+   $self->stash(fs_ops => \%fs_ops);
    $self->stash(result => $result);
    $self->stash(msg => $msg);
    $self->render(template => 'easynas/filesystem');
@@ -339,6 +386,8 @@ sub changeraid($self) {
    return;
  }
 
+ return if deny_if_op($fs);
+
  # Current profile, canonicalised to the radio values (single/raidN).
  my $current = lc(raid_status($fs));
  $current = "single" if $current eq "jbod";
@@ -368,7 +417,10 @@ sub changeraid($self) {
  }
 
  my $mount = ($fs eq "ROOT") ? "/" : get_mount_dir()."/".$fs;
- system("/usr/bin/nohup /usr/bin/sudo /sbin/btrfs balance start "
+ # The user already confirmed via the force checkbox (required above), so pass
+ # --force to btrfs too: conversions that reduce metadata redundancy (e.g.
+ # raid1 -> single) are otherwise refused with "use --force if you want this".
+ system("/usr/bin/nohup /usr/bin/sudo /sbin/btrfs balance start --force "
        ."-dconvert=$raid -mconvert=$raid $mount "
        .">>/var/log/easynas/balance.log 2>&1 &");
  $result="success";
@@ -400,6 +452,7 @@ sub require_mounted {
 sub balance($self) {
  my $fs=$self->param("fs");
  return unless require_mounted($fs);
+ return if deny_if_op($fs);
  my $mount=fs_mount($fs);
  system("/usr/bin/nohup /usr/bin/sudo /sbin/btrfs balance start $mount >>/var/log/easynas/balance.log 2>&1 &");
  $result="success";
@@ -413,6 +466,7 @@ sub balance($self) {
 sub scrub($self) {
  my $fs=$self->param("fs");
  return unless require_mounted($fs);
+ return if deny_if_op($fs);
  my $mount=fs_mount($fs);
  system("/usr/bin/sudo /sbin/btrfs scrub start $mount >/dev/null 2>&1");
  $result="success";
@@ -426,6 +480,7 @@ sub scrub($self) {
 sub repairhd($self) {
  my $fs=$self->param("fs");
  return unless require_mounted($fs);
+ return if deny_if_op($fs);
  my $mount=fs_mount($fs);
  system("/usr/bin/sudo /sbin/btrfs scrub start $mount >/dev/null 2>&1");
  $result="success";
@@ -441,6 +496,7 @@ sub removehd($self) {
  my $disk=$self->param("disk");
  unless (defined $disk && $disk =~ m{^/dev/[\w]+$}) { $result="fail"; $msg="Invalid disk."; return; }
  return unless require_mounted($fs);
+ return if deny_if_op($fs);
  my $mount=fs_mount($fs);
  system("/usr/bin/nohup /usr/bin/sudo /sbin/btrfs device remove $disk $mount >>/var/log/easynas/balance.log 2>&1 &");
  $result="success";
@@ -457,6 +513,7 @@ sub addhd($self) {
  my ($disk)=split(" ",$self->param("disk") // "");
  unless (defined $disk && $disk =~ /^[A-Za-z0-9]+$/) { $result="fail"; $msg="Invalid disk."; return; }
  return unless require_mounted($fs);
+ return if deny_if_op($fs);
  my $mount=fs_mount($fs);
  my $rc=system("/usr/bin/sudo /sbin/btrfs device add -f /dev/$disk $mount >/dev/null 2>&1");
  if ($rc ne 0) { $result="fail"; $msg=$TEXT{'fs_failed_adding_disk'} || "Failed to add the disk."; return; }
@@ -476,6 +533,7 @@ sub replacehd($self) {
  unless (defined $olddisk && $olddisk =~ m{^/dev/[\w]+$}) { $result="fail"; $msg="Invalid disk."; return; }
  unless (defined $newdisk && $newdisk =~ /^[A-Za-z0-9]+$/) { $result="fail"; $msg="Invalid disk."; return; }
  return unless require_mounted($fs);
+ return if deny_if_op($fs);
  my $mount=fs_mount($fs);
  system("/usr/bin/nohup /usr/bin/sudo /sbin/btrfs replace start -f $olddisk /dev/$newdisk $mount >>/var/log/easynas/balance.log 2>&1 &");
  $result="success";
@@ -706,6 +764,7 @@ sub changesettings($self) {
  my $rc;
 
  return unless valid_fs($fs);
+ return if deny_if_op($fs);
  my $optstr = build_mount_opts($access,$compress,$ssd,$defrag);
 
  if (!-d $dir) {

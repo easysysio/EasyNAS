@@ -1,0 +1,41 @@
+% layout 'default';
+
+<div class="row">
+ <div class="col-lg-12">
+  <div class="panel panel-default">
+   <div class="panel-heading">
+    <%= ($TEXT->{'logs_title'} || 'Logs') %>
+   </div>
+   <div class="panel-body">
+    <form class="form-inline" style="margin-bottom:10px">
+     <label><%= ($TEXT->{'logs_file'} || 'Log') %></label>
+     <select class="form-control" name="file" onchange="this.form.submit()">
+% foreach my $l (@$logs) {
+      <option value="<%= $l %>" <%= $l eq $file ? 'selected' : '' %>><%= $l %></option>
+% }
+     </select>
+     <label><%= ($TEXT->{'logs_lines'} || 'Lines') %></label>
+     <select class="form-control" name="lines" onchange="this.form.submit()">
+% foreach my $n (100,200,500,1000) {
+      <option value="<%= $n %>" <%= $n == $lines ? 'selected' : '' %>><%= $n %></option>
+% }
+     </select>
+     <button type="submit" class="btn btn-default"><i class="fa fa-refresh"></i> <%= ($TEXT->{'logs_refresh'} || 'Refresh') %></button>
+    </form>
+    <div style="max-height:600px;overflow:auto">
+    <table class="table table-condensed table-striped" style="font-family:monospace;font-size:12px">
+     <tbody>
+% foreach my $e (@$entries) {
+%  my $cls = ($e =~ /\bERROR\b/) ? 'danger' : ($e =~ /\bWARN/) ? 'warning' : '';
+      <tr class="<%= $cls %>"><td><%= $e %></td></tr>
+% }
+% unless (@$entries) {
+      <tr><td class="text-muted"><%= ($TEXT->{'logs_empty'} || 'Log is empty.') %></td></tr>
+% }
+     </tbody>
+    </table>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>

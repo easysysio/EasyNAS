@@ -34,9 +34,9 @@ set_admin_password() {
         if [ "$p1" != "$p2" ] ; then echo "Passwords do not match, try again." ; continue ; fi
         break
     done
-    # /etc/easynas is owned by the easynas service user and the console runs as
-    # the unprivileged 'admin' account (which has passwordless sudo), so write
-    # via sudo and hand the file to easynas -- the web app reads it as that user.
+    # The console autologin user is 'easynas' (the only account with sudo;
+    # 'admin' exists solely as the web-UI login hashed below). Write via sudo
+    # so ownership/permissions come out right regardless of the mount state.
     printf 'admin:%s\n' "$(openssl passwd -6 "$p1")" | sudo /usr/bin/tee "$ADMIN_CONF" >/dev/null
     sudo /usr/bin/chown easynas:easynas "$ADMIN_CONF"
     sudo /usr/bin/chmod 600 "$ADMIN_CONF"

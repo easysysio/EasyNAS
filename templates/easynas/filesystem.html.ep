@@ -41,7 +41,11 @@
 						    <td>
 % my $h=$filesystems->{$fs}[1];
 % my %hc=(good=>'success', insufficient=>'warning', disk_errors=>'danger', degraded=>'danger');
-<span class="label label-<%= ($hc{$h} || 'default') %>"><%= ($TEXT->{$h} || $h) %></span></td>
+<span class="label label-<%= ($hc{$h} || 'default') %>"><%= ($TEXT->{$h} || $h) %></span>
+% if ($fs_ops->{$fs}) {
+<br><span class="label label-info"><i class="fa fa-refresh fa-spin"></i> <%= $fs_ops->{$fs} %></span>
+% }
+</td>
 						    <td><%= $filesystems->{$fs}[2] %></td>
 						    <td><%= $filesystems->{$fs}[6] %></td>
 						    <td><%= $filesystems->{$fs}[8] %></td>
@@ -67,3 +71,11 @@
 			        <br><br><a href="?action=createfsmenu">[Create File System]</a>
 
 
+
+% if (keys %$fs_ops) {
+<script>
+// A balance/scrub/replace is running: refresh so the progress indicator
+// and the settings lock track reality without manual reloads.
+setTimeout(function(){ location.reload(); }, 10000);
+</script>
+% }

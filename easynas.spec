@@ -49,7 +49,6 @@ cp easy_n_a_s.yml %{buildroot}/easynas/
 
 cat > %{buildroot}/etc/sudoers.d/easynas << 'EOF'
 easynas ALL = NOPASSWD: ALL
-admin   ALL = NOPASSWD: ALL
 EOF
 chmod 440 %{buildroot}/etc/sudoers.d/easynas
 
@@ -206,6 +205,7 @@ EOF
 /easynas/addons/sync.easynas
 /easynas/addons/firmware.easynas
 /easynas/addons/power.easynas
+/easynas/addons/logs.easynas
 /easynas/addons/settings.easynas
 /easynas/addons/computers.easynas
 /easynas/addons/realm.easynas
@@ -215,6 +215,7 @@ EOF
 /easynas/lib/EasyNAS/Controller/filesystem.pm
 /easynas/lib/EasyNAS/Controller/volume.pm
 /easynas/lib/EasyNAS/Controller/dashboard.pm
+/easynas/lib/EasyNAS/Controller/logs.pm
 /easynas/lib/EasyNAS/Controller/login.pm
 /easynas/lib/EasyNAS/Controller/addons.pm
 /easynas/lib/EasyNAS/Controller/users.pm
@@ -230,6 +231,7 @@ EOF
 /easynas/templates/easynas/filesystem*
 /easynas/templates/easynas/volume*
 /easynas/templates/easynas/dashboard*
+/easynas/templates/easynas/logs.html.ep
 /easynas/templates/easynas/settings*
 /easynas/templates/easynas/addons*
 /easynas/templates/easynas/users*
