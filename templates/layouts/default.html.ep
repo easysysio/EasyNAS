@@ -341,6 +341,23 @@
             });
         </script>
 
+        <script>
+        // Post/Redirect/Get, client-side: after a mutating ?action=... link
+        // runs, the controller falls through to the menu but the action URL
+        // stays in the address bar -- Enter or F5 would silently re-run it
+        // (delete a share, stop a service, ...). Rewrite the URL back to the
+        // clean path. Actions that legitimately RENDER their own page
+        // (settings/create/edit menus, the progress view, the lxc terminal)
+        // keep their URL so refreshing them still works.
+        (function(){
+          var m = location.search.match(/[?&]action=([^&]*)/);
+          if (!m || !window.history || !history.replaceState) return;
+          var a = decodeURIComponent(m[1]);
+          if (/(menu$|^(display|progress|create|edit|settings|terminal)$)/.test(a)) return;
+          history.replaceState(null, '', location.pathname);
+        })();
+        </script>
+
     </body>
 
 </html>
