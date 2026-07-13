@@ -308,13 +308,15 @@ sub get_update_file
 
 ############# get_update_count ###############
 # Number of pending EasyNAS package updates (base + addons), from the list
-# check_update.pl writes (zypper lu --xmlout: one <update .../> per package).
-# Used for the sidebar Addons badge. Plain grep -- no XML dependency here.
+# check_update.pl writes. Count OCCURRENCES with grep -o, not lines (-c):
+# zypper --xmlout emits the whole update list on a single line, so a line
+# count reports "1" no matter how many updates are pending.
 sub get_update_count
 {
  return 0 unless (-e $update_file);
- my $c=`/bin/grep -c '<update ' $update_file 2>/dev/null`;
+ my $c=`/bin/grep -o '<update ' $update_file 2>/dev/null | /usr/bin/wc -l`;
  chomp $c;
+ $c =~ s/\s+//g;
  return ($c =~ /^\d+$/) ? $c+0 : 0;
 }
 
