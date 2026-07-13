@@ -42,10 +42,13 @@ foreach my $l (split /\n/, `git diff $range -- easynas.spec`) {
 }
 
 ##### verdict #####
+# %files entries may be globs (e.g. templates/easynas/samba*), so match the
+# changed paths against each entry as a pattern, not by string equality.
 my @errors;
 foreach my $p (sort keys %files) {
   next if $bumped{$p};
-  my @hit = grep { $changed{$_} } @{$files{$p}};
+  my @res = map { my $q = quotemeta($_); $q =~ s/\\\*/[^\/]*/g; qr/^$q$/ } @{$files{$p}};
+  my @hit = grep { my $f = $_; grep { $f =~ $_ } @res } sort keys %changed;
   push @errors, "$p (files: @hit)" if @hit;
 }
 
