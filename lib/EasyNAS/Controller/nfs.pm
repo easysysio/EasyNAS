@@ -43,8 +43,7 @@ sub view ($self) {
 ##### create menu #####
  if (defined($action) && $action eq "create") {
   my %vol = vol_info();
-  my %groups = groups_info();
-  $self->stash(volumes => \%vol, groups => \%groups);
+  $self->stash(volumes => \%vol);
   $self->render(template => 'easynas/nfs_create');
   return;
  }
@@ -58,16 +57,10 @@ sub view ($self) {
    $msg=$TEXT{'nfs_exists'};
   }
   else {
-   my $group=$self->param("group") // "";
    my $path="$mount_dir/$vol";
-   # On-disk group ownership (docs/identity-design.md sec 4). NFS has no force
-   # group, so ownership is purely filesystem-level: chown + setgid so files
-   # created over NFS belong to the group -- consistent with a Samba share on
-   # the same volume. Only applied if the group resolves via NSS.
-   if ($group ne "" && `/usr/bin/getent group $group 2>/dev/null` ne "") {
-    system("/usr/bin/sudo","/usr/bin/chown","root:$group",$path);
-    system("/usr/bin/sudo","/usr/bin/chmod","2770",$path);
-   }
+   # Ownership belongs to the volume (set in Volume settings); NFS has no
+   # per-share identity mapping, so the export just serves the directory
+   # with whatever owner/group/permissions the volume carries.
    my $export="$path *($per,sync,no_subtree_check)";
    `/bin/echo "$export" | /usr/bin/sudo /usr/bin/tee -a $addon->{config}`;
    write_share_marker($path,"nfs",$export);
@@ -104,7 +97,7 @@ sub view ($self) {
   {
    ($path,undef)=split(" ",$_);
    (undef,undef,$fs,$vol)=split("/",$path);
-   my $owner=`/usr/bin/stat -c '%G' "$path" 2>/dev/null`;
+   my $owner=`/usr/bin/stat -c '%U:%G' "$path" 2>/dev/null`;
    chomp $owner;
    push(@shares,{path=>$path,fs=>$fs,vol=>$vol,owner=>$owner});
   }

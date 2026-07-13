@@ -386,7 +386,7 @@ FTP addon for EasyNAS
 ##### NFS ####
 %package        fs-nfs
 Version:        %{version}
-Release:        1
+Release:        2
 Summary:        NFS addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -410,7 +410,7 @@ NFS addon for EasyNAS
 ##### SAMBA ####
 %package        fs-samba
 Version:        %{version}
-Release:        1
+Release:        2
 Summary:        SAMBA addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
