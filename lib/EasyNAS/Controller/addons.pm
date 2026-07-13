@@ -76,6 +76,10 @@ sub view ($self) {
   # map; language addons default to a flag icon; otherwise a generic icon.
   my $icon=($info->{icon} && $info->{icon} ne "") ? $info->{icon}
           : ($addon_icon{$name} // ($group eq "lang" ? "fa-flag" : "fa-puzzle-piece"));
+  # Description for the (i) modal: prefer the curated, translated about_*
+  # text (main catalog -- present even when the addon isn't installed, and
+  # the same text its own page shows) over the terse zypper summary.
+  $desc=$TEXT{"about_$name"} if (defined $TEXT{"about_$name"} && $TEXT{"about_$name"} ne "");
   # A language addon shows its country flag image when we know it (installed).
   my $flag=($group eq "lang") ? ($lang_flag{lc $name} // "") : "";
   # Category = the package group code (fs/mm/srv/stg/lang); the template maps it
@@ -95,7 +99,7 @@ sub view ($self) {
  chomp $ever;
  if ($ever ne "") {
   my $etile={ pkg=>"easynas", name=>"EasyNAS", icon=>"fa-server", flag=>"", cat=>"easynas",
-              version=>$ever, desc=>"", installed=>1, core=>1,
+              version=>$ever, desc=>($TEXT{'about_easynas'}//""), installed=>1, core=>1,
               program=>"", newver=>($upd{"easynas"}//"") };
   if ($upd{"easynas"}) { push @updates,$etile; }
   else                 { push @{$by_cat{"easynas"}},$etile; }

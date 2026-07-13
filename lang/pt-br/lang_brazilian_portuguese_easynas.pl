@@ -658,3 +658,23 @@ $TEXT{'access_control'} = "Controle de Acesso";
 $TEXT{'security_help'} = "Controle de Acesso <br><br> Permitir ou negar o acesso ao menu de administração de IPs ou da rede<br><br> Permitir todas as conexões: Qualquer um pode acessar o menu de administração. <br> Negar conexão a partir da lista: Qualquer um da lista não pode acessar o menu de administração, o restante pode.<br> Permitir conexão a partir da lista: Qualquer um da lista pode acessar o menu de administração, o restante não pode.<br><br> A lista de IP/rede precisa estar no seguinte formato:<br> IP: x.y.z.w <br> Sub-rede (subnet):  x.y.z.w/[1-32] <br>";
 $TEXT{'enter_ip_or_network'} = "Digite o endereço IP ou a rede na qual as conexões para este servidor serão permitidas ou rejeitadas";
 $TEXT{'error_security_demo'} = "Não é possível alterar ACL em site demonstração";
+
+#### Addon descriptions (addons grid (i) + each addon's page) ####
+$TEXT{'about_easynas'} = "O núcleo do EasyNAS: interface web, gerenciamento de armazenamento e o sistema de atualização.";
+$TEXT{'about_samba'} = "Compartilhamento de arquivos compatível com Windows (SMB/CIFS): compartilhe volumes com clientes Windows, macOS e Linux.";
+$TEXT{'about_nfs'} = "Exportações NFS para clientes Linux/UNIX: compartilhe volumes pelo sistema de arquivos de rede.";
+$TEXT{'about_afp'} = "Apple Filing Protocol (netatalk): compartilhe volumes com clientes macOS antigos e backups do Time Machine.";
+$TEXT{'about_ftp'} = "Transferência de arquivos FTP (pure-ftpd): os usuários entram com suas contas EasyNAS e acessam os volumes.";
+$TEXT{'about_ssh'} = "Acesso shell seguro ao dispositivo, incluindo transferência de arquivos SFTP.";
+$TEXT{'about_rsyncd'} = "Daemon rsync: exponha volumes como módulos rsync para sincronização remota rápida e backups.";
+$TEXT{'about_tftp'} = "Servidor TFTP: sirva um volume por Trivial FTP, por exemplo para imagens de boot PXE e equipamentos de rede.";
+$TEXT{'about_dlna'} = "Servidor de mídia DLNA/UPnP (minidlna): transmita músicas, fotos e vídeos para TVs e players.";
+$TEXT{'about_plex'} = "Plex Media Server: organize e transmita sua biblioteca de mídia; gerencie no app web do Plex na porta 32400.";
+$TEXT{'about_iscsi'} = "Alvo iSCSI: publique imagens de disco armazenadas em um volume como dispositivos de bloco (LUNs) para iniciadores iSCSI.";
+$TEXT{'about_radius'} = "Servidor FreeRADIUS: autenticação central para equipamentos de rede como pontos de acesso Wi-Fi e switches.";
+$TEXT{'about_lxc'} = "Contêineres Linux (LXC): execute contêineres leves no dispositivo com terminal web.";
+$TEXT{'about_mariadb'} = "Servidor de banco de dados MariaDB para aplicações que precisam de armazenamento SQL.";
+$TEXT{'about_german'} = "Pacote de idioma alemão para a interface do EasyNAS.";
+$TEXT{'about_polish'} = "Pacote de idioma polonês para a interface do EasyNAS.";
+$TEXT{'about_chinese'} = "Pacote de idioma chinês simplificado para a interface do EasyNAS.";
+$TEXT{'about_portuguese'} = "Pacote de idioma português do Brasil para a interface do EasyNAS.";

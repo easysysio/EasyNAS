@@ -662,3 +662,23 @@ $TEXT{'access_control'} = "Access Control";
 $TEXT{'security_help'} = "";
 $TEXT{'enter_ip_or_network'} = "Enter the IP address or network from with the connections to this server will be allowed or rejected";
 $TEXT{'error_security_demo'} = "Can't change ACL in a demo site";
+
+#### Addon descriptions (addons grid (i) + each addon's page) ####
+$TEXT{'about_easynas'} = "The EasyNAS core: web interface, storage management and the update system.";
+$TEXT{'about_samba'} = "Windows-compatible file sharing (SMB/CIFS): share volumes with Windows, macOS and Linux clients.";
+$TEXT{'about_nfs'} = "NFS exports for Linux/UNIX clients: share volumes over the network file system.";
+$TEXT{'about_afp'} = "Apple Filing Protocol (netatalk): share volumes with older macOS clients and Time Machine backups.";
+$TEXT{'about_ftp'} = "FTP file transfer (pure-ftpd): users sign in with their EasyNAS accounts and reach the volumes.";
+$TEXT{'about_ssh'} = "Secure shell access to the appliance, including SFTP file transfer.";
+$TEXT{'about_rsyncd'} = "rsync daemon: expose volumes as rsync modules for fast remote synchronization and backups.";
+$TEXT{'about_tftp'} = "TFTP server: serve one volume over trivial FTP, e.g. for PXE boot images and network devices.";
+$TEXT{'about_dlna'} = "DLNA/UPnP media server (minidlna): stream music, photos and videos to TVs and media players.";
+$TEXT{'about_plex'} = "Plex Media Server: organize and stream your media library; manage it in the Plex web app on port 32400.";
+$TEXT{'about_iscsi'} = "iSCSI target: publish disk images stored on a volume as block devices (LUNs) to iSCSI initiators.";
+$TEXT{'about_radius'} = "FreeRADIUS server: central authentication for network devices such as Wi-Fi access points and switches.";
+$TEXT{'about_lxc'} = "Linux containers (LXC): run lightweight containers on the appliance with a web terminal.";
+$TEXT{'about_mariadb'} = "MariaDB database server for applications that need SQL storage.";
+$TEXT{'about_german'} = "German translation pack for the EasyNAS interface.";
+$TEXT{'about_polish'} = "Polish translation pack for the EasyNAS interface.";
+$TEXT{'about_chinese'} = "Simplified Chinese translation pack for the EasyNAS interface.";
+$TEXT{'about_portuguese'} = "Brazilian Portuguese translation pack for the EasyNAS interface.";

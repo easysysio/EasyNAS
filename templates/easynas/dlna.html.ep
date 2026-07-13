@@ -11,6 +11,7 @@
     <%= ($TEXT->{$addon->{'description'}}) %>
    </div>
    <div class="panel-body">
+    <p class="text-muted"><%= $TEXT->{'about_dlna'} %></p>
     <ul class="nav nav-tabs">
      <li class="active"><a href="#tabs-1" data-toggle="tab"><%= ($TEXT->{'dlna_on_off'} || 'On / Off') %></a></li>
      <li><a href="#tabs-2" data-toggle="tab"><%= ($TEXT->{'dlna_media'} || 'Media') %></a></li>

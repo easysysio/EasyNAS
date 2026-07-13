@@ -658,3 +658,23 @@ $TEXT{'access_control'} = "Kontrola dostępu";
 $TEXT{'security_help'} = "";
 $TEXT{'enter_ip_or_network'} = "Wprowadź adres IP lub sieć, z której połączenia z tym serwerem będą dozwolone lub odrzucone";
 $TEXT{'error_security_demo'} = "Nie mogę zmienić ACL na stronie demo";
+
+#### Addon descriptions (addons grid (i) + each addon's page) ####
+$TEXT{'about_easynas'} = "Rdzeń EasyNAS: interfejs WWW, zarządzanie pamięcią masową i system aktualizacji.";
+$TEXT{'about_samba'} = "Udostępnianie plików zgodne z Windows (SMB/CIFS): wolumeny dla klientów Windows, macOS i Linux.";
+$TEXT{'about_nfs'} = "Eksporty NFS dla klientów Linux/UNIX: udostępnianie wolumenów przez sieciowy system plików.";
+$TEXT{'about_afp'} = "Apple Filing Protocol (netatalk): wolumeny dla starszych klientów macOS i kopii Time Machine.";
+$TEXT{'about_ftp'} = "Transfer plików FTP (pure-ftpd): użytkownicy logują się kontami EasyNAS i mają dostęp do wolumenów.";
+$TEXT{'about_ssh'} = "Bezpieczny dostęp powłoki do urządzenia, w tym transfer plików SFTP.";
+$TEXT{'about_rsyncd'} = "Demon rsync: wolumeny jako moduły rsync do szybkiej zdalnej synchronizacji i kopii zapasowych.";
+$TEXT{'about_tftp'} = "Serwer TFTP: udostępnianie jednego wolumenu przez Trivial FTP, np. dla obrazów PXE i urządzeń sieciowych.";
+$TEXT{'about_dlna'} = "Serwer multimediów DLNA/UPnP (minidlna): strumieniowanie muzyki, zdjęć i filmów do telewizorów i odtwarzaczy.";
+$TEXT{'about_plex'} = "Plex Media Server: organizacja i strumieniowanie biblioteki multimediów; zarządzanie w aplikacji Plex na porcie 32400.";
+$TEXT{'about_iscsi'} = "Cel iSCSI: obrazy dysków przechowywane na wolumenie jako urządzenia blokowe (LUN) dla inicjatorów iSCSI.";
+$TEXT{'about_radius'} = "Serwer FreeRADIUS: centralne uwierzytelnianie urządzeń sieciowych, np. punktów dostępowych Wi-Fi i przełączników.";
+$TEXT{'about_lxc'} = "Kontenery Linux (LXC): lekkie kontenery na urządzeniu z terminalem WWW.";
+$TEXT{'about_mariadb'} = "Serwer bazy danych MariaDB dla aplikacji wymagających magazynu SQL.";
+$TEXT{'about_german'} = "Niemiecki pakiet językowy interfejsu EasyNAS.";
+$TEXT{'about_polish'} = "Polski pakiet językowy interfejsu EasyNAS.";
+$TEXT{'about_chinese'} = "Pakiet językowy chiński uproszczony dla interfejsu EasyNAS.";
+$TEXT{'about_portuguese'} = "Pakiet językowy portugalski (brazylijski) dla interfejsu EasyNAS.";

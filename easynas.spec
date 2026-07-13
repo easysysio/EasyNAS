@@ -278,7 +278,7 @@ fi
 #### lxc ####
 %package        srv-lxc
 Version:        %{version}
-Release:        1
+Release:        2
 Summary:        Virtualization addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -316,7 +316,7 @@ MariaDB addon for EasyNAS
 ##### TFTP #####
 %package        fs-tftp
 Version:        %{version}
-Release:        2
+Release:        3
 Summary:        TFTP addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -339,7 +339,7 @@ TFTP addon for EasyNAS
 ##### AFP ####
 %package        fs-afp
 Version:        %{version}
-Release:        2
+Release:        3
 Summary:        AFP addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -363,7 +363,7 @@ AFP addon for EasyNAS
 ##### FTP ####
 %package        fs-ftp
 Version:        %{version}
-Release:        2
+Release:        3
 Summary:        FTP addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -435,7 +435,7 @@ SAMBA addon for EasyNAS
 ##### SSH ####
 %package        fs-ssh
 Version:        %{version}
-Release:        1
+Release:        2
 Summary:        SSH addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -456,7 +456,7 @@ SSH addon for EasyNAS
 #### DLNA ####
 %package        mm-dlna
 Version:        %{version}
-Release:        2
+Release:        3
 Summary:        DLNA addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -480,7 +480,7 @@ DLNA addon for EasyNAS
 #### Plex ####
 %package        mm-plex
 Version:        %{version}
-Release:        2
+Release:        3
 Summary:        PLEX addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -500,7 +500,7 @@ Plex Server addon for EasyNAS
 #### RSync ####
 %package        fs-rsyncd
 Version:        %{version}
-Release:        2
+Release:        3
 Summary:        RSyncd addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -524,7 +524,7 @@ RSyncd addon for EasyNAS
 #### Radius ####
 %package        srv-radius
 Version:        %{version}
-Release:        2
+Release:        3
 Summary:        Radius addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -548,7 +548,7 @@ Radius addon for EasyNAS
 #### iSCSI ####
 %package        stg-iscsi
 Version:        %{version}
-Release:        2
+Release:        3
 Summary:        iSCSI Initiator addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -569,7 +569,7 @@ iSCSI addon for EasyNAS
 ##### German Language ####
 %package        lang-german
 Version:        %{version}
-Release:        2
+Release:        3
 Summary:        German Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -601,7 +601,7 @@ Portuguese Language for EasyNAS
 ##### Chinese Language ####
 %package        lang-chinese
 Version:        %{version}
-Release:        2
+Release:        3
 Summary:        Simplified Chinese Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -617,7 +617,7 @@ Simplified Chinese Language for EasyNAS
 ##### Polish Language ####
 %package        lang-polish
 Version:        %{version}
-Release:        2
+Release:        3
 Summary:        Polish Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}

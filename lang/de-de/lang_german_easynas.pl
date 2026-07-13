@@ -658,3 +658,23 @@ $TEXT{'access_control'} = "Zugriffskontrolle";
 $TEXT{'security_help'} = " Zugriffskontrolle / Zugriffssteuerung<br><br> Zugriffe erlauben / verbieten die auf mit diesem Server verbinden können<br><br> - Alle Verbindungen erlauben.<br> - Alle Verbindungen verbieten, die in der Liste eingetragen sind.<br> - Alle Verbindungen erlauben, die in der Liste eingetragen sind<br><br> Format:<br> IP-Adresse: xxx.yyy.zzz.www<br> Netzwerk  : xxx.yyy.zzz.wwww/[1-32]<br>";
 $TEXT{'enter_ip_or_network'} = "Eingabe der IP-Adresse oder Netzwerks, von der/dem Verbindungen zu deisem Server zugelassen/abgelehnt werden sollen";
 $TEXT{'error_security_demo'} = "Keine Änderungen an ACL ist im Demo-Modus zugelassen";
+
+#### Addon descriptions (addons grid (i) + each addon's page) ####
+$TEXT{'about_easynas'} = "Der EasyNAS-Kern: Weboberfläche, Speicherverwaltung und das Update-System.";
+$TEXT{'about_samba'} = "Windows-kompatible Dateifreigabe (SMB/CIFS): Volumes für Windows-, macOS- und Linux-Clients freigeben.";
+$TEXT{'about_nfs'} = "NFS-Exporte für Linux/UNIX-Clients: Volumes über das Netzwerkdateisystem freigeben.";
+$TEXT{'about_afp'} = "Apple Filing Protocol (netatalk): Volumes für ältere macOS-Clients und Time-Machine-Backups freigeben.";
+$TEXT{'about_ftp'} = "FTP-Dateiübertragung (pure-ftpd): Benutzer melden sich mit ihren EasyNAS-Konten an und erreichen die Volumes.";
+$TEXT{'about_ssh'} = "Sicherer Shell-Zugriff auf die Appliance, einschließlich SFTP-Dateiübertragung.";
+$TEXT{'about_rsyncd'} = "rsync-Daemon: Volumes als rsync-Module für schnelle Fernsynchronisation und Backups bereitstellen.";
+$TEXT{'about_tftp'} = "TFTP-Server: ein Volume über Trivial FTP bereitstellen, z. B. für PXE-Boot-Images und Netzwerkgeräte.";
+$TEXT{'about_dlna'} = "DLNA/UPnP-Medienserver (minidlna): Musik, Fotos und Videos an Fernseher und Player streamen.";
+$TEXT{'about_plex'} = "Plex Media Server: Medienbibliothek organisieren und streamen; Verwaltung in der Plex-Web-App auf Port 32400.";
+$TEXT{'about_iscsi'} = "iSCSI-Target: auf einem Volume gespeicherte Disk-Images als Blockgeräte (LUNs) für iSCSI-Initiatoren bereitstellen.";
+$TEXT{'about_radius'} = "FreeRADIUS-Server: zentrale Authentifizierung für Netzwerkgeräte wie WLAN-Access-Points und Switches.";
+$TEXT{'about_lxc'} = "Linux-Container (LXC): leichtgewichtige Container auf der Appliance mit Web-Terminal betreiben.";
+$TEXT{'about_mariadb'} = "MariaDB-Datenbankserver für Anwendungen, die SQL-Speicher benötigen.";
+$TEXT{'about_german'} = "Deutsches Sprachpaket für die EasyNAS-Oberfläche.";
+$TEXT{'about_polish'} = "Polnisches Sprachpaket für die EasyNAS-Oberfläche.";
+$TEXT{'about_chinese'} = "Sprachpaket Vereinfachtes Chinesisch für die EasyNAS-Oberfläche.";
+$TEXT{'about_portuguese'} = "Sprachpaket Brasilianisches Portugiesisch für die EasyNAS-Oberfläche.";

@@ -11,6 +11,7 @@
     <%= ($TEXT->{$addon->{'description'}}) %>
    </div>
    <div class="panel-body">
+    <p class="text-muted"><%= $TEXT->{'about_samba'} %></p>
     <ul class="nav nav-tabs">
      <li class="active"><a href="#tabs-1" data-toggle="tab"><%= ($TEXT->{'samba_on_off'}) %></a></li>
      <li><a href="#tabs-2" data-toggle="tab"><%= ($TEXT->{'samba_shared_vol'}) %></a></li>

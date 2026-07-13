@@ -658,3 +658,23 @@ $TEXT{'access_control'} = "访问控制";
 $TEXT{'security_help'} = " Access Control<br><br> Allow or deny access to the admin menu from IPs or networks<br><br> Allow all connection:  anyone can access the admin menu. <br> Deny connection from the list: anyone from the list can't access the admin menu, the rest can.<br> Allow connection from the list: anyone from the list can access the admin menu, the rest can't.<br><br> the IP/network list need to be in the following format:<br> IP: xxx.yyy.zzz.www <br> Subnet: xxx.yyy.zzz.www/[1-32]<br>";
 $TEXT{'enter_ip_or_network'} = "输入允许或者拒绝的IP地址或者网络";
 $TEXT{'error_security_demo'} = "不能改变访问控制层（ACL），这是掩饰网站";
+
+#### Addon descriptions (addons grid (i) + each addon's page) ####
+$TEXT{'about_easynas'} = "EasyNAS 核心：Web 界面、存储管理和更新系统。";
+$TEXT{'about_samba'} = "兼容 Windows 的文件共享（SMB/CIFS）：向 Windows、macOS 和 Linux 客户端共享卷。";
+$TEXT{'about_nfs'} = "面向 Linux/UNIX 客户端的 NFS 导出：通过网络文件系统共享卷。";
+$TEXT{'about_afp'} = "Apple 文件协议（netatalk）：向较旧的 macOS 客户端和时间机器备份共享卷。";
+$TEXT{'about_ftp'} = "FTP 文件传输（pure-ftpd）：用户使用 EasyNAS 账户登录并访问卷。";
+$TEXT{'about_ssh'} = "对设备的安全 Shell 访问，包括 SFTP 文件传输。";
+$TEXT{'about_rsyncd'} = "rsync 守护进程：将卷作为 rsync 模块，用于快速远程同步和备份。";
+$TEXT{'about_tftp'} = "TFTP 服务器：通过简单 FTP 提供一个卷，例如用于 PXE 启动镜像和网络设备。";
+$TEXT{'about_dlna'} = "DLNA/UPnP 媒体服务器（minidlna）：向电视和播放器串流音乐、照片和视频。";
+$TEXT{'about_plex'} = "Plex 媒体服务器：整理并串流媒体库；在 32400 端口的 Plex Web 应用中管理。";
+$TEXT{'about_iscsi'} = "iSCSI 目标：将卷上的磁盘镜像作为块设备（LUN）发布给 iSCSI 启动器。";
+$TEXT{'about_radius'} = "FreeRADIUS 服务器：为 Wi-Fi 接入点和交换机等网络设备提供集中认证。";
+$TEXT{'about_lxc'} = "Linux 容器（LXC）：在设备上运行轻量级容器，带 Web 终端。";
+$TEXT{'about_mariadb'} = "MariaDB 数据库服务器，供需要 SQL 存储的应用使用。";
+$TEXT{'about_german'} = "EasyNAS 界面的德语语言包。";
+$TEXT{'about_polish'} = "EasyNAS 界面的波兰语语言包。";
+$TEXT{'about_chinese'} = "EasyNAS 界面的简体中文语言包。";
+$TEXT{'about_portuguese'} = "EasyNAS 界面的巴西葡萄牙语语言包。";

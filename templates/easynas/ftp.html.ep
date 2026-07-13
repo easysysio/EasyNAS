@@ -11,6 +11,7 @@
     <%= ($TEXT->{$addon->{'description'}}) %>
    </div>
    <div class="panel-body">
+    <p class="text-muted"><%= $TEXT->{'about_ftp'} %></p>
     <ul class="nav nav-tabs">
      <li class="active"><a href="#tabs-1" data-toggle="tab"><%= ($TEXT->{'ftp_on_off'} || 'On / Off') %></a></li>
     </ul>
