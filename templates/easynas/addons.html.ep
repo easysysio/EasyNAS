@@ -116,6 +116,9 @@
       onclick="return confirm('<%= ($TEXT->{'addons_delete_confirm'} || 'Remove this add-on?') %>')"
       href="?action=delete_addon&package=<%= $a->{pkg} %>"><i class="fa fa-trash"></i></a>
 %   }
+% } elsif ($a->{unavailable}) {
+   <span class="label label-default" style="display:inline-block;margin-top:4px" title="<%= ($TEXT->{'addons_unavail_arm_tip'} || 'No ARM build is available upstream.') %>">
+    <i class="fa fa-ban"></i> <%= ($TEXT->{'addons_unavail_arm'} || 'Not available on ARM') %></span>
 % } else {
    <a class="btn btn-primary btn-xs" style="margin-top:4px"
       onclick="return easynasBusy(this,'<%= ($TEXT->{'addons_installing'} || 'Installing') %>')"

@@ -23,6 +23,16 @@ my %addon_icon = (
  iscsi   => "fa-external-link",
 );
 
+# Add-ons whose upstream dependency ships only for x86_64, so they cannot be
+# installed on aarch64 -- Plex Media Server's RPM repo is x86_64-only (no ARM
+# RPM exists upstream), so easynas-mm-plex's "Requires: plexmediaserver" can
+# never resolve on ARM. The grid marks these unavailable there instead of
+# offering an Install button that always fails silently.
+my %x86_only_pkg = ( "easynas-mm-plex" => 1 );
+# Appliance arch, read once at startup (it never changes at runtime).
+my $arch = `/usr/bin/uname -m`; chomp $arch;
+my $is_arm = ($arch =~ /^(?:aarch64|arm)/) ? 1 : 0;
+
 
 sub view ($self) {
   if (!($self->session('is_auth'))) {
@@ -90,8 +100,10 @@ sub view ($self) {
   # Category = the package group code (fs/mm/srv/stg/lang); the template maps it
   # to a friendly label (File Sharing / Multimedia / Service / Storage).
   my $cat = $group;
+  # Can't be installed here (e.g. Plex on ARM): only when not already installed.
+  my $unavail = ($is_arm && $x86_only_pkg{$package} && !$installed) ? 1 : 0;
   my $tile={ pkg=>$package, name=>$name, icon=>$icon, flag=>$flag, cat=>$cat,
-             version=>$ver, desc=>$desc, installed=>$installed,
+             version=>$ver, desc=>$desc, installed=>$installed, unavailable=>$unavail,
              program=>($info->{program}//""), newver=>($upd{$package}//"") };
   # Installed with an update -> Updates section; otherwise (installed-current or
   # not-installed) -> its category.

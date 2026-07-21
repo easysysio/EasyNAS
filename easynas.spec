@@ -640,6 +640,9 @@ Polish Language for EasyNAS
     several times per render; count updates and read the lang code natively
     instead of forking grep/wc/cat each request; drop dead IE8 CDN shims and a
     stray debug print
+  - Add-ons: mark x86_64-only add-ons (Plex) "Not available on ARM" on aarch64
+    instead of offering an Install button that always fails (Plex ships no ARM
+    RPM upstream)
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

@@ -327,6 +327,8 @@ $TEXT{'addons_q_updating'} = "Updating";
 $TEXT{'addons_check'} = "Check for updates";
 $TEXT{'addons_checking'} = "Checking for updates";
 $TEXT{'addons_checked'} = "Checked for updates.";
+$TEXT{'addons_unavail_arm'} = "Not available on ARM";
+$TEXT{'addons_unavail_arm_tip'} = "No ARM build is available upstream.";
 $TEXT{'addons_version'} = "Version";
 $TEXT{'addons_nodesc'} = "No description available.";
 
