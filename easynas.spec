@@ -636,6 +636,10 @@ Polish Language for EasyNAS
     per-tile waiting/installing badges advance as the worker drains
   - Add-ons: "Check for updates" button refreshes the channel metadata and
     recomputes the pending-update list on demand
+  - UI speed: cache the addon-catalog parse (mtime-keyed) so it isn't re-parsed
+    several times per render; count updates and read the lang code natively
+    instead of forking grep/wc/cat each request; drop dead IE8 CDN shims and a
+    stray debug print
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

@@ -67,6 +67,14 @@ my $log_file = $log_dir."/easynas.log";
 my $addons_file= $addons_update_dir."/easynas.addons";
 my $update_file = $conf_dir."/easynas.updates";
 
+# get_addons() cache. The addon catalog (~25 files under $addons_dir) is parsed
+# on every page render -- often several times (get_menu/get_addon_info call it) --
+# but only changes when an addon is installed/removed. In the persistent daemon
+# this cache survives across requests; it is keyed on the directory mtime so it
+# self-invalidates the moment an addon file is added or deleted.
+my %addons_cache;        # the last parsed catalog
+my $addons_cache_mtime;  # $addons_dir mtime the cache was built from
+
 ######## easynas_info #######
 sub easynas_info
 {
@@ -313,11 +321,14 @@ sub get_update_file
 # count reports "1" no matter how many updates are pending.
 sub get_update_count
 {
- return 0 unless (-e $update_file);
- my $c=`/bin/grep -o '<update ' $update_file 2>/dev/null | /usr/bin/wc -l`;
- chomp $c;
- $c =~ s/\s+//g;
- return ($c =~ /^\d+$/) ? $c+0 : 0;
+ # Count "<update " occurrences natively -- this runs on every page render, so
+ # avoid forking grep|wc (two processes) each time in the single-process daemon.
+ open(my $fh,'<',$update_file) or return 0;
+ local $/;                       # slurp
+ my $xml=<$fh>;
+ close $fh;
+ my $c=()=($xml =~ /<update /g); # count matches in list context
+ return $c;
 }
 
 ############# get_conf_hosts ################
@@ -340,7 +351,11 @@ sub get_lang
     my $lang;
     if (-e $lang_conf )
     {
-        $lang=`/usr/bin/cat $lang_conf`;
+        # Read the one-line lang code natively instead of forking cat.
+        open(my $fh,'<',$lang_conf) or return "en-en";
+        $lang=<$fh>;
+        close $fh;
+        $lang="" unless defined $lang;
         chomp($lang);
         if (-e $lang_dir."/".$lang."/iso.txt")
         {
@@ -481,7 +496,12 @@ sub current_lang
     my $lang;
     if (-e $lang_conf )
     {
-        $lang=`/usr/bin/cat $lang_conf`;
+        # Read the one-line lang code natively; current_lang is called several
+        # times per render, so forking cat each time is pure waste.
+        open(my $fh,'<',$lang_conf) or return "en-en";
+        $lang=<$fh>;
+        close $fh;
+        $lang="" unless defined $lang;
         chomp($lang);
         if (-e $lang_dir."/".$lang."/iso.txt")
         {
@@ -617,7 +637,13 @@ sub get_addons
     my $addon_secrets;
     my $addon_service;
     my $addon_program;
-    
+
+    # Serve from cache while the addon dir is unchanged (see %addons_cache).
+    my $mtime = (stat($addons_dir))[9];
+    if (defined $mtime && defined $addons_cache_mtime && $mtime == $addons_cache_mtime) {
+        return %addons_cache;
+    }
+
      opendir (DIR, $addons_dir) or die $!;
      while ($file = readdir(DIR))
      {
@@ -726,7 +752,6 @@ sub get_addons
 		    $addon_enable =~ s|<.?enable>||g;
                     $addon_enable = substr($addon_enable, 1);
                     chop($addon_enable);
-		    print $addon_enable;
  		}
 	    }
 	    ### push collected infos in %addons
@@ -750,6 +775,9 @@ sub get_addons
 	}
     }
  closedir(DIR);
+ # Cache the parse, keyed on the dir mtime captured above.
+ %addons_cache = %addons;
+ $addons_cache_mtime = $mtime;
  return(%addons);
 }
 
