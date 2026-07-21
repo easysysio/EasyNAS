@@ -321,6 +321,9 @@ $TEXT{'addons_updated'} = "Addon updated successfully";
 $TEXT{'addons_not_updated'} = "Error updating addon";
 $TEXT{'addons_close'} = "Close";
 $TEXT{'addons_details'} = "Details";
+$TEXT{'addons_q_waiting'} = "Waiting";
+$TEXT{'addons_q_installing'} = "Installing";
+$TEXT{'addons_q_updating'} = "Updating";
 $TEXT{'addons_version'} = "Version";
 $TEXT{'addons_nodesc'} = "No description available.";
 

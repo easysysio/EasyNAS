@@ -104,10 +104,15 @@ sub view ($self) {
   if ($upd{"easynas"}) { push @updates,$etile; }
   else                 { push @{$by_cat{"easynas"}},$etile; }
  }
+ # Per-package queue state (installing/updating/waiting) for the tile badges;
+ # the page auto-refreshes while anything is queued.
+ my %qstate = queue_state();
  $self->stash(result => $result,
               msg => $msg,
               updates => \@updates,
-              by_cat => \%by_cat);
+              by_cat => \%by_cat,
+              qstate => \%qstate,
+              qactive => (scalar keys %qstate ? 1 : 0));
  $self->render(template => 'easynas/addons');
 }
 
@@ -138,6 +143,35 @@ sub active_channel_repo {
  return $repo;
 }
 
+############## queue helpers ##############
+# The addon install/update queue (see startup/addon-worker.sh). enqueue_op
+# appends one op in click order; start_worker kicks the (single) drainer.
+sub enqueue_op {
+ my ($op,$package)=@_;
+ return unless ($op eq "install" || $op eq "update");
+ return unless (defined $package && $package =~ /^easynas(-[a-z0-9-]{1,64})?$/);
+ # LIST form: op is literal, package validated -- no shell, no injection.
+ system("/usr/bin/sudo","/easynas/startup/addon-worker.sh","enqueue",$op,$package);
+}
+sub start_worker {
+ system("/usr/bin/sudo","/usr/bin/systemd-run","--collect","/easynas/startup/addon-worker.sh");
+}
+
+# Per-package queue state for the grid: package -> "installing"/"updating"
+# (the one running now) or "waiting" (still queued). Empty when idle.
+sub queue_state {
+ my %st;
+ if (open(my $c,'<','/etc/easynas/addonq.cur')) {
+  my $l=<$c>; close $c;
+  if (defined $l && $l=~/^(\w+)\t(\S+)/) { $st{$2}=($1 eq 'install')?'installing':'updating'; }
+ }
+ if (open(my $q,'<','/etc/easynas/addonq')) {
+  while (my $l=<$q>) { $st{$2}||='waiting' if ($l=~/^(\w+)\t(\S+)/); }
+  close $q;
+ }
+ return %st;
+}
+
 ############## refresh_update_list ##############
 # Regenerate /etc/easynas/easynas.updates from the live rpmdb so the pending-
 # update count (dashboard banner + sidebar badge) recomputes immediately after
@@ -147,70 +181,33 @@ sub refresh_update_list {
  `/usr/bin/sudo /usr/bin/zypper --quiet --xmlout lu -a --repo $repo | /usr/bin/sudo /usr/bin/tee /etc/easynas/easynas.updates >/dev/null`;
 }
 
-############## run_bg_update ##############
-# Update EasyNAS packages in a transient systemd unit (own cgroup): updating the
-# base easynas restarts easynas.service, which would otherwise kill this process
-# mid-transaction. $pkg empty => update the whole channel; else that one package.
-#
-# Addon/app updates are INSTANT and need NO reboot, so unlike the firmware track
-# this never sets update.status="ready" (which the layout renders as a "reboot
-# to apply" banner). On success it refreshes easynas.updates and clears
-# update.status, so both the "update running" spinner and the "updates
-# available" message disappear; on failure it leaves "failed" for the banner.
-sub run_bg_update {
- my ($pkg)=@_;
- my $repo=active_channel_repo();
- my $target = ($pkg && $pkg ne "") ? $pkg : "--repo $repo";
- system("/bin/echo updating | /usr/bin/sudo /usr/bin/tee /etc/easynas/update.status >/dev/null");
- system("/usr/bin/sudo /usr/bin/systemd-run --collect --unit=easynas-update "
-       ."/bin/sh -c '"
-       ."/usr/bin/zypper -n --gpg-auto-import-keys update $target "
-       .">/var/log/easynas/update.log 2>&1 "
-       ."&& { /usr/bin/zypper --quiet --xmlout lu -a --repo $repo "
-       ."| /usr/bin/tee /etc/easynas/easynas.updates >/dev/null; "
-       ."/bin/rm -f /etc/easynas/update.status; } "
-       ."|| echo failed | /usr/bin/tee /etc/easynas/update.status"
-       ."' >/dev/null 2>&1");
-}
 
 ############## update_all ##############
-# Update every EasyNAS package from the active channel (detached; no reboot).
+# Queue an update for every package that has one, in order -- the worker runs
+# them one at a time. No page message: the grid badges + banner show progress.
 sub update_all($self) {
- run_bg_update("");
- # No page-level message: the global status banner already shows the progress
- # bar, so a redundant "updating in the background" alert would just duplicate it.
+ my %upd=addon_updates();
+ foreach my $pkg (sort keys %upd) { enqueue_op("update",$pkg); }
+ start_worker();
  $result="";
  $msg="";
 }
 
 ############# install addon ###############
-# Installs run detached in a transient systemd unit, like updates: the page
-# returns immediately and the global banner (update.status + update.log)
-# shows live progress on every page. On success the unit refreshes the
-# catalog/update files so the grid reflects the new state on reload.
+# Queue the install; the worker (startup/addon-worker.sh) processes the queue
+# one op at a time in click order. The page returns immediately -- the grid
+# shows this tile "installing" (or "waiting" behind another op) and the global
+# banner shows overall progress; both refresh until the queue drains.
 sub install_addon($self) {
  my $package=$self->param("package");
- my $addons_update_dir=get_addons_update_dir();
- # The package name reaches a root shell command -- whitelist its shape.
+ # The package name reaches a root command -- whitelist its shape.
  unless (defined $package && $package =~ /^easynas-[a-z0-9-]{1,64}$/) {
   $result="fail";
   $msg=$TEXT{'addons_not_installed'};
   return;
  }
- my $repo=active_channel_repo();
- system("/bin/echo updating | /usr/bin/sudo /usr/bin/tee /etc/easynas/update.status >/dev/null");
- system("/usr/bin/sudo /usr/bin/systemd-run --collect --unit=easynas-install "
-       ."/bin/sh -c '"
-       ."/usr/bin/zypper -n --gpg-auto-import-keys install $package "
-       .">/var/log/easynas/update.log 2>&1 "
-       ."&& { /usr/bin/zypper --xmlout info $package "
-       ."| /usr/bin/tee $addons_update_dir/$package.addon >/dev/null; "
-       ."/usr/bin/zypper --quiet --xmlout lu -a --repo $repo "
-       ."| /usr/bin/tee /etc/easynas/easynas.updates >/dev/null; "
-       ."/bin/rm -f /etc/easynas/update.status; } "
-       ."|| echo failed | /usr/bin/tee /etc/easynas/update.status"
-       ."' >/dev/null 2>&1");
- # No page-level message -- the global status banner shows the progress bar.
+ enqueue_op("install",$package);
+ start_worker();
  $result="";
  $msg="";
  return;
@@ -254,47 +251,21 @@ sub delete_addon($self) {
 
 
 ############## update_addon ##############
+# Queue an update. Same queue as install -- one op at a time, click order.
+# The base easynas restarts easynas.service on update, but the worker runs in
+# its own transient unit and survives that, so it needs no special casing.
 sub update_addon($self) {
  my $package=$self->param("package");
- my $addons_update_dir=get_addons_update_dir();
- my @info;
- my $info1;
- my $info2;
- my $rc;
- my $updated=0;
- # The base easynas package restarts easynas.service on update, which would
- # kill this request -- run it detached (like update_all). Regular addons
- # update in place, so keep them synchronous for immediate feedback.
- if ($package eq "easynas") {
-  run_bg_update("easynas");
-  # No page-level message -- the global status banner shows the progress bar.
-  $result="";
-  $msg="";
-  return;
- }
- $rc = `sudo /usr/bin/zypper -n update $package`;
- @info=`sudo /usr/bin/zypper info $package`;
- foreach(@info)
-  {
-   ($info1,$info2) = split /:/,$_;
-   if ($info1 =~ "Status" && $info2 =~ "up-to-date")
-   {
-     $updated=1
-    }
-   }
- if ($updated) {
-  `/usr/bin/sudo /usr/bin/zypper --xmlout info $package | /usr/bin/sudo /usr/bin/tee $addons_update_dir/$package.addon`;
-  refresh_update_list();   # clear this addon from the pending-update count
-  $result="success";
-  $msg=$TEXT{'addons_updated'};
- }
- else
- {
+ unless (defined $package && $package =~ /^easynas(-[a-z0-9-]{1,64})?$/) {
   $result="fail";
   $msg=$TEXT{'addons_not_updated'};
+  return;
  }
-
-return;
+ enqueue_op("update",$package);
+ start_worker();
+ $result="";
+ $msg="";
+ return;
 }
 
 

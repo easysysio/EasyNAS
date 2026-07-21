@@ -631,6 +631,9 @@ Polish Language for EasyNAS
 
 
 %changelog
+* Tue Jul 21 2026 Yariv Hakim
+  - Add-ons: serialize install/update through a FIFO click-order queue;
+    per-tile waiting/installing badges advance as the worker drains
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv
