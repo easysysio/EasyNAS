@@ -35,6 +35,16 @@
 
 <div class="col-sm-9 col-md-10">
 
+%# ================= Toolbar: check for updates (refresh) =================
+<div class="clearfix" style="margin-bottom:12px">
+% if ($qactive) {
+ <span class="btn btn-default btn-sm pull-right disabled"><i class="fa fa-refresh"></i> <%= ($TEXT->{'addons_check'} || 'Check for updates') %></span>
+% } else {
+ <a class="btn btn-default btn-sm pull-right" href="?action=check_updates"
+    onclick="return easynasBusy(this,'<%= ($TEXT->{'addons_checking'} || 'Checking for updates') %>')"><i class="fa fa-refresh"></i> <%= ($TEXT->{'addons_check'} || 'Check for updates') %></a>
+% }
+</div>
+
 %# ================= Updates (pinned on top) =================
 % if (@$updates) {
 <div class="panel panel-default easynas-cat" id="cat-updates">

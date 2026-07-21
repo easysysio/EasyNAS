@@ -55,6 +55,11 @@ sub view ($self) {
   update_all($self);
  }
 
+#### check for updates (refresh button) #####
+ if ($action eq "check_updates") {
+  check_updates($self);
+ }
+
  ##### menu (QNAP-style grid: updates on top, then by category) #####
  my %addons=addons_info();               # package -> [name, group, desc, status, version]
  my %upd=addon_updates();                # package -> new version (from easynas.updates)
@@ -181,6 +186,24 @@ sub refresh_update_list {
  `/usr/bin/sudo /usr/bin/zypper --quiet --xmlout lu -a --repo $repo | /usr/bin/sudo /usr/bin/tee /etc/easynas/easynas.updates >/dev/null`;
 }
 
+
+############## check_updates ##############
+# The "Check for updates" button. Pull fresh metadata for the active channel
+# and recompute the pending-update list NOW, instead of waiting for the
+# 6-hourly check_update.pl. Runs the same three channel-scoped zypper calls
+# that check_update.pl uses -- refresh (new metadata), search (surfaces newly
+# published add-ons in the grid), lu (regenerates easynas.updates) -- so a few
+# seconds, not a full-system refresh. Synchronous: view() then renders the grid
+# already reflecting the check. The template disables the button while the
+# install/update queue is active, so this never races the worker's zypper lock.
+sub check_updates($self) {
+ my $repo=active_channel_repo();
+ `/usr/bin/sudo /usr/bin/zypper --quiet --gpg-auto-import-keys refresh $repo`;
+ `/usr/bin/sudo /usr/bin/zypper --quiet --xmlout search easynas | /usr/bin/sudo /usr/bin/tee /etc/easynas/addons/easynas.addons >/dev/null`;
+ refresh_update_list();
+ $result="success";
+ $msg=$TEXT{'addons_checked'} || "Checked for updates.";
+}
 
 ############## update_all ##############
 # Queue an update for every package that has one, in order -- the worker runs
