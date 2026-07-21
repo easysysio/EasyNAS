@@ -262,6 +262,38 @@ sub changepassword($self) {
      return;
     }
 
+ # The web administrator is NOT a system user: its credential is the hashed
+ # line "admin:<$6$ crypt hash>" in /etc/easynas/admin.conf (see login.pm),
+ # so chpasswd would fail with "user admin does not exist". Rewrite that file
+ # instead. crypt() with a fresh $6$ salt produces the same SHA-512 format
+ # login re-derives, and the password stays inside Perl -- never on a command
+ # line or through a shell. This path is independent of the realm backend.
+ if ($name eq "admin")
+    {
+     my @c=('.','/',0..9,'A'..'Z','a'..'z');
+     my $salt='$6$'.join('',map { $c[int rand @c] } 1..16).'$';
+     my $hash=crypt($password1,$salt);
+     if (!defined $hash || $hash !~ /^\$6\$/)
+        {
+         $result="fail";
+         $msg=$TEXT{'users_failed_to_change_password'};
+         return;
+        }
+     # Pipe to `sudo tee` with list args (no shell): the $-laden hash can't be
+     # reinterpreted. tee writes admin.conf as root; then lock it down.
+     my $ok=open(my $t,"|-","/usr/bin/sudo","/usr/bin/tee","/etc/easynas/admin.conf");
+     if (!$ok) { $result="fail"; $msg=$TEXT{'users_failed_to_change_password'}; return; }
+     print $t "admin:$hash\n";
+     close($t);
+     if ($? != 0) { $result="fail"; $msg=$TEXT{'users_failed_to_change_password'}; return; }
+     system("/usr/bin/sudo","/usr/bin/chown","easynas:easynas","/etc/easynas/admin.conf");
+     system("/usr/bin/sudo","/bin/chmod","600","/etc/easynas/admin.conf");
+     write_log("users","INFO","Web admin password changed");
+     $result="success";
+     $msg=$TEXT{'users_password_changed'};
+     return;
+    }
+
  my $realm = get_realm();
  if ($realm->{mode} eq 'consumer')
     {
@@ -282,8 +314,13 @@ sub changepassword($self) {
     }
  else
     {
-     $rc = system("/usr/bin/echo $name:$password1 | /usr/bin/sudo /usr/sbin/chpasswd");
-     if ($rc ne 0)
+     # Feed "user:password" to chpasswd on stdin via list-form open (no shell),
+     # so a password containing spaces, $, ` or ; can't break or inject.
+     my $ok=open(my $cp,"|-","/usr/bin/sudo","/usr/sbin/chpasswd");
+     if (!$ok) { $result="fail"; $msg=$TEXT{'users_failed_to_change_password'}; return; }
+     print $cp "$name:$password1\n";
+     close($cp);
+     if ($? != 0)
         {
          $result="fail";
          $msg=$TEXT{'users_failed_to_change_password'};
@@ -291,8 +328,9 @@ sub changepassword($self) {
         }
      if( -f "/usr/bin/smbpasswd" )
         {
-         $rc = system("/usr/bin/echo -e \"$password1\n$password1\" | /usr/bin/sudo /usr/bin/smbpasswd -s -a $name >/dev/null");
-         if ($rc ne 0)
+         my $sok=open(my $sp,"|-","/usr/bin/sudo","/usr/bin/smbpasswd","-s","-a",$name);
+         if ($sok) { print $sp "$password1\n$password1\n"; close($sp); }
+         if (!$sok || $? != 0)
             {
              $result="fail";
              $msg=$TEXT{'users_failed_to_add_samba_user'};
