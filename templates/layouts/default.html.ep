@@ -304,7 +304,7 @@
 	 <BR>
 	 <h3><center><%= ($TEXT->{'version'}) %> <%= $easynas{'version'} %></center></h3>
 	 <h4><center><%= ($TEXT->{'running'}) %> <%= ($easynas{'arc'}) %></center></h4>
- 	 <br> <center>Copyright &copy; 2013-2023</center>
+ 	 <br> <center>Copyright &copy; 2013-2026</center>
 	 <h4><center><a <%= ($TEXT->{'easynas_url'}) %>><%= ($TEXT->{'easynas_url'}) %></a></center></h4>
        </div>
      <div class="modal-footer">
