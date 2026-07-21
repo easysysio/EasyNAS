@@ -11,14 +11,14 @@
     <%= ($TEXT->{$addon->{'description'}}) %>
    </div>
    <div class="panel-body">
-    <p class="text-muted"><%= $TEXT->{'about_tftp'} %></p>
     <ul class="nav nav-tabs">
      <li class="active"><a href="#tabs-1" data-toggle="tab"><%= ($TEXT->{'tftp_on_off'} || 'On / Off') %></a></li>
      <li><a href="#tabs-2" data-toggle="tab"><%= ($TEXT->{'tftp_shared_vol'} || 'Served directory') %></a></li>
     </ul>
    <div class="tab-content">
     <div class="tab-pane fade in active" id="tabs-1">
-    <br><br><br>
+    <br>
+    <p class="text-muted"><%= $TEXT->{'about_tftp'} %></p>
     <label><%= ($TEXT->{$addon->{'description'}}) %></label>
     <br>
     %if ($service_active) {

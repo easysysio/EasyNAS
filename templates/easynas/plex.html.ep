@@ -11,14 +11,14 @@
     <%= ($TEXT->{$addon->{'description'}}) %>
    </div>
    <div class="panel-body">
-    <p class="text-muted"><%= $TEXT->{'about_plex'} %></p>
     <ul class="nav nav-tabs">
      <li class="active"><a href="#tabs-1" data-toggle="tab"><%= ($TEXT->{'plex_on_off'} || 'On / Off') %></a></li>
      <li><a href="#tabs-2" data-toggle="tab"><%= ($TEXT->{'plex_media'} || 'Media') %></a></li>
     </ul>
    <div class="tab-content">
     <div class="tab-pane fade in active" id="tabs-1">
-    <br><br><br>
+    <br>
+    <p class="text-muted"><%= $TEXT->{'about_plex'} %></p>
     <label><%= ($TEXT->{$addon->{'description'}}) %></label>
     <br>
     %if ($service_active) {
@@ -27,7 +27,6 @@
     %else {
      <a href="?action=plexon"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
     %}
-    <p class="text-muted"><br><%= ($TEXT->{'plex_help'} || 'Manage libraries in the Plex web app on port 32400.') %></p>
 </div><!-- end of #tab1 -->
 <div class="tab-pane fade" id="tabs-2">
 <br>
