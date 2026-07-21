@@ -177,8 +177,10 @@ sub run_bg_update {
 # Update every EasyNAS package from the active channel (detached; no reboot).
 sub update_all($self) {
  run_bg_update("");
- $result="success";
- $msg=$TEXT{'addons_updating'} || "Updating add-ons in the background. The status banner shows progress.";
+ # No page-level message: the global status banner already shows the progress
+ # bar, so a redundant "updating in the background" alert would just duplicate it.
+ $result="";
+ $msg="";
 }
 
 ############# install addon ###############
@@ -208,8 +210,9 @@ sub install_addon($self) {
        ."/bin/rm -f /etc/easynas/update.status; } "
        ."|| echo failed | /usr/bin/tee /etc/easynas/update.status"
        ."' >/dev/null 2>&1");
- $result="success";
- $msg=$TEXT{'addons_installing_bg'} || "Installing in the background. The status banner shows progress.";
+ # No page-level message -- the global status banner shows the progress bar.
+ $result="";
+ $msg="";
  return;
 }
 
@@ -264,8 +267,9 @@ sub update_addon($self) {
  # update in place, so keep them synchronous for immediate feedback.
  if ($package eq "easynas") {
   run_bg_update("easynas");
-  $result="success";
-  $msg=$TEXT{'addons_updating'} || "Updating in the background. The status banner shows progress.";
+  # No page-level message -- the global status banner shows the progress bar.
+  $result="";
+  $msg="";
   return;
  }
  $rc = `sudo /usr/bin/zypper -n update $package`;
