@@ -738,6 +738,8 @@ Polish Language for EasyNAS
   - AD-DC realm: pick a reachable DNS forwarder -- prefer the DHCP-provided
     resolver (then the gateway) over the hardcoded 1.1.1.1, which is blocked on
     many networks and left a freshly provisioned DC unable to resolve anything
+  - Add-ons grid: lay tiles out with flexbox and a larger bottom margin so a
+    category spanning more than one line spaces its rows evenly
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

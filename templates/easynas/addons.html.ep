@@ -54,9 +54,9 @@
      onclick="if(!confirm('<%= ($TEXT->{'addons_update_all_confirm'} || 'Update all add-ons now?') %>'))return false; return easynasBusy(this,'<%= ($TEXT->{'addons_updating_all'} || 'Updating all') %>')"
      href="?action=update_all"><i class="fa fa-refresh"></i> <%= ($TEXT->{'addons_update_all'} || 'Update all') %></a>
  </div>
- <div class="panel-body"><div class="row">
+ <div class="panel-body"><div class="row easynas-tiles">
 % for my $a (@$updates) {
-  <div class="col-sm-3 col-xs-6 text-center" style="margin-bottom:20px">
+  <div class="col-sm-3 col-xs-6 text-center" style="margin-bottom:30px">
 % if ($a->{flag}) {
    <img src="/images/<%= $a->{flag} %>" alt="" style="height:44px">
 % } else {
@@ -89,9 +89,9 @@
 % for my $cat (sort keys %$by_cat) {
 <div class="panel panel-default easynas-cat" id="cat-<%= $cat %>">
  <div class="panel-heading"><b><%= ($TEXT->{"addons_$cat"} || ucfirst $cat) %></b></div>
- <div class="panel-body"><div class="row">
+ <div class="panel-body"><div class="row easynas-tiles">
 % for my $a (@{$by_cat->{$cat}}) {
-  <div class="col-sm-3 col-xs-6 text-center" style="margin-bottom:20px">
+  <div class="col-sm-3 col-xs-6 text-center" style="margin-bottom:30px">
 % if ($a->{flag}) {
    <img src="/images/<%= $a->{flag} %>" alt="" style="height:44px<%= $a->{installed} ? '' : ';opacity:0.45' %>">
 % } else {
@@ -163,6 +163,10 @@
 .easynas-catnav .badge { background-color:#5cb85c; }
 .easynas-cat { scroll-margin-top:70px; }
 @media (min-width:768px){ .easynas-catnav { position:sticky; top:70px; } }
+/* Lay the tiles out with flex so wrapped lines are equal-height and the
+   30px bottom margin spaces every line evenly (plain floats catch on a taller
+   tile, leaving ragged gaps between lines). */
+.easynas-tiles { display:flex; flex-wrap:wrap; }
 /* Info (i) button, inline next to each tile's action button. */
 .addon-info { cursor:pointer; }
 </style>
