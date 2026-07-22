@@ -14,7 +14,7 @@ my %TEXT=get_lang_text($addon->{'name'});
 # absent until installed). Lets the grid show the real icon before install.
 # Keep in sync with the addons/*.easynas <icon> fields.
 my %addon_icon = (
- afp     => "fa-brands fa-apple",   ftp    => "fa-file",
+ ftp     => "fa-file",
  nfs     => "fa-brands fa-linux",   rsyncd => "fa-refresh",
  samba   => "fa-brands fa-windows", ssh    => "fa-terminal",
  tftp    => "fa-file-code",         dlna   => "fa-file-video",

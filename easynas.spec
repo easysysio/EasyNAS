@@ -64,7 +64,6 @@ cat > %{buildroot}/etc/easynas/addons/easynas.addons << 'EOF'
 <search-result version="0.0">
 <solvable-list>
 <solvable status="installed" name="easynas" summary="Network Attached Storage" kind="package"/>
-<solvable status="not-installed" name="easynas-fs-afp" summary="AFP addon for EasyNAS" kind="package"/>
 <solvable status="not-installed" name="easynas-fs-ftp" summary="FTP addon for EasyNAS" kind="package"/>
 <solvable status="not-installed" name="easynas-fs-nfs" summary="NFS addon for EasyNAS" kind="package"/>
 <solvable status="not-installed" name="easynas-fs-rsyncd" summary="RSyncd addon for EasyNAS" kind="package"/>
@@ -372,30 +371,6 @@ TFTP addon for EasyNAS
 /easynas/lang/pt-br/lang_brazilian_portuguese_tftp.pl
 /easynas/lang/zh-cn/lang_chinese_tftp.pl
 /easynas/lang/pl-pl/lang_polish_tftp.pl
-
-
-##### AFP ####
-%package        fs-afp
-Version:        %{version}
-Release:        4
-Summary:        AFP addon for EasyNAS
-Group:          easynas/addon
-Requires:       easynas >= %{version}
-Requires:       netatalk
-
-%description fs-afp
-AFP addon for EasyNAS
-
-%files fs-afp
-/easynas/addons/afp.easynas
-/easynas/lib/EasyNAS/Controller/afp.pm
-/easynas/templates/easynas/afp.html.ep
-/easynas/templates/easynas/afp_create.html.ep
-/easynas/lang/en-en/lang_english_afp.pl
-/easynas/lang/de-de/lang_german_afp.pl
-/easynas/lang/pt-br/lang_brazilian_portuguese_afp.pl
-/easynas/lang/zh-cn/lang_chinese_afp.pl
-/easynas/lang/pl-pl/lang_polish_afp.pl
 
 
 ##### FTP ####
@@ -739,6 +714,9 @@ Polish Language for EasyNAS
     manual restart (routes are built once at startup)
   - RSyncd add-on: ship the easynas-rsyncd.service unit and seed
     /etc/easynas/rsyncd/rsyncd.conf on install (same missing-unit gap as radius)
+  - Retire the AFP add-on: netatalk was dropped from openSUSE Tumbleweed (AFP is
+    deprecated; use Samba/SMB for Mac clients), so easynas-fs-afp could never
+    resolve its dependency. Remove the subpackage and all AFP files.
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv
