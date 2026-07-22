@@ -198,6 +198,22 @@ ExecReload=/bin/kill -HUP $MAINPID
 WantedBy=multi-user.target
 EOF
 
+# EasyNAS rsync daemon: the distro rsync in daemon mode, reading the addon's
+# config on the writable config partition. rsyncd needs only a single conf file
+# (no config tree), seeded by the fs-rsyncd %post.
+cat > %{buildroot}/usr/lib/systemd/system/easynas-rsyncd.service << 'EOF'
+[Unit]
+Description=EasyNAS rsync daemon
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/rsync --daemon --no-detach --config=/etc/easynas/rsyncd/rsyncd.conf
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 
 %files
 %config(noreplace) /etc/easynas/easynas.lang
@@ -522,7 +538,7 @@ Plex Server addon for EasyNAS
 #### RSync ####
 %package        fs-rsyncd
 Version:        %{version}
-Release:        4
+Release:        5
 Summary:        RSyncd addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -536,11 +552,38 @@ RSyncd addon for EasyNAS
 /easynas/lib/EasyNAS/Controller/rsyncd.pm
 /easynas/templates/easynas/rsyncd.html.ep
 /easynas/templates/easynas/rsyncd_create.html.ep
+/usr/lib/systemd/system/easynas-rsyncd.service
 /easynas/lang/en-en/lang_english_rsync.pl
 /easynas/lang/de-de/lang_german_rsync.pl
 /easynas/lang/pt-br/lang_brazilian_portuguese_rsync.pl
 /easynas/lang/zh-cn/lang_chinese_rsync.pl
 /easynas/lang/pl-pl/lang_polish_rsync.pl
+
+%post fs-rsyncd
+# Seed the addon's rsync config on first install. The rsyncd controller only
+# appends module sections to this file, so it must already exist with sane
+# globals. Never clobber an existing config so shares survive upgrades.
+mkdir -p /etc/easynas/rsyncd
+if [ ! -e /etc/easynas/rsyncd/rsyncd.conf ] ; then
+  cat > /etc/easynas/rsyncd/rsyncd.conf << 'RSCONF'
+# EasyNAS rsync daemon config. Module sections are appended below by the
+# RSyncd add-on page; edit globals here.
+pid file = /run/easynas-rsyncd.pid
+use chroot = yes
+max connections = 10
+secrets file = /etc/easynas/rsyncd/rsyncd.secrets
+RSCONF
+fi
+[ -e /etc/easynas/rsyncd/rsyncd.secrets ] || : > /etc/easynas/rsyncd/rsyncd.secrets
+chmod 600 /etc/easynas/rsyncd/rsyncd.secrets
+/usr/bin/systemctl daemon-reload 2>/dev/null || true
+
+%preun fs-rsyncd
+# On final removal (not upgrade) stop and disable the service so no unit lingers
+# after its file is gone. The seeded config is left on the config partition.
+if [ "$1" = 0 ] ; then
+  /usr/bin/systemctl disable --now easynas-rsyncd.service 2>/dev/null || true
+fi
 
 
 #### Radius ####
@@ -694,6 +737,8 @@ Polish Language for EasyNAS
   - Add-ons: restart the web service after the install queue drains, so a newly
     installed addon's route is registered and its menu link works without a
     manual restart (routes are built once at startup)
+  - RSyncd add-on: ship the easynas-rsyncd.service unit and seed
+    /etc/easynas/rsyncd/rsyncd.conf on install (same missing-unit gap as radius)
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv
