@@ -1,6 +1,6 @@
 <addon>
  <name>lxc</name>
- <enable>false</enable>
+ <enable>true</enable>
  <description>virtualization</description>
  <version>1.0.0</version>
  <author>Yariv Hakim</author>

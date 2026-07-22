@@ -300,7 +300,7 @@ fi
 #### lxc ####
 %package        srv-lxc
 Version:        %{version}
-Release:        2
+Release:        3
 Summary:        Virtualization addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -689,6 +689,8 @@ Polish Language for EasyNAS
   - Radius add-on: ship the easynas-radiusd.service unit and seed /etc/easynas/
     raddb from the stock freeradius config on install -- the unit and config the
     addon drives were never packaged, so it installed but could not start
+  - LXC add-on: enable it in the descriptor so it appears in the sidebar Services
+    menu after install (it shipped with enable=false, which get_menu hides)
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv
