@@ -19,7 +19,7 @@ my %addon_icon = (
  samba   => "fa-brands fa-windows", ssh    => "fa-terminal",
  tftp    => "fa-file-code",         dlna   => "fa-file-video",
  plex    => "fa-film",              lxc    => "fa-desktop",
- mariadb => "fa-file-text",         radius => "fa-circle",
+ mariadb => "fa-database",          radius => "fa-circle",
  iscsi   => "fa-external-link",
 );
 

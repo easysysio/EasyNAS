@@ -1,12 +1,12 @@
 <addon>
  <name>mariadb</name>
- <enable>false</enable>
+ <enable>true</enable>
  <description>mariadb</description>
  <version>1.0.0</version>
  <author>Yariv Hakim</author>
  <type>services</type>
  <program>mariadb</program>
- <config>/etc/easynas/raddb/radiusd.conf</config>
- <service>easynas-db.service</service>
- <icon>fa-file-text</icon>
+ <config>/etc/my.cnf</config>
+ <service>mariadb.service</service>
+ <icon>fa-database</icon>
 </addon>

@@ -76,6 +76,8 @@ cat > %{buildroot}/etc/easynas/addons/easynas.addons << 'EOF'
 <solvable status="not-installed" name="easynas-lang-portuguese" summary="Portuguese Language for EasyNAS" kind="package"/>
 <solvable status="not-installed" name="easynas-mm-dlna" summary="DLNA addon for EasyNAS" kind="package"/>
 <solvable status="not-installed" name="easynas-mm-plex" summary="PLEX addon for EasyNAS" kind="package"/>
+<solvable status="not-installed" name="easynas-srv-lxc" summary="Virtualization addon for EasyNAS" kind="package"/>
+<solvable status="not-installed" name="easynas-srv-mariadb" summary="MariaDB addon for EasyNAS" kind="package"/>
 <solvable status="not-installed" name="easynas-srv-radius" summary="Radius addon for EasyNAS" kind="package"/>
 <solvable status="not-installed" name="easynas-stg-iscsi" summary="iSCSI Initiator addon for EasyNAS" kind="package"/>
 </solvable-list>
@@ -337,16 +339,20 @@ Virtualization addon for EasyNAS
 #### mariadb ####
 %package        srv-mariadb
 Version:        %{version}
-Release:        1
+Release:        2
 Summary:        MariaDB addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
+Requires:       mariadb
+Requires:       mariadb-client
 
 %description srv-mariadb
 MariaDB addon for EasyNAS
 
 %files srv-mariadb
 /easynas/addons/mariadb.easynas
+/easynas/lib/EasyNAS/Controller/mariadb.pm
+/easynas/templates/easynas/mariadb.html.ep
 /easynas/lang/en-en/lang_english_mariadb.pl
 
 
@@ -721,6 +727,11 @@ Polish Language for EasyNAS
     status reader only knew zlib/lzo, so zstd displayed as "None"; it now reads
     /proc/mounts natively and the list shows the same translated labels as the
     settings page
+  - Add-ons grid: list easynas-srv-lxc and easynas-srv-mariadb in the seeded
+    catalog so they appear without waiting for an update-check refresh
+  - MariaDB add-on: build it out (was a stub) -- controller with on/off + version
+    display, on/off template, enable it in the menu, and Requires: mariadb +
+    mariadb-client so the DB server is actually pulled in
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

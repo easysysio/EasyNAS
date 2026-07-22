@@ -23,3 +23,5 @@
 $TEXT{'mariadb'} = "MariaDB";
 $TEXT{'mariadb_not_installed'} = "MariaDB not installed";
 $TEXT{'mariadb_on_off'} = "ON/OFF";
+$TEXT{'mariadb_version'} = "Version";
+$TEXT{'mariadb_port'} = "Port";
