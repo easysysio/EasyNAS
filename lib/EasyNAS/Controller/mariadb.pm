@@ -52,7 +52,13 @@ sub view ($self) {
   setrootpw($self);
  }
 
+##### set storage location #####
+ if (defined($action) && $action eq "setstorage") {
+  setstorage($self);
+ }
+
 ##### menu ######
+  my $mount_dir = get_mount_dir();
   my $active = get_service_status($service);
   # Server version straight from the client; empty when unavailable so the
   # template can hide the line.
@@ -67,12 +73,53 @@ sub view ($self) {
     push @databases, $_ unless ($_ eq "" || $system_db{$_});
    }
   }
+  # Current storage: our fstab bind line names <mount>/<fs>/<subvol>/mariadb ->
+  # /var/lib/mysql. Empty $storage_vol means internal (on-root) storage.
+  my $storage_vol="";
+  foreach (`/bin/cat /etc/fstab 2>/dev/null`) {
+   if (m{^(\S+)/mariadb\s+/var/lib/mysql\s.*easynas-mariadb-storage}) {
+    my $p=$1; $p =~ s{^\Q$mount_dir\E/}{}; $storage_vol=$p; last;
+   }
+  }
+  my %vol = vol_info();
   $self->stash(service_active => $active,
 	       dbver => $dbver,
 	       databases => \@databases,
+	       volumes => \%vol,
+	       storage_vol => $storage_vol,
 	       result => $result,
 	       msg => $msg);
   $self->render(template => 'easynas/mariadb');
+}
+
+
+##### setstorage #####
+# Point MariaDB's data at an EasyNAS volume (survives firmware updates) or back
+# to internal storage. The heavy lifting -- stop, migrate, bind-mount, persist,
+# start -- is in startup/mariadb-storage.sh; here we just validate and dispatch.
+sub setstorage($self) {
+ my $sel=$self->param("radio_sel") // "";
+ my $vol=$self->param("vol") // "";
+ my $mount_dir=get_mount_dir();
+ my $target;
+ if ($sel eq "internal") {
+  $target="internal";
+ }
+ elsif ($sel eq "vol" && $vol =~ m{^[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$}) {
+  $target="$mount_dir/$vol";
+ }
+ else {
+  $result="fail"; $msg=$TEXT{'mariadb_bad_vol'}; return;
+ }
+ # LIST form: target is validated (literal "internal" or a whitelisted volume
+ # path), so no shell parsing of user data.
+ my $rc=system("/usr/bin/sudo","/easynas/startup/mariadb-storage.sh",$target);
+ if ($rc==0) {
+  write_log($addon->{"name"},"INFO","MariaDB storage set to $target");
+  $result="success"; $msg=$TEXT{'mariadb_storage_saved'};
+ } else {
+  $result="fail"; $msg=$TEXT{'mariadb_storage_failed'};
+ }
 }
 
 

@@ -339,7 +339,7 @@ Virtualization addon for EasyNAS
 #### mariadb ####
 %package        srv-mariadb
 Version:        %{version}
-Release:        3
+Release:        4
 Summary:        MariaDB addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -740,6 +740,11 @@ Polish Language for EasyNAS
     many networks and left a freshly provisioned DC unable to resolve anything
   - Add-ons grid: lay tiles out with flexbox and a larger bottom margin so a
     category spanning more than one line spaces its rows evenly
+  - MariaDB add-on: choose which volume stores the database. Data is bind-mounted
+    onto /var/lib/mysql (datadir unchanged, so AppArmor/config are untouched),
+    existing data is migrated, and the bind is persisted + ordered so the DB
+    survives firmware updates. A "Storage" tab picks the volume or reverts to
+    internal.
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

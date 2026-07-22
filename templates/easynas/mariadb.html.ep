@@ -19,6 +19,7 @@
      <li class="active"><a href="#tabs-1" data-toggle="tab"><%= ($TEXT->{'mariadb_on_off'} || 'On / Off') %></a></li>
      <li><a href="#tabs-2" data-toggle="tab"><%= ($TEXT->{'mariadb_databases'} || 'Databases') %></a></li>
      <li><a href="#tabs-3" data-toggle="tab"><%= ($TEXT->{'mariadb_root_pw'} || 'Root Password') %></a></li>
+     <li><a href="#tabs-4" data-toggle="tab"><%= ($TEXT->{'mariadb_storage'} || 'Storage') %></a></li>
     </ul>
    <div class="tab-content">
 
@@ -96,6 +97,35 @@
     </form>
 % }
     </div><!-- end of #tab3 -->
+
+    %# ===== Storage =====
+    <div class="tab-pane fade" id="tabs-4">
+    <br>
+    <p class="text-muted"><%= ($TEXT->{'mariadb_storage_help'} || 'Keep the database on a volume so it survives firmware updates (internal storage on the system disk is wiped when the firmware is updated).') %></p>
+    <p><b><%= ($TEXT->{'mariadb_current_storage'} || 'Current location') %>:</b>
+       <%= $storage_vol ne "" ? $storage_vol : ($TEXT->{'mariadb_internal'} || 'Internal (system disk)') %></p>
+    <form role="form">
+     <input type="hidden" name="action" value="setstorage">
+     <div class="radio"><label>
+      <input type="radio" name="radio_sel" value="internal" <%= $storage_vol eq "" ? "checked" : "" %>>
+      <%= ($TEXT->{'mariadb_internal'} || 'Internal (system disk)') %></label></div>
+     <div class="radio"><label>
+      <input type="radio" name="radio_sel" value="vol" <%= $storage_vol ne "" ? "checked" : "" %>>
+      <%= ($TEXT->{'mariadb_volume'} || 'Volume') %></label>
+      <select class="form-control" name="vol">
+% for my $v (sort keys %$volumes) {
+       <option value="<%= $v %>" <%= ($v eq $storage_vol) ? "selected" : "" %>><%= $v %></option>
+% }
+      </select>
+     </div>
+% unless (keys %$volumes) {
+     <p class="text-muted"><%= ($TEXT->{'mariadb_no_vol'} || 'No volumes available. Create a volume first.') %></p>
+% }
+     <button type="submit" class="btn btn-default"
+             onclick="return confirm('<%= ($TEXT->{'mariadb_storage_confirm'} || 'Move the database now? The service will restart.') %>')">
+       <%= ($TEXT->{'mariadb_save'} || 'Save') %></button>
+    </form>
+    </div><!-- end of #tab4 -->
 
  </div><!-- end of .tab_container -->
  </div></div></div></div>
