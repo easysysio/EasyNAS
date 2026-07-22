@@ -691,6 +691,9 @@ Polish Language for EasyNAS
     addon drives were never packaged, so it installed but could not start
   - LXC add-on: enable it in the descriptor so it appears in the sidebar Services
     menu after install (it shipped with enable=false, which get_menu hides)
+  - Add-ons: restart the web service after the install queue drains, so a newly
+    installed addon's route is registered and its menu link works without a
+    manual restart (routes are built once at startup)
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv
