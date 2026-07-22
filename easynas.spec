@@ -717,6 +717,10 @@ Polish Language for EasyNAS
   - Retire the AFP add-on: netatalk was dropped from openSUSE Tumbleweed (AFP is
     deprecated; use Samba/SMB for Mac clients), so easynas-fs-afp could never
     resolve its dependency. Remove the subpackage and all AFP files.
+  - Filesystem list: show zstd ("Optimized") compression correctly -- the legacy
+    status reader only knew zlib/lzo, so zstd displayed as "None"; it now reads
+    /proc/mounts natively and the list shows the same translated labels as the
+    settings page
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

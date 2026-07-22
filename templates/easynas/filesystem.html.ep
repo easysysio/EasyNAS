@@ -51,7 +51,8 @@
 						    <td><%= $filesystems->{$fs}[6] %></td>
 						    <td><%= $filesystems->{$fs}[8] %></td>
 						    <td><%= $filesystems->{$fs}[9] %></td>
-						    <td><%= $filesystems->{$fs}[10] %></td>
+% my %clabel=(zstd=>($TEXT->{'fs_optimized'}||'Optimized'), lzo=>($TEXT->{'fs_faster'}||'Faster'), zlib=>($TEXT->{'fs_better'}||'Better'));
+						    <td><%= $clabel{$filesystems->{$fs}[10]} || ($TEXT->{'fs_none'}||'None') %></td>
 						    <td>
 % if ($fs_ops->{$fs}) {
 %# An operation is running: only pause/resume/stop are allowed.

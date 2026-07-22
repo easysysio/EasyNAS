@@ -442,19 +442,25 @@ sub get_service_status
 } 
 
 ########### get_compress_status ##########
+# The live compression algorithm of a mounted filesystem, from /proc/mounts:
+# "zstd", "lzo", "zlib", or "none" -- the same raw-algo vocabulary the settings
+# page parses, translated to a label by the templates (fs_optimized/fs_faster/
+# fs_better/fs_none). Native read, no forks (this runs once per filesystem per
+# list render). The mountpoint is matched as an exact field, not a prefix, so
+# /mnt/Data never matches /mnt/Data2's line. The kernel may report a level
+# suffix ("compress=zstd:3") -- capture stops at the ":".
 sub get_compress_status
 {
  my $fs=$_[0];
- my $compress="none";
- if (`/usr/bin/sudo /usr/bin/mount | /usr/bin/grep "$mount_dir/$fs" | /usr/bin/grep "compress=zlib"`)
-  {
-   $compress="better";
-  }
-  elsif (`/usr/bin/sudo /usr/bin/mount | /usr/bin/grep "$mount_dir/$fs" | /usr/bin/grep "compress=lzo"`)
-  {
-   $compress="faster";
-  }
-  return($compress);
+ open(my $mf,'<','/proc/mounts') or return "none";
+ while (my $l=<$mf>) {
+  my (undef,$mp,undef,$opts)=split(' ',$l);
+  next unless (defined $mp && $mp eq "$mount_dir/$fs");
+  close $mf;
+  return ($opts =~ /(?:^|,)compress(?:-force)?=(\w+)/) ? $1 : "none";
+ }
+ close $mf;
+ return "none";
 }
 
 
