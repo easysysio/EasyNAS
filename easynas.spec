@@ -339,7 +339,7 @@ Virtualization addon for EasyNAS
 #### mariadb ####
 %package        srv-mariadb
 Version:        %{version}
-Release:        2
+Release:        3
 Summary:        MariaDB addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -732,6 +732,9 @@ Polish Language for EasyNAS
   - MariaDB add-on: build it out (was a stub) -- controller with on/off + version
     display, on/off template, enable it in the menu, and Requires: mariadb +
     mariadb-client so the DB server is actually pulled in
+  - MariaDB add-on: manage databases (list/create/delete) and set the root
+    password from the UI -- all via the local unix socket as root, with SQL fed
+    on stdin (never the command line), name whitelisting, and delete confirmation
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

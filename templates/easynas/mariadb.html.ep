@@ -4,6 +4,10 @@
 <div class="alert alert-danger alert-dismissable">
 <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button><%= $msg %></div>
 % }
+% if ($result eq "success") {
+<div class="alert alert-success alert-dismissable">
+<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button><%= $msg %></div>
+% }
 <div class="row">
  <div class="col-lg-8">
   <div class="panel panel-default">
@@ -13,8 +17,12 @@
    <div class="panel-body">
     <ul class="nav nav-tabs">
      <li class="active"><a href="#tabs-1" data-toggle="tab"><%= ($TEXT->{'mariadb_on_off'} || 'On / Off') %></a></li>
+     <li><a href="#tabs-2" data-toggle="tab"><%= ($TEXT->{'mariadb_databases'} || 'Databases') %></a></li>
+     <li><a href="#tabs-3" data-toggle="tab"><%= ($TEXT->{'mariadb_root_pw'} || 'Root Password') %></a></li>
     </ul>
    <div class="tab-content">
+
+    %# ===== On / Off =====
     <div class="tab-pane fade in active" id="tabs-1">
     <br>
     <p class="text-muted"><%= $TEXT->{'about_mariadb'} %></p>
@@ -30,6 +38,64 @@
     %else {
      <a href="?action=mariadbon"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
     %}
-</div><!-- end of #tab1 -->
+    </div><!-- end of #tab1 -->
+
+    %# ===== Databases =====
+    <div class="tab-pane fade" id="tabs-2">
+    <br>
+% if (!$service_active) {
+    <p class="text-muted"><%= ($TEXT->{'mariadb_not_running'} || 'Start the MariaDB service to manage databases.') %></p>
+% } else {
+    <table class="table table-striped">
+     <thead><tr><th><%= ($TEXT->{'mariadb_database'} || 'Database') %></th><th></th></tr></thead>
+     <tbody>
+% for my $db (sort @$databases) {
+      <tr>
+       <td><%= $db %></td>
+       <td class="text-right">
+        <a class="btn btn-default btn-xs"
+           onclick="return confirm('<%= ($TEXT->{'mariadb_delete_confirm'} || 'Delete this database? All its data will be lost.') %>')"
+           href="?action=deletedb&dbname=<%= $db %>"><i class="fa fa-trash"></i></a>
+       </td>
+      </tr>
+% }
+% unless (@$databases) {
+      <tr><td colspan="2" class="text-muted"><%= ($TEXT->{'mariadb_no_db'} || 'No databases yet.') %></td></tr>
+% }
+     </tbody>
+    </table>
+    <form role="form" class="form-inline">
+     <input type="hidden" name="action" value="createdb">
+     <div class="form-group">
+      <input type="text" class="form-control" name="dbname" placeholder="<%= ($TEXT->{'mariadb_new_db'} || 'New database name') %>"
+             pattern="[A-Za-z0-9_]{1,64}" title="A-Z a-z 0-9 _ (max 64)" required>
+     </div>
+     <button type="submit" class="btn btn-default"><i class="fa fa-plus"></i> <%= ($TEXT->{'mariadb_create'} || 'Create') %></button>
+    </form>
+% }
+    </div><!-- end of #tab2 -->
+
+    %# ===== Root Password =====
+    <div class="tab-pane fade" id="tabs-3">
+    <br>
+% if (!$service_active) {
+    <p class="text-muted"><%= ($TEXT->{'mariadb_not_running'} || 'Start the MariaDB service to manage databases.') %></p>
+% } else {
+    <p class="text-muted"><%= ($TEXT->{'mariadb_root_pw_help'} || 'Set the MariaDB root password used by database clients. Local appliance management keeps working regardless.') %></p>
+    <form role="form">
+     <input type="hidden" name="action" value="setrootpw">
+     <div class="form-group">
+      <label><%= ($TEXT->{'mariadb_new_pw'} || 'New password') %></label>
+      <input type="password" class="form-control" name="password1" required>
+     </div>
+     <div class="form-group">
+      <label><%= ($TEXT->{'mariadb_confirm_pw'} || 'Confirm password') %></label>
+      <input type="password" class="form-control" name="password2" required>
+     </div>
+     <button type="submit" class="btn btn-default"><%= ($TEXT->{'mariadb_set_pw'} || 'Set password') %></button>
+    </form>
+% }
+    </div><!-- end of #tab3 -->
+
  </div><!-- end of .tab_container -->
  </div></div></div></div>
