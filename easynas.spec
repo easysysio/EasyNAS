@@ -176,6 +176,28 @@ TasksMax=infinity
 WantedBy=multi-user.target
 EOF
 
+# EasyNAS FreeRADIUS unit: the distro's radiusd pointed at the writable config
+# tree seeded under /etc/easynas/raddb by the srv-radius %post (the read-only
+# system /etc/raddb can't hold runtime client edits). Derived verbatim from the
+# stock radiusd.service -- only the -d config dir differs.
+cat > %{buildroot}/usr/lib/systemd/system/easynas-radiusd.service << 'EOF'
+[Unit]
+Description=EasyNAS FreeRADIUS server
+After=syslog.target network.target
+
+[Service]
+Type=forking
+PIDFile=/run/radiusd/radiusd.pid
+ExecStartPre=-/bin/chown -R radiusd:radiusd /run/radiusd /var/log/radius
+ExecStartPre=/usr/sbin/radiusd -C -d /etc/easynas/raddb
+ExecStart=/usr/sbin/radiusd -d /etc/easynas/raddb
+ExecReload=/usr/sbin/radiusd -C -d /etc/easynas/raddb
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 
 %files
 %config(noreplace) /etc/easynas/easynas.lang
@@ -524,7 +546,7 @@ RSyncd addon for EasyNAS
 #### Radius ####
 %package        srv-radius
 Version:        %{version}
-Release:        4
+Release:        5
 Summary:        Radius addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -538,11 +560,32 @@ Radius addon for EasyNAS
 /easynas/lib/EasyNAS/Controller/radius.pm
 /easynas/templates/easynas/radius.html.ep
 /easynas/templates/easynas/radius_create.html.ep
+/usr/lib/systemd/system/easynas-radiusd.service
 /easynas/lang/en-en/lang_english_radius.pl
 /easynas/lang/de-de/lang_german_radius.pl
 /easynas/lang/pt-br/lang_brazilian_portuguese_radius.pl
 /easynas/lang/zh-cn/lang_chinese_radius.pl
 /easynas/lang/pl-pl/lang_polish_radius.pl
+
+%post srv-radius
+# Seed the writable RADIUS config from the distro's stock tree on first install
+# (freeradius-server is a hard dep, so /etc/raddb exists here). radiusd needs
+# its whole config tree -- not just radiusd.conf/clients.conf -- so copy it
+# wholesale, preserving the mods-enabled/sites-enabled symlinks and the
+# root:radiusd ownership the daemon expects. Never clobber an existing tree, so
+# client edits survive upgrades.
+if [ ! -e /etc/easynas/raddb/radiusd.conf ] && [ -d /etc/raddb ] ; then
+  cp -a /etc/raddb /etc/easynas/raddb
+fi
+/usr/bin/systemctl daemon-reload 2>/dev/null || true
+
+%preun srv-radius
+# On final removal (not upgrade) stop and disable the service so no unit lingers
+# after its file is gone. The seeded /etc/easynas/raddb is left in place (config
+# partition) so a reinstall keeps existing clients.
+if [ "$1" = 0 ] ; then
+  /usr/bin/systemctl disable --now easynas-radiusd.service 2>/dev/null || true
+fi
 
 
 #### iSCSI ####
@@ -643,6 +686,9 @@ Polish Language for EasyNAS
   - Add-ons: mark x86_64-only add-ons (Plex) "Not available on ARM" on aarch64
     instead of offering an Install button that always fails (Plex ships no ARM
     RPM upstream)
+  - Radius add-on: ship the easynas-radiusd.service unit and seed /etc/easynas/
+    raddb from the stock freeradius config on install -- the unit and config the
+    addon drives were never packaged, so it installed but could not start
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv
