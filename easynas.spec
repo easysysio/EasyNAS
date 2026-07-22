@@ -317,7 +317,7 @@ fi
 #### lxc ####
 %package        srv-lxc
 Version:        %{version}
-Release:        3
+Release:        4
 Summary:        Virtualization addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -519,7 +519,7 @@ Plex Server addon for EasyNAS
 #### RSync ####
 %package        fs-rsyncd
 Version:        %{version}
-Release:        5
+Release:        6
 Summary:        RSyncd addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -570,7 +570,7 @@ fi
 #### Radius ####
 %package        srv-radius
 Version:        %{version}
-Release:        5
+Release:        6
 Summary:        Radius addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
