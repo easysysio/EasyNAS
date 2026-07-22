@@ -20,6 +20,18 @@ ADMINPASS="${3:?admin password required}"
 FORWARDER="${4:-1.1.1.1}"
 DC_HOSTNAME="${5:-easynas-dc}"
 
+# The DC forwards external DNS to $FORWARDER. A hardcoded public resolver
+# (1.1.1.1) is unreachable on networks that block outbound DNS -- and once the
+# DC points the box at 127.0.0.1 (realm-apply), that leaves nothing resolvable.
+# When the caller left the default, prefer the resolver DHCP already handed us
+# (captured now, before step 4 overwrites resolv.conf); the network is
+# guaranteed to allow it. Fall back to the default gateway, then 1.1.1.1.
+if [ "$FORWARDER" = "1.1.1.1" ]; then
+    _dns="$(awk '/^nameserver/ && $2 !~ /^127\./ {print $2; exit}' /etc/resolv.conf 2>/dev/null)"
+    [ -z "$_dns" ] && _dns="$(ip route 2>/dev/null | awk '/^default/{print $3; exit}')"
+    [ -n "$_dns" ] && FORWARDER="$_dns"
+fi
+
 CONF=/etc/easynas
 STATUS="$CONF/realm.status"
 RCONF="$CONF/realm.conf"

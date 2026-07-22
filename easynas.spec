@@ -735,6 +735,9 @@ Polish Language for EasyNAS
   - MariaDB add-on: manage databases (list/create/delete) and set the root
     password from the UI -- all via the local unix socket as root, with SQL fed
     on stdin (never the command line), name whitelisting, and delete confirmation
+  - AD-DC realm: pick a reachable DNS forwarder -- prefer the DHCP-provided
+    resolver (then the gateway) over the hardcoded 1.1.1.1, which is blocked on
+    many networks and left a freshly provisioned DC unable to resolve anything
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv
