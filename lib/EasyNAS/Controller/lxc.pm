@@ -49,16 +49,21 @@ sub view ($self) {
   ##### web terminal into a container #####
   # Serve a one-shot ttyd terminal ATTACHED TO THE CONTAINER (not a host shell)
   # on port 8080, started in its own transient unit (no shell, name passed as a
-  # list argument). Redirect to the appliance's OWN address, taken from the
-  # request Host header -- never a build-time hardcoded IP.
+  # list argument). Guard it with a fresh random credential so it is not an open
+  # shell on the LAN: only the admin who clicked gets it (embedded in the
+  # redirect URL), ttyd rejects everyone else, and it exits after the one
+  # session (-o). Redirect to the appliance's OWN address from the Host header
+  # -- never a build-time hardcoded IP.
   if (defined $action && $action eq "terminal" && defined $name && $name =~ $NAME_RE) {
+    my @c=(0..9,'a'..'f');
+    my $token=join('', map { $c[int rand @c] } 1..32);
     system("/usr/bin/sudo","/usr/bin/systemd-run","--collect",
-           "/usr/bin/ttyd","-p","8080","-o","-W",
+           "/usr/bin/ttyd","-p","8080","-o","-W","-c","easynas:$token",
            "/usr/bin/lxc-attach","-n",$name);
     my $host=$self->req->headers->host // "";
     $host =~ s/:.*//;                       # drop the app's port
     if ($host ne "") {
-      $self->redirect_to("http://$host:8080/");
+      $self->redirect_to("http://easynas:$token\@$host:8080/");
       return;
     }
   }

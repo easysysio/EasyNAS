@@ -317,7 +317,7 @@ fi
 #### lxc ####
 %package        srv-lxc
 Version:        %{version}
-Release:        5
+Release:        6
 Summary:        Virtualization addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -749,6 +749,12 @@ Polish Language for EasyNAS
     request) instead of an empty stale capture; start/stop actions added; the
     web terminal opens INTO the selected container at the appliance's own
     address (was a hardcoded developer IP and a host root shell).
+  - Add-ons: restart the web app after an addon UPDATE too, not just an install
+    -- an update replaces controller .pm code that Mojolicious only loads at
+    startup, so without it an updated addon kept running its old code.
+  - LXC terminal: guard the ttyd session with a fresh random credential (handed
+    to the admin via the redirect URL) so it is no longer an open shell on the
+    LAN.
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

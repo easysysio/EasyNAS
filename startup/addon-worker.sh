@@ -52,9 +52,12 @@ pop() {
     ) 8>>"$QUEUE.lock"
 }
 
-# Track whether a NEW addon was installed this drain: its Mojolicious route is
-# only registered at web-app startup, so we restart the service once at the end.
-did_install=0
+# Track whether anything changed this drain. Both installs and updates need a
+# web-app restart at the end: an install adds a route (registered only at
+# startup), and an update replaces a controller's .pm, which Mojolicious also
+# loads only at startup -- so without the restart an updated addon keeps running
+# its OLD code and typically breaks.
+did_change=0
 
 while :; do
     line=$(pop) || break
@@ -74,8 +77,8 @@ while :; do
     rc=$?
     if [ "$rc" -ne 0 ]; then
         echo "[addon-worker] $op $pkg failed (rc=$rc)" >>"$LOG"
-    elif [ "$op" = install ]; then
-        did_install=1
+    else
+        did_change=1
     fi
 
     # Reflect the new state: refresh this addon's info and the pending-update
@@ -87,11 +90,9 @@ done
 # Queue drained: clear the current-op and the banner flag.
 rm -f "$CUR" "$DIR/update.status"
 
-# A freshly installed addon's Mojolicious route is only registered at web-app
-# startup (lib/EasyNAS.pm builds routes from get_addons once), so its new
-# sidebar link would 404 until the service restarts. Restart once, after the
-# whole queue drains, and only when something was actually installed -- updates
-# reuse the same program and need no restart. This worker runs in its own
-# transient systemd unit (systemd-run --collect), so it survives the restart
-# and still exits cleanly.
-[ "$did_install" = 1 ] && /usr/bin/systemctl restart easynas.service
+# Restart the web app once, after the whole queue drains, if anything installed
+# or updated -- so new routes register AND updated controller/template code is
+# actually loaded (Mojolicious reads controllers only at startup). This worker
+# runs in its own transient systemd unit (systemd-run --collect), so it survives
+# the restart and still exits cleanly.
+[ "$did_change" = 1 ] && /usr/bin/systemctl restart easynas.service
