@@ -31,14 +31,26 @@
                                                 </tr>
                                             </thead>
                                             <tbody>
-						% foreach my $system (keys (%$systems)) {
+						% foreach my $system (sort keys (%$systems)) {
+%   my $running = ($systems->{$system}[1] eq 'RUNNING');
                                                 <tr>
-                                                    <td><a href="?action=terminal&name=<%= $system %>" target="_blank" rel="noopener noreferrer"><i class="fa fa-desktop fa-2x" title="Settings"></i></a></td>
+                                                    <td><i class="fa fa-desktop fa-2x"></i></td>
 						    <td><%= $systems->{$system}[0] %></td>
 						    <td><%= $systems->{$system}[1] %></td>
 						    <td><%= $systems->{$system}[2] %></td>
+						    <td>
+% if ($running) {
+						     <a href="?action=terminal&name=<%= $system %>" target="_blank" rel="noopener noreferrer" title="<%= ($TEXT->{'lxc_terminal'} || 'Terminal') %>"><i class="fa fa-terminal fa-2x">&nbsp;</i></a>
+						     <a href="?action=stop&name=<%= $system %>" title="<%= ($TEXT->{'lxc_stop'} || 'Stop') %>"><i class="fa fa-stop fa-2x"></i></a>
+% } else {
+						     <a href="?action=start&name=<%= $system %>" title="<%= ($TEXT->{'lxc_start'} || 'Start') %>"><i class="fa fa-play fa-2x"></i></a>
+% }
+						    </td>
 						</tr>
 					 	%}
+% unless (keys %$systems) {
+						<tr><td colspan="5" class="text-muted"><%= ($TEXT->{'lxc_none'} || 'No containers.') %></td></tr>
+% }
                                             </tbody>
                                         </table>
                                     </div>

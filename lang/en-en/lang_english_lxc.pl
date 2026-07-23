@@ -25,3 +25,7 @@ $TEXT{'lxc_state'} = "State";
 $TEXT{'lxc_ip'} = "IP";
 $TEXT{'lxc_action'} = "Action";
 $TEXT{'lxc_create'} = "Create new System";
+$TEXT{'lxc_start'} = "Start";
+$TEXT{'lxc_stop'} = "Stop";
+$TEXT{'lxc_terminal'} = "Terminal";
+$TEXT{'lxc_none'} = "No containers.";

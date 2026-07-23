@@ -317,7 +317,7 @@ fi
 #### lxc ####
 %package        srv-lxc
 Version:        %{version}
-Release:        4
+Release:        5
 Summary:        Virtualization addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -745,6 +745,10 @@ Polish Language for EasyNAS
     existing data is migrated, and the bind is persisted + ordered so the DB
     survives firmware updates. A "Storage" tab picks the volume or reverts to
     internal.
+  - LXC add-on: make it work. The container list now reads live (sudo, per
+    request) instead of an empty stale capture; start/stop actions added; the
+    web terminal opens INTO the selected container at the appliance's own
+    address (was a hardcoded developer IP and a host root shell).
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv
