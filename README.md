@@ -12,7 +12,7 @@ file sharing.
 [![Built on openSUSE](https://img.shields.io/badge/built%20on-openSUSE%20Tumbleweed-73ba25.svg)](https://www.opensuse.org/)
 ![Platform](https://img.shields.io/badge/arch-x86__64%20%7C%20aarch64-informational.svg)
 
-[Website](https://www.easynas.org) · [Documentation](https://docs.easysys.io/easynas) · [Downloads](https://repo.easysys.io/easynas)
+[Website & Documentation](https://www.easynas.org) · [Downloads](https://repo.easysys.io/easynas)
 
 </div>
 
@@ -140,11 +140,13 @@ The web interface listens on port **1443** by default; change it in
 | `lang/` | Translations |
 | `addons/*.easynas` | Add-on manifests (name, service, dependencies) |
 | `startup/` | Console menu (`easynas.sh`), first-boot wizard, update checker |
-| `docs/` | Design documents |
+| `docs/` | Website & user documentation (MkDocs), plus internal design notes |
 
 ## Documentation
 
-Full documentation is hosted at **[docs.easysys.io/easynas](https://docs.easysys.io/easynas)**.
+Full documentation is hosted at **[www.easynas.org](https://www.easynas.org)**.
+The site is built with MkDocs from the pages in [`docs/`](docs/) (`mkdocs.yml`,
+deployed with `deploy-docs.sh`).
 Design notes for internals (immutable OS, storage recovery, snapshots, identity)
 live under [`docs/`](docs/).
 

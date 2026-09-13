@@ -1,0 +1,102 @@
+# EasyNAS website and documentation — https://www.easynas.org
+#
+# Same theme and extensions as the EasySYS site and the other product docs, so
+# this reads as part of the family. The pages live beside the code they
+# describe, so a feature and its documentation land in one commit.
+#
+# Build:   pip install -r docs-requirements.txt && mkdocs serve
+# Deploy:  ./deploy-docs.sh   (on the host that serves the site)
+
+site_name: EasyNAS
+site_url: https://www.easynas.org/
+site_description: A turnkey NAS appliance — dedicated operating system, web management, and the storage power of Btrfs.
+repo_url: https://github.com/easysysio/EasyNAS
+repo_name: easysysio/EasyNAS
+copyright: GPL-3.0
+
+nav:
+  - Overview: index.md
+  - Supported hardware: supported-hardware.md
+  - Installation: installation.md
+  - Getting started: getting-started.md
+  - Storage: storage.md
+  - Sharing: sharing.md
+  - Add-ons: addons.md
+  - Administration: administration.md
+
+# docs/ also holds the internal design notes that code comments point at
+# (docs/<name>-design.md). They stay in the repo but are not published.
+exclude_docs: |
+  *-design.md
+  poc-test.md
+  v1-migration-plan.md
+
+theme:
+  name: material
+  font:
+    text: Inter
+    code: Roboto Mono
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - navigation.path
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - admonition
+  - tables
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.magiclink
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  - search
+  - glightbox
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/easysysio/EasyNAS
+    - icon: fontawesome/solid/download
+      link: https://repo.easysys.io/easynas
+    - icon: fontawesome/solid/globe
+      link: https://easysys.io
