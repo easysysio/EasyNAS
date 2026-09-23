@@ -1,9 +1,9 @@
 #!/bin/sh
-# Build the EasyNAS website/documentation and publish it to www.easynas.org.
+# Build the EasyNAS website and documentation and publish it to easynas.org.
 #
 # Mirrors EasyDC/deploy-docs.sh and EasySYS-web/deploy.sh: pull, build with
 # mkdocs, replace what is served. Run it on the host that serves the site; the
-# web server's www.easynas.org vhost should point at the target directory.
+# web server's easynas.org vhost should point at the target directory.
 #
 # Usage: ./deploy-docs.sh [TARGET]    (default /var/www/easynas)
 set -e
