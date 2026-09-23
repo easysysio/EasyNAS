@@ -14,7 +14,7 @@
 #
 # This file is part of EasyNAS (c) created by Yariv Hakim 2012-2022
 #
-# Homepage    : https://www.easynas.org
+# Homepage    : https://easynas.org
 #
 #########################################################################
 
@@ -30,7 +30,7 @@ $TEXT{'save'} = "保存";
 $TEXT{'reset'} = "重置";
 $TEXT{'create'} = "创建";
 $TEXT{'add'} = "增加";
-$TEXT{'easynas_url'} = "https://www.easynas.org";
+$TEXT{'easynas_url'} = "https://easynas.org";
 $TEXT{'running'} = "运行于";
 $TEXT{'close'} = "关闭";
 
@@ -341,7 +341,7 @@ $TEXT{'upgrade_addon'} = "升级插件";
 $TEXT{'check_for_update'} = "检查更新";
 $TEXT{'cheking_firmware_availble'} = "检查有效的固件: ";
 $TEXT{'latest_firmware'} = "你的系统固件已经最新";
-$TEXT{'download_latest_version_here'} = "下载最新版在 <a href=http://www.easynas.org/download target=New_Page>here</a>";
+$TEXT{'download_latest_version_here'} = "下载最新版在 <a href=https://repo.easysys.io/easynas target=New_Page>here</a>";
 $TEXT{'upgrade_in_progress'} = "升级中.........";
 $TEXT{'downloading_firmware'} = "下载固件.......";
 $TEXT{'installing_new_firmware'} = "安装新固件......";

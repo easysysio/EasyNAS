@@ -14,7 +14,7 @@
 #
 # This file is part of EasyNAS (c) created by Yariv Hakim 2012-2017
 #
-# Homepage    : https://www.easynas.org
+# Homepage    : https://easynas.org
 # Sourceforge : https://sourceforge.net/projects/easynas/
 #
 #########################################################################

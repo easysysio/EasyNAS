@@ -10,7 +10,7 @@ Release:        1
 Summary:        Network Attached Storage
 License:        GPL-3.0
 Group:          System Environment/Daemons
-URL:            https://www.easynas.org
+URL:            https://easynas.org
 BuildArch:      noarch
 Source0:        %{name}-%{version}.tar.gz
 
@@ -636,7 +636,7 @@ iSCSI addon for EasyNAS
 ##### German Language ####
 %package        lang-german
 Version:        %{version}
-Release:        3
+Release:        4
 Summary:        German Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -652,7 +652,7 @@ German Language for EasyNAS
 ##### Portuguese Language ####
 %package        lang-portuguese
 Version:        %{version}
-Release:        3
+Release:        4
 Summary:        Portuguese Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -668,7 +668,7 @@ Portuguese Language for EasyNAS
 ##### Chinese Language ####
 %package        lang-chinese
 Version:        %{version}
-Release:        3
+Release:        4
 Summary:        Simplified Chinese Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -684,7 +684,7 @@ Simplified Chinese Language for EasyNAS
 ##### Polish Language ####
 %package        lang-polish
 Version:        %{version}
-Release:        3
+Release:        4
 Summary:        Polish Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}

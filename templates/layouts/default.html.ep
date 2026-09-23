@@ -136,7 +136,7 @@
                             </li>
 			    <li>         
                                	    <div>
-                                        <a href="#" onClick="MyWindow=window.open('https://www.easynas.org/index.php/documentation','MyWindow','width=600,height=300'); return false;"><i class="fa fa-question-circle fa-fw"></i> Help</a>
+                                        <a href="https://easynas.org/" target="_blank" rel="noopener noreferrer"><i class="fa fa-question-circle fa-fw"></i> Help</a>
                                     </div>
                             </li>
 			    <li>
@@ -298,7 +298,7 @@
 	 <h3><center><%= ($TEXT->{'version'}) %> <%= $easynas{'version'} %></center></h3>
 	 <h4><center><%= ($TEXT->{'running'}) %> <%= ($easynas{'arc'}) %></center></h4>
  	 <br> <center>Copyright &copy; 2013-2026</center>
-	 <h4><center><a <%= ($TEXT->{'easynas_url'}) %>><%= ($TEXT->{'easynas_url'}) %></a></center></h4>
+	 <h4><center><a href="<%= ($TEXT->{'easynas_url'}) %>" target="_blank" rel="noopener noreferrer"><%= ($TEXT->{'easynas_url'}) %></a></center></h4>
        </div>
      <div class="modal-footer">
      <button type="button" class="btn btn-default" data-dismiss="modal"><%= ($TEXT->{'close'}) %></button>

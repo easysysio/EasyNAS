@@ -14,7 +14,7 @@
 #
 # This file is part of EasyNAS (c) created by Yariv Hakim 2012-2022
 #
-# Homepage    : https://www.easynas.org
+# Homepage    : https://easynas.org
 #
 #########################################################################
 
@@ -30,7 +30,7 @@ $TEXT{'save'} = "Speichern";
 $TEXT{'reset'} = "Reset";
 $TEXT{'create'} = "Erstellen";
 $TEXT{'add'} = "Hinzufügen";
-$TEXT{'easynas_url'} = "https://www.easynas.org";
+$TEXT{'easynas_url'} = "https://easynas.org";
 $TEXT{'running'} = "Läuft auf";
 $TEXT{'close'} = "Schließen";
 
@@ -341,7 +341,7 @@ $TEXT{'upgrade_addon'} = "Add-on aktualisieren";
 $TEXT{'check_for_update'} = "Nach Update suchen";
 $TEXT{'cheking_firmware_availble'} = "Suche die aktuellste Firmware von EasyNAS: ......  ";
 $TEXT{'latest_firmware'} = "Das System ist bereits auf den neusten Stand";
-$TEXT{'download_latest_version_here'} = "Download der aktuellsten Version <a href=http://www.easynas.org/download target=New_Page>hier</a>";
+$TEXT{'download_latest_version_here'} = "Download der aktuellsten Version <a href=https://repo.easysys.io/easynas target=New_Page>hier</a>";
 $TEXT{'upgrade_in_progress'} = "Upgrade wird ausgeführt.........";
 $TEXT{'downloading_firmware'} = "Herunterladen der Firmware.......";
 $TEXT{'installing_new_firmware'} = "Installieren der neuen Firmware......";
