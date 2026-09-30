@@ -246,8 +246,6 @@ EOF
 /easynas/addons/power.easynas
 /easynas/addons/logs.easynas
 /easynas/addons/settings.easynas
-/easynas/addons/computers.easynas
-/easynas/addons/realm.easynas
 /easynas/lib/EasyNAS.pm
 /easynas/lib/EasyNAS/Controller/disk.pm
 /easynas/lib/EasyNAS/Controller/easynas.pm
@@ -259,7 +257,6 @@ EOF
 /easynas/lib/EasyNAS/Controller/addons.pm
 /easynas/lib/EasyNAS/Controller/users.pm
 /easynas/lib/EasyNAS/Controller/groups.pm
-/easynas/lib/EasyNAS/Controller/realm.pm
 /easynas/lib/EasyNAS/Controller/firmware.pm
 /easynas/lib/EasyNAS/Controller/network.pm
 /easynas/lib/EasyNAS/Controller/settings.pm
@@ -275,7 +272,6 @@ EOF
 /easynas/templates/easynas/addons*
 /easynas/templates/easynas/users*
 /easynas/templates/easynas/groups*
-/easynas/templates/easynas/realm*
 /easynas/templates/easynas/network*
 /easynas/templates/easynas/firmware*
 /easynas/templates/easynas/login*
@@ -755,6 +751,11 @@ Polish Language for EasyNAS
   - LXC terminal: guard the ttyd session with a fresh random credential (handed
     to the admin via the redirect URL) so it is no longer an open shell on the
     LAN.
+  - Park directory integration: remove the realm add-on and its AD DC, AD join
+    and LDAP backends (realm-setup/join/ldap/import/apply scripts, the
+    computers page, the samba-tool paths in Users/Groups). Users and groups are
+    local accounts only while the core is stabilized; the design stays in
+    docs/identity-design.md and the removal is one commit to revert.
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

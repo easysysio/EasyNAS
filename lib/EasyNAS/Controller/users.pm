@@ -120,63 +120,29 @@ sub createuser($self) {
     }
 
 
- my $realm = get_realm();
- if ($realm->{mode} eq 'consumer')
+ # Local accounts: POSIX account + Samba (tdbsam) NT hash.
+ $rc = system("/usr/bin/sudo /usr/sbin/useradd -g $group_default -G \"$groups\" -d $mount_dir -c \"$desc\" $name");
+ if ($rc ne 0)
     {
      $result="fail";
-     $msg=$TEXT{'users_managed_externally'} || "Users are managed on the directory server (read-only).";
+     $msg=$TEXT{'users_failed_to_add_user'};
      return;
     }
-
- if ($realm->{backend} eq 'ad-dc')
+ $rc = system("/usr/bin/echo $name:$password1 | /usr/bin/sudo /usr/sbin/chpasswd");
+ if ($rc ne 0)
     {
-     # AD DC: one samba-tool op sets POSIX + Kerberos + NT hash. Assign an
-     # explicit RFC2307 uid so file ownership stays stable across reinstall.
-     # (AD-DC paths validated on a real DC / the Phase-2 spike.)
-     my $uidn = next_uid_number();
-     my $gidn = (split(/:/, `/usr/bin/getent group $group_default 2>/dev/null`))[2];
-     $gidn = next_gid_number() unless (defined $gidn && $gidn ne "");
-     chomp $gidn;
-     $rc = system("/usr/bin/sudo","/usr/bin/samba-tool","user","create",$name,$password1,
-                  "--given-name=$name","--uid-number=$uidn","--gid-number=$gidn",
-                  "--login-shell=/bin/bash","--unix-home=$mount_dir");
-     if ($rc ne 0)
-        {
-         $result="fail";
-         $msg=$TEXT{'users_failed_to_add_user'};
-         return;
-        }
-     foreach my $g (@groups)
-        {
-         system("/usr/bin/sudo","/usr/bin/samba-tool","group","addmembers",$g,$name);
-        }
+     $result="fail";
+     $msg=$TEXT{'users_failed_to_change_password'};
+     return;
     }
- else
+ if( -f "/usr/bin/smbpasswd" )
     {
-     # local backend: POSIX account + Samba (tdbsam) NT hash.
-     $rc = system("/usr/bin/sudo /usr/sbin/useradd -g $group_default -G \"$groups\" -d $mount_dir -c \"$desc\" $name");
+     $rc = system("/usr/bin/echo -e \"$password1\n$password1\" | /usr/bin/sudo /usr/bin/smbpasswd -s -a $name >/dev/null");
      if ($rc ne 0)
         {
          $result="fail";
-         $msg=$TEXT{'users_failed_to_add_user'};
+         $msg=$TEXT{'users_failed_to_add_samba_user'};
          return;
-        }
-     $rc = system("/usr/bin/echo $name:$password1 | /usr/bin/sudo /usr/sbin/chpasswd");
-     if ($rc ne 0)
-        {
-         $result="fail";
-         $msg=$TEXT{'users_failed_to_change_password'};
-         return;
-        }
-     if( -f "/usr/bin/smbpasswd" )
-        {
-         $rc = system("/usr/bin/echo -e \"$password1\n$password1\" | /usr/bin/sudo /usr/bin/smbpasswd -s -a $name >/dev/null");
-         if ($rc ne 0)
-            {
-             $result="fail";
-             $msg=$TEXT{'users_failed_to_add_samba_user'};
-             return;
-            }
         }
     }
 
@@ -191,30 +157,7 @@ sub createuser($self) {
 sub deleteuser($self) {
   my $username = $self->param("username");
   my $rc;
-  my $realm = get_realm();
 
-  if ($realm->{mode} eq 'consumer')
-   {
-    $result="fail";
-    $msg=$TEXT{'users_managed_externally'} || "Users are managed on the directory server (read-only).";
-    return;
-   }
-
-  if ($realm->{backend} eq 'ad-dc')
-   {
-    $rc = system("/usr/bin/sudo","/usr/bin/samba-tool","user","delete",$username);
-    if ($rc ne 0)
-     {
-      $result="fail";
-      $msg=$TEXT{'users_failed_to_delete_user'};
-      return;
-     }
-    $result="success";
-    $msg=$TEXT{'users_deleted'};
-    return;
-   }
-
-  # local backend
   if( -f "/usr/bin/smbpasswd" )
    {
     $rc = system("/usr/bin/sudo /usr/bin/smbpasswd -x $username >/dev/null");
@@ -267,7 +210,7 @@ sub changepassword($self) {
  # so chpasswd would fail with "user admin does not exist". Rewrite that file
  # instead. crypt() with a fresh $6$ salt produces the same SHA-512 format
  # login re-derives, and the password stays inside Perl -- never on a command
- # line or through a shell. This path is independent of the realm backend.
+ # line or through a shell.
  if ($name eq "admin")
     {
      my @c=('.','/',0..9,'A'..'Z','a'..'z');
@@ -294,48 +237,27 @@ sub changepassword($self) {
      return;
     }
 
- my $realm = get_realm();
- if ($realm->{mode} eq 'consumer')
+ # Feed "user:password" to chpasswd on stdin via list-form open (no shell),
+ # so a password containing spaces, $, ` or ; can't break or inject.
+ my $ok=open(my $cp,"|-","/usr/bin/sudo","/usr/sbin/chpasswd");
+ if (!$ok) { $result="fail"; $msg=$TEXT{'users_failed_to_change_password'}; return; }
+ print $cp "$name:$password1\n";
+ close($cp);
+ if ($? != 0)
     {
      $result="fail";
-     $msg=$TEXT{'users_managed_externally'} || "Users are managed on the directory server (read-only).";
+     $msg=$TEXT{'users_failed_to_change_password'};
      return;
     }
-
- if ($realm->{backend} eq 'ad-dc')
+ if( -f "/usr/bin/smbpasswd" )
     {
-     $rc = system("/usr/bin/sudo","/usr/bin/samba-tool","user","setpassword",$name,"--newpassword=$password1");
-     if ($rc ne 0)
+     my $sok=open(my $sp,"|-","/usr/bin/sudo","/usr/bin/smbpasswd","-s","-a",$name);
+     if ($sok) { print $sp "$password1\n$password1\n"; close($sp); }
+     if (!$sok || $? != 0)
         {
          $result="fail";
-         $msg=$TEXT{'users_failed_to_change_password'};
+         $msg=$TEXT{'users_failed_to_add_samba_user'};
          return;
-        }
-    }
- else
-    {
-     # Feed "user:password" to chpasswd on stdin via list-form open (no shell),
-     # so a password containing spaces, $, ` or ; can't break or inject.
-     my $ok=open(my $cp,"|-","/usr/bin/sudo","/usr/sbin/chpasswd");
-     if (!$ok) { $result="fail"; $msg=$TEXT{'users_failed_to_change_password'}; return; }
-     print $cp "$name:$password1\n";
-     close($cp);
-     if ($? != 0)
-        {
-         $result="fail";
-         $msg=$TEXT{'users_failed_to_change_password'};
-         return;
-        }
-     if( -f "/usr/bin/smbpasswd" )
-        {
-         my $sok=open(my $sp,"|-","/usr/bin/sudo","/usr/bin/smbpasswd","-s","-a",$name);
-         if ($sok) { print $sp "$password1\n$password1\n"; close($sp); }
-         if (!$sok || $? != 0)
-            {
-             $result="fail";
-             $msg=$TEXT{'users_failed_to_add_samba_user'};
-             return;
-            }
         }
     }
 
@@ -360,35 +282,6 @@ sub changesettings($self) {
 	$groups = $groups.$_.",";
     }
     chop($groups);
-
- my $realm = get_realm();
- if ($realm->{mode} eq 'consumer')
-    {
-     $result="fail";
-     $msg=$TEXT{'users_managed_externally'} || "Users are managed on the directory server (read-only).";
-     return;
-    }
-
- if ($realm->{backend} eq 'ad-dc')
-    {
-     # Sync supplementary group membership against the selection (description
-     # edit is not applied on AD in this phase).
-     my %want = map { $_ => 1 } @groups;
-     my %have = map { $_ => 1 } split(' ', `/usr/bin/id -Gn $name 2>/dev/null`);
-     foreach my $g (@groups)
-        {
-         next if $have{$g};
-         system("/usr/bin/sudo","/usr/bin/samba-tool","group","addmembers",$g,$name);
-        }
-     foreach my $g (keys %have)
-        {
-         next if $want{$g} || $g eq $group_default;
-         system("/usr/bin/sudo","/usr/bin/samba-tool","group","removemembers",$g,$name);
-        }
-     $result="success";
-     $msg=$TEXT{'users_settings_saved'};
-     return;
-    }
 
     $rc = system("/usr/bin/sudo /usr/sbin/usermod -g $group_default -G \"$groups\" -d $mount_dir -c \"$desc\" $name");
     if ($rc ne 0)

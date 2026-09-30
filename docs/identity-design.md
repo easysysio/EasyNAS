@@ -1,6 +1,10 @@
 # EasyNAS Identity / Directory Design
 
-Status: **Planned**
+Status: **Parked** — the service plane (realm add-on, AD DC / AD join / LDAP
+backends) was removed while the core is stabilized. Users and groups are local
+accounts only; the management plane (§2) is unchanged. To bring it back, revert
+the commit that removed it (`git log -- lib/EasyNAS/Controller/realm.pm`) and
+resume from §7 / §10. `tools/realm-dc-spike.sh` is kept for that.
 Author: Yariv Hakim
 
 How EasyNAS manages the appliance administrator and the users that access

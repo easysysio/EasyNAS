@@ -20,9 +20,9 @@ CRON=/etc/cron.d/easynas.cron
 # --- Layer-2 persistence (docs/immutable-design.md sec 8.3) ------------------
 # The config partition mounts at /config. Persistent state lives under
 # /config/<name> and is bind-mounted onto its real location so it survives an
-# OS reinstall: /etc/easynas (admin/realm config, certs) and /var/lib/samba
-# (the AD DC database). No-op when /config isn't a mounted partition (e.g. a
-# source/dev checkout), so nothing breaks off-appliance.
+# OS reinstall: /etc/easynas (admin config, certs), /var/lib/samba (the Samba
+# password database) and /etc/samba (smb.conf). No-op when /config isn't a
+# mounted partition (e.g. a source/dev checkout), so nothing breaks off-appliance.
 CONFIG_MNT=/config
 
 persist_bind() {
@@ -42,8 +42,7 @@ persist_bind() {
 
 persist_bind easynas  /etc/easynas
 persist_bind samba    /var/lib/samba
-persist_bind samba-cf /etc/samba      # smb.conf (ad-dc / ad-member)
-persist_bind sssd     /etc/sssd        # sssd.conf (ldap)
+persist_bind samba-cf /etc/samba      # smb.conf
 
 # SSL certificate (conflict #3): generate only if missing, so an OS upgrade
 # never regenerates the appliance's identity.
@@ -69,12 +68,6 @@ fi
 
 chown -R easynas:easynas ${CONF_DIR}
 chown -R easynas:easynas /var/log/easynas
-
-# Re-establish an AD DC realm on boot (idempotent, no-op unless the backend is
-# ad-dc): after a reboot or an OS reinstall the database is persisted on the
-# config partition, but the OS-layer runtime config (service enablement,
-# nsswitch, Kerberos, resolver) must be reapplied. See realm-apply.sh.
-/easynas/startup/realm-apply.sh 2>/dev/null || true
 
 # --- btrfs root snapshots (set up here, not at image-build) -------------------
 # The image ships a plain '@' subvolume root (KIWI btrfs_root_is_subvolume),

@@ -50,28 +50,7 @@ sub view ($self) {
 ##### creategroup #####
 sub creategroup($self) {
  my $group=$self->param("group");
- my $rc;
- my $realm = get_realm();
- if ($realm->{mode} eq 'consumer')
-  {
-   $result="fail";
-   $msg=$TEXT{'groups_managed_externally'} || "Groups are managed on the directory server (read-only).";
-   return;
-  }
- if ($realm->{backend} eq 'ad-dc')
-  {
-   # A group only resolves via NSS once it has a gidNumber, and
-   # 'group add --gid-number' does not reliably set it. Create the group then
-   # set the RFC2307 gidNumber with addunixattrs (validated in the realm spike,
-   # tools/realm-dc-spike.sh).
-   my $gidn = next_gid_number();
-   $rc=system("/usr/bin/sudo","/usr/bin/samba-tool","group","add",$group);
-   system("/usr/bin/sudo","/usr/bin/samba-tool","group","addunixattrs",$group,$gidn) if ($rc == 0);
-  }
- else
-  {
-   $rc=system("/usr/bin/sudo","/usr/sbin/groupadd", $group);
-  }
+ my $rc=system("/usr/bin/sudo","/usr/sbin/groupadd", $group);
  if ($rc)
   {
    $result="fail";
@@ -88,22 +67,7 @@ sub creategroup($self) {
 
 sub deletegroup($self) {
  my $group=$self->param("group");
- my $rc;
- my $realm = get_realm();
- if ($realm->{mode} eq 'consumer')
-  {
-   $result="fail";
-   $msg=$TEXT{'groups_managed_externally'} || "Groups are managed on the directory server (read-only).";
-   return;
-  }
- if ($realm->{backend} eq 'ad-dc')
-  {
-   $rc=system("/usr/bin/sudo","/usr/bin/samba-tool","group","delete",$group);
-  }
- else
-  {
-   $rc=system("/usr/bin/sudo","/usr/sbin/groupdel", $group);
-  }
+ my $rc=system("/usr/bin/sudo","/usr/sbin/groupdel", $group);
  if ($rc)
   {
    $result="fail";
