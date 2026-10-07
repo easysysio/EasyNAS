@@ -17,6 +17,7 @@ updates.
 
 | Add-on | Provides |
 |---|---|
+| `fs-files` | Web file manager — NAS users sign in with their own account |
 | `fs-ftp` | FTP server (pure-ftpd) |
 | `fs-afp` | AFP for older macOS (netatalk) |
 | `fs-tftp` | TFTP server |

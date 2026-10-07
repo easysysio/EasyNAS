@@ -30,7 +30,18 @@ jobs:
           fi
           perl tools/check-addon-release-bumps.pl "$BEFORE..HEAD"
 
+  # The file manager's filesystem helper is the one piece that decides what a
+  # web request may touch (and it shells out to GNU cp/rm/mv), so its tests run
+  # on every push and gate the build. They need only core Perl and coreutils.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: File manager helper tests
+        run: prove -v t/files-helper.t
+
   build:
+    needs: test
     if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:

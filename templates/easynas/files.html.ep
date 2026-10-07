@@ -1,0 +1,453 @@
+% # File manager. The administrator sees it inside the normal layout; a NAS
+% # user gets the bare frame in files_user.html.ep -- no menu, nothing else.
+% if ($is_admin) { layout 'default'; } else { extends 'easynas/files_user'; }
+% use Mojo::JSON ();
+% my %strings = map { $_ => $TEXT->{$_} } grep { /^files_/ } keys %$TEXT;
+
+<style>
+ #fm .fm-bar { margin-bottom: 10px; }
+ #fm .fm-bar .btn-group { margin: 0 6px 6px 0; }
+ #fm .breadcrumb { margin-bottom: 10px; }
+ #fm table { margin-bottom: 0; }
+ #fm td.fm-check, #fm th.fm-check { width: 30px; text-align: center; }
+ #fm td.fm-name { word-break: break-all; }
+ #fm td.fm-name i { width: 20px; text-align: center; margin-right: 6px; }
+ #fm td.fm-name a { cursor: pointer; }
+ #fm td.fm-num, #fm th.fm-num { text-align: right; white-space: nowrap; }
+ #fm td.fm-meta { white-space: nowrap; color: #777; font-family: Menlo, Consolas, monospace; font-size: 12px; }
+ #fm tr.fm-sel { background: #eaf3fb; }
+ #fm tr.fm-cut td.fm-name { opacity: .45; }
+ #fm .fm-muted { color: #999; }
+ #fm .fm-empty { padding: 30px; text-align: center; color: #999; }
+ #fm .fm-drop { outline: 2px dashed #337ab7; outline-offset: -6px; background: #f5faff; }
+ #fm .fm-up { margin-bottom: 6px; }
+ #fm .fm-up .progress { margin: 2px 0 0; height: 8px; }
+ #fm .fm-up small { color: #777; }
+ #fm .fm-count { line-height: 30px; color: #777; margin-left: 4px; }
+</style>
+
+<div class="row" id="fm">
+ <div class="col-lg-12">
+  <div class="panel panel-default" id="fm-panel">
+   <div class="panel-body">
+
+    <div id="fm-msg"></div>
+
+    <div class="fm-bar">
+     <div class="btn-group">
+      <button type="button" class="btn btn-default btn-sm" id="fm-up" title="<%= $TEXT->{'files_up'} %>"><i class="fa fa-turn-up"></i></button>
+      <button type="button" class="btn btn-default btn-sm" id="fm-refresh" title="<%= $TEXT->{'files_refresh'} %>"><i class="fa fa-rotate"></i></button>
+     </div>
+     <div class="btn-group">
+      <button type="button" class="btn btn-default btn-sm" id="fm-mkdir"><i class="fa fa-folder"></i> <%= $TEXT->{'files_new_folder'} %></button>
+      <button type="button" class="btn btn-default btn-sm" id="fm-upload"><i class="fa fa-upload"></i> <%= $TEXT->{'files_upload'} %></button>
+     </div>
+     <div class="btn-group">
+      <button type="button" class="btn btn-default btn-sm" id="fm-copy"><i class="fa fa-copy"></i> <%= $TEXT->{'files_copy'} %></button>
+      <button type="button" class="btn btn-default btn-sm" id="fm-cut"><i class="fa fa-scissors"></i> <%= $TEXT->{'files_cut'} %></button>
+      <button type="button" class="btn btn-default btn-sm" id="fm-paste"><i class="fa fa-paste"></i> <%= $TEXT->{'files_paste'} %> <span class="badge" id="fm-clip"></span></button>
+     </div>
+     <div class="btn-group">
+      <button type="button" class="btn btn-default btn-sm" id="fm-rename"><i class="fa fa-pencil"></i> <%= $TEXT->{'files_rename'} %></button>
+      <button type="button" class="btn btn-danger btn-sm" id="fm-delete"><i class="fa fa-trash"></i> <%= $TEXT->{'files_delete'} %></button>
+     </div>
+     <span class="fm-count" id="fm-count"></span>
+    </div>
+
+    <ol class="breadcrumb" id="fm-crumbs"></ol>
+
+    <div id="fm-uploads"></div>
+
+    <div class="table-responsive">
+     <table class="table table-hover">
+      <thead>
+       <tr>
+        <th class="fm-check"><input type="checkbox" id="fm-all"></th>
+        <th><%= $TEXT->{'files_name'} %></th>
+        <th class="fm-num"><%= $TEXT->{'files_size'} %></th>
+        <th><%= $TEXT->{'files_modified'} %></th>
+        <th><%= $TEXT->{'files_owner'} %></th>
+        <th><%= $TEXT->{'files_permissions'} %></th>
+       </tr>
+      </thead>
+      <tbody id="fm-rows"></tbody>
+     </table>
+    </div>
+    <div class="fm-empty" id="fm-empty" style="display:none"></div>
+
+    <input type="file" id="fm-file" multiple style="display:none">
+   </div>
+  </div>
+ </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var S     = <%== Mojo::JSON::to_json(\%strings) %>;
+  var CSRF  = <%== Mojo::JSON::to_json($csrf) %>;
+  var CHUNK = <%= $chunk_size %>;
+  var URL_  = '/<%= $addon->{program} %>';
+
+  var cwd = [];            // current folder, as path components
+  var entries = [];        // its listing
+  var writable = false;    // may the signed-in account change things here?
+  var protectedDir = true; // above the inside of a volume: read-only by design
+  var sel = {};            // selected names
+  var clip = null;         // { mode: 'copy' | 'cut', items: [paths], from: path }
+  var busy = false;
+
+  function $(id) { return document.getElementById(id); }
+  function t(key) { return S['files_' + key] || key; }
+  function rel(parts) { return parts.join('/'); }
+  function pathOf(name) { return rel(cwd.concat([name])); }
+  function selected() { return Object.keys(sel); }
+
+  // Everything that comes from the filesystem goes into the page as text
+  // nodes, never as markup: a file may be named <img onerror=...>.
+  function el(tag, attrs, children) {
+    var n = document.createElement(tag), k;
+    for (k in (attrs || {})) {
+      if (k === 'text') n.textContent = attrs[k];
+      else if (k === 'on') { for (var ev in attrs.on) n.addEventListener(ev, attrs.on[ev]); }
+      else n.setAttribute(k, attrs[k]);
+    }
+    (children || []).forEach(function (c) { n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return n;
+  }
+
+  function msg(text, kind) {
+    var box = $('fm-msg');
+    box.textContent = '';
+    if (!text) return;
+    var close = el('button', { type: 'button', 'class': 'close', text: '×', on: { click: function () { box.textContent = ''; } } });
+    box.appendChild(el('div', { 'class': 'alert alert-' + (kind || 'danger') }, [close, text]));
+  }
+  function errText(code) { return S['files_err_' + code] || t('err_failed'); }
+
+  // What a batch operation answered: say what failed and why, by name.
+  function report(res, okKey) {
+    if (res.failed && res.failed.length) {
+      var parts = res.failed.map(function (f) { return f.name + ' (' + errText(f.error) + ')'; });
+      msg(t('some_failed') + ' ' + parts.join(', '));
+    } else if (!res.ok) {
+      msg(errText(res.error));
+    } else if (okKey) {
+      msg(t(okKey), 'success');
+    }
+  }
+
+  function parse(r) {
+    var type = r.headers.get('content-type') || '';
+    // Signed out meanwhile: the request was redirected to the login page.
+    if (type.indexOf('json') < 0) { location.reload(); throw new Error('signed out'); }
+    return r.json();
+  }
+  function qs(params) {
+    var p = new URLSearchParams();
+    Object.keys(params).forEach(function (k) {
+      [].concat(params[k]).forEach(function (v) { p.append(k, v); });
+    });
+    return p;
+  }
+  function get(action, params) {
+    params.action = action;
+    return fetch(URL_ + '?' + qs(params), { credentials: 'same-origin' }).then(parse);
+  }
+  function post(action, params, body) {
+    var q = { action: action }, opts;
+    if (body === undefined) {
+      params.action = action;
+      opts = { method: 'POST', body: qs(params) };
+      q = null;
+    } else {
+      Object.keys(params).forEach(function (k) { q[k] = params[k]; });
+      opts = { method: 'POST', body: body, headers: { 'Content-Type': 'application/octet-stream' } };
+    }
+    opts.credentials = 'same-origin';
+    opts.headers = opts.headers || {};
+    opts.headers['X-CSRF-Token'] = CSRF;
+    return fetch(URL_ + (q ? '?' + qs(q) : ''), opts).then(parse);
+  }
+
+  function size(n) {
+    if (n < 1024) return n + ' B';
+    var u = ['KB', 'MB', 'GB', 'TB', 'PB'], i = -1;
+    do { n /= 1024; i++; } while (n >= 1024 && i < u.length - 1);
+    return (n < 10 ? n.toFixed(1) : Math.round(n)) + ' ' + u[i];
+  }
+  function when(sec) {
+    var d = new Date(sec * 1000);
+    function p(x) { return (x < 10 ? '0' : '') + x; }
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  // ------------------------------------------------------------ rendering
+  function crumbs() {
+    var ol = $('fm-crumbs');
+    ol.textContent = '';
+    function link(label, parts, icon) {
+      var kids = icon ? [el('i', { 'class': 'fa ' + icon }), ' ' + label] : [label];
+      return el('li', {}, [el('a', { href: '#', on: { click: function (e) { e.preventDefault(); go(parts); } } }, kids)]);
+    }
+    if (!cwd.length) { ol.appendChild(el('li', { 'class': 'active' }, [el('i', { 'class': 'fa fa-hard-drive' }), ' ' + t('volumes')])); return; }
+    ol.appendChild(link(t('volumes'), [], 'fa-hard-drive'));
+    cwd.forEach(function (c, i) {
+      if (i === cwd.length - 1) ol.appendChild(el('li', { 'class': 'active', text: c }));
+      else ol.appendChild(link(c, cwd.slice(0, i + 1)));
+    });
+  }
+
+  function icon(e) {
+    if (!e.readable) return 'fa-lock fm-muted';
+    if (e.type === 'dir') return 'fa-folder';
+    if (e.type === 'file') return 'fa-file';
+    return 'fa-question fm-muted';
+  }
+
+  function rows() {
+    var body = $('fm-rows');
+    body.textContent = '';
+    var cut = {};
+    if (clip && clip.mode === 'cut' && clip.from === rel(cwd)) clip.names.forEach(function (n) { cut[n] = 1; });
+
+    entries.sort(function (a, b) {
+      if ((a.type === 'dir') !== (b.type === 'dir')) return a.type === 'dir' ? -1 : 1;
+      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+    });
+
+    entries.forEach(function (e) {
+      var box = el('input', { type: 'checkbox' });
+      box.checked = !!sel[e.name];
+      box.disabled = !!e.badname;
+      box.addEventListener('change', function () {
+        if (box.checked) sel[e.name] = 1; else delete sel[e.name];
+        tr.className = rowClass();
+        toolbar();
+      });
+
+      var label;
+      if (e.badname) {
+        label = el('span', { 'class': 'fm-muted', title: t('bad_name'), text: e.name });
+      } else if (e.type === 'dir' && e.readable) {
+        label = el('a', { href: '#', text: e.name, on: { click: function (ev) { ev.preventDefault(); go(cwd.concat([e.name])); } } });
+      } else if (e.type === 'file' && e.readable) {
+        label = el('a', { href: URL_ + '?' + qs({ action: 'download', path: pathOf(e.name) }), title: t('download'), text: e.name });
+      } else {
+        label = el('span', { 'class': 'fm-muted', title: t('no_access'), text: e.name });
+      }
+
+      function rowClass() { return (sel[e.name] ? 'fm-sel ' : '') + (cut[e.name] ? 'fm-cut' : ''); }
+      var tr = el('tr', { 'class': rowClass() }, [
+        el('td', { 'class': 'fm-check' }, [box]),
+        el('td', { 'class': 'fm-name' }, [el('i', { 'class': 'fa ' + icon(e) }), label]),
+        el('td', { 'class': 'fm-num', text: e.type === 'file' ? size(e.size) : '' }),
+        el('td', { 'class': 'fm-meta', text: when(e.mtime) }),
+        el('td', { 'class': 'fm-meta', text: e.owner + ':' + e.group }),
+        el('td', { 'class': 'fm-meta', text: e.mode })
+      ]);
+      body.appendChild(tr);
+    });
+
+    var empty = $('fm-empty');
+    empty.style.display = entries.length ? 'none' : '';
+    empty.textContent = entries.length ? '' : t('empty');
+    $('fm-all').checked = false;
+  }
+
+  function toolbar() {
+    var n = selected().length;
+    var change = writable && !busy;
+    $('fm-up').disabled = !cwd.length;
+    $('fm-mkdir').disabled = !change;
+    $('fm-upload').disabled = !change;
+    $('fm-copy').disabled = !n || busy;
+    $('fm-cut').disabled = !n || !change;
+    $('fm-paste').disabled = !clip || !change;
+    $('fm-rename').disabled = n !== 1 || !change;
+    $('fm-delete').disabled = !n || !change;
+    $('fm-clip').textContent = clip ? clip.items.length : '';
+    var note = n ? t('selected').replace('%d', n)
+             : protectedDir ? t('protected_note')
+             : !writable ? t('read_only_note') : '';
+    $('fm-count').textContent = note;
+  }
+
+  function render() { crumbs(); rows(); toolbar(); }
+
+  // ------------------------------------------------------------ navigation
+  function load(keepMsg) {
+    if (!keepMsg) msg('');
+    return get('list', { path: rel(cwd) }).then(function (res) {
+      if (!res.ok) {
+        entries = []; writable = false; protectedDir = true;
+        msg(errText(res.error));
+      } else {
+        entries = res.entries; writable = !!res.writable; protectedDir = !!res.protected;
+      }
+      // Keep only selections that still exist.
+      var have = {};
+      entries.forEach(function (e) { have[e.name] = 1; });
+      Object.keys(sel).forEach(function (k) { if (!have[k]) delete sel[k]; });
+      render();
+    }).catch(function () {});
+  }
+  function fromHash() {
+    var h = location.hash.replace(/^#\/?/, '');
+    cwd = h ? h.split('/').filter(Boolean).map(decodeURIComponent) : [];
+    sel = {};
+    load();
+  }
+  function go(parts) {
+    var h = '#/' + parts.map(encodeURIComponent).join('/');
+    if (location.hash === h) fromHash(); else location.hash = h;
+  }
+  window.addEventListener('hashchange', fromHash);
+
+  // Run one change, then show the folder as it now is.
+  function act(promise, okKey) {
+    busy = true; toolbar();
+    return promise.then(function (res) {
+      busy = false;
+      return load(true).then(function () { report(res, okKey); return res; });
+    }).catch(function () { busy = false; toolbar(); });
+  }
+
+  // ------------------------------------------------------------ actions
+  $('fm-up').addEventListener('click', function () { go(cwd.slice(0, -1)); });
+  $('fm-refresh').addEventListener('click', function () { load(); });
+  $('fm-all').addEventListener('change', function () {
+    sel = {};
+    if (this.checked) entries.forEach(function (e) { if (!e.badname) sel[e.name] = 1; });
+    rows(); $('fm-all').checked = selected().length > 0; toolbar();
+  });
+
+  $('fm-mkdir').addEventListener('click', function () {
+    var name = prompt(t('new_folder_prompt'), '');
+    if (!name) return;
+    act(post('mkdir', { path: rel(cwd), name: name }));
+  });
+
+  $('fm-rename').addEventListener('click', function () {
+    var old = selected()[0];
+    var name = prompt(t('rename_prompt'), old);
+    if (!name || name === old) return;
+    sel = {};
+    act(post('rename', { path: pathOf(old), name: name }));
+  });
+
+  $('fm-delete').addEventListener('click', function () {
+    var names = selected();
+    var q = names.length === 1 ? t('delete_one').replace('%s', names[0]) : t('delete_many').replace('%d', names.length);
+    if (!confirm(q)) return;
+    sel = {};
+    act(post('delete', { item: names.map(pathOf) }));
+  });
+
+  function toClip(mode) {
+    var names = selected();
+    clip = { mode: mode, from: rel(cwd), names: names, items: names.map(pathOf) };
+    sel = {};
+    rows(); toolbar();
+  }
+  $('fm-copy').addEventListener('click', function () { toClip('copy'); });
+  $('fm-cut').addEventListener('click', function () { toClip('cut'); });
+
+  $('fm-paste').addEventListener('click', function () {
+    if (!clip) return;
+    var c = clip;
+    if (c.mode === 'cut') clip = null;      // a move happens once
+    act(post(c.mode === 'cut' ? 'move' : 'copy', { path: rel(cwd), item: c.items }));
+  });
+
+  // ------------------------------------------------------------ upload
+  // A file goes up in chunks, one request each, so its size is not bounded by
+  // any request limit and nothing large is ever held in the server's memory.
+  // The server appends them to a hidden part file and only gives the file its
+  // name once it is complete.
+  function uploadOne(file, dir, row) {
+    var bar = row.querySelector('.progress-bar'), note = row.querySelector('small');
+    function progress(done) {
+      var pct = file.size ? Math.floor(done * 100 / file.size) : 100;
+      bar.style.width = pct + '%';
+      note.textContent = size(done) + ' / ' + size(file.size);
+    }
+    function send(offset, overwrite) {
+      var blob = file.slice(offset, offset + CHUNK);
+      return post('upload', { path: dir, name: file.name, offset: offset, total: file.size, overwrite: overwrite ? 1 : 0 }, blob)
+        .then(function (res) {
+          if (res.ok) {
+            progress(res.size);
+            return res.done ? true : send(res.size, overwrite);
+          }
+          if (res.error === 'exists' && !overwrite) {
+            if (confirm(t('overwrite').replace('%s', file.name))) return send(0, true);
+            note.textContent = t('skipped');
+            return false;
+          }
+          // The server has a different amount than we thought: carry on from there.
+          if (res.error === 'offset' && typeof res.have === 'number' && res.have < file.size) return send(res.have, overwrite);
+          throw new Error(errText(res.error));
+        });
+    }
+    progress(0);
+    return send(0, false);
+  }
+
+  function upload(files) {
+    files = [].slice.call(files);
+    if (!files.length || !writable) return;
+    var dir = rel(cwd), box = $('fm-uploads'), failed = [];
+    busy = true; toolbar();
+    var chain = Promise.resolve();
+    files.forEach(function (file) {
+      var row = el('div', { 'class': 'fm-up' }, [
+        el('span', { text: file.name + ' ' }), el('small', {}),
+        el('div', { 'class': 'progress' }, [el('div', { 'class': 'progress-bar', style: 'width:0' })])
+      ]);
+      box.appendChild(row);
+      chain = chain.then(function () {
+        return uploadOne(file, dir, row).then(function () {
+          row.querySelector('.progress-bar').className = 'progress-bar progress-bar-success';
+        }, function (err) {
+          row.querySelector('.progress-bar').className = 'progress-bar progress-bar-danger';
+          row.querySelector('small').textContent = err.message;
+          failed.push(file.name + ' (' + err.message + ')');
+        });
+      });
+    });
+    chain.then(function () {
+      busy = false;
+      load(true).then(function () {
+        if (failed.length) msg(t('some_failed') + ' ' + failed.join(', '));
+        else setTimeout(function () { box.textContent = ''; }, 2500);
+      });
+    });
+  }
+
+  $('fm-upload').addEventListener('click', function () { $('fm-file').click(); });
+  $('fm-file').addEventListener('change', function () { upload(this.files); this.value = ''; });
+
+  // Drop files onto the listing to upload them here.
+  var panel = $('fm-panel'), depth = 0;
+  function hasFiles(e) { return e.dataTransfer && [].indexOf.call(e.dataTransfer.types || [], 'Files') >= 0; }
+  panel.addEventListener('dragenter', function (e) { if (!hasFiles(e)) return; e.preventDefault(); depth++; if (writable) panel.classList.add('fm-drop'); });
+  panel.addEventListener('dragover', function (e) { if (hasFiles(e)) e.preventDefault(); });
+  panel.addEventListener('dragleave', function (e) { if (!hasFiles(e)) return; if (--depth <= 0) { depth = 0; panel.classList.remove('fm-drop'); } });
+  panel.addEventListener('drop', function (e) {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); depth = 0; panel.classList.remove('fm-drop');
+    if (!writable) { msg(protectedDir ? t('protected_note') : t('read_only_note')); return; }
+    // A dropped folder arrives as an unreadable pseudo-file; leave those out.
+    var files = [], items = e.dataTransfer.items || [];
+    [].forEach.call(e.dataTransfer.files, function (f, i) {
+      var entry = items[i] && items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
+      if (entry && entry.isDirectory) { msg(t('no_folder_upload')); return; }
+      files.push(f);
+    });
+    upload(files);
+  });
+
+  fromHash();
+})();
+</script>

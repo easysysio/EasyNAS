@@ -1,0 +1,10 @@
+<addon>
+ <name>files</name>
+ <description>files</description>
+ <version>1.0.0</version>
+ <author>Yariv Hakim</author>
+ <icon>fa-folder-open</icon>
+ <type>sharing</type>
+ <program>files</program>
+ <access>user</access>
+</addon>

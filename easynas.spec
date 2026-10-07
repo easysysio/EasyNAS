@@ -64,6 +64,7 @@ cat > %{buildroot}/etc/easynas/addons/easynas.addons << 'EOF'
 <search-result version="0.0">
 <solvable-list>
 <solvable status="installed" name="easynas" summary="Network Attached Storage" kind="package"/>
+<solvable status="not-installed" name="easynas-fs-files" summary="File Manager addon for EasyNAS" kind="package"/>
 <solvable status="not-installed" name="easynas-fs-ftp" summary="FTP addon for EasyNAS" kind="package"/>
 <solvable status="not-installed" name="easynas-fs-nfs" summary="NFS addon for EasyNAS" kind="package"/>
 <solvable status="not-installed" name="easynas-fs-rsyncd" summary="RSyncd addon for EasyNAS" kind="package"/>
@@ -373,6 +374,32 @@ TFTP addon for EasyNAS
 /easynas/lang/pt-br/lang_brazilian_portuguese_tftp.pl
 /easynas/lang/zh-cn/lang_chinese_tftp.pl
 /easynas/lang/pl-pl/lang_polish_tftp.pl
+
+
+##### File Manager ####
+# setpriv (util-linux) drops to the signed-in NAS account; cp/mv/rm (coreutils)
+# do the recursive work with GNU options.
+%package        fs-files
+Version:        %{version}
+Release:        1
+Summary:        File Manager addon for EasyNAS
+Group:          easynas/addon
+Requires:       easynas >= %{version}
+Requires:       util-linux
+Requires:       coreutils
+
+%description fs-files
+Web file manager addon for EasyNAS: browse the volumes, download, upload,
+copy, move, rename and delete from the browser. NAS users sign in with their
+own account and act with its permissions.
+
+%files fs-files
+/easynas/addons/files.easynas
+/easynas/lib/EasyNAS/Controller/files.pm
+/easynas/lib/EasyNAS/files-helper.pl
+/easynas/templates/easynas/files.html.ep
+/easynas/templates/easynas/files_user.html.ep
+/easynas/lang/en-en/lang_english_files.pl
 
 
 ##### FTP ####
@@ -756,6 +783,14 @@ Polish Language for EasyNAS
     computers page, the samba-tool paths in Users/Groups). Users and groups are
     local accounts only while the core is stabilized; the design stays in
     docs/identity-design.md and the removal is one commit to revert.
+  - Security: session cookies are signed with a secret generated on each
+    appliance (/etc/easynas/session.secret) instead of one fixed value shipped
+    in easy_n_a_s.yml, with which anyone could forge an administrator session
+  - File Manager add-on (easynas-fs-files): browse the volumes in the browser;
+    download, upload (chunked, any size), copy, move, rename, delete, create
+    and remove folders. NAS users can sign in to it with their own account and
+    are confined to it; every operation runs as the signed-in Linux account,
+    so ownership and permission bits decide what each person may do
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

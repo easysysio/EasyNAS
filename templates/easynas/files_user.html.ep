@@ -1,0 +1,37 @@
+% # The frame a NAS user gets around the file manager: a title bar with their
+% # name and a sign-out link, and nothing of the administration interface.
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>EasyNAS - <%= $TEXT->{$addon->{'description'}} %></title>
+        <link href="/css/bootstrap.min.css" rel="stylesheet">
+        <link href="/fonts/css/fontawesome.css" rel="stylesheet" />
+        <link href="/fonts/css/solid.css" rel="stylesheet" />
+        <link href="/fonts/css/v4-font-face.css" rel="stylesheet" />
+        <style>
+         body { padding-top: 70px; background: #f8f8f8; }
+         .navbar-text a { color: #9d9d9d; }
+         .navbar-text a:hover { color: #fff; text-decoration: none; }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+            <div class="container-fluid">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="/<%= $addon->{'program'} %>">EasyNAS</a>
+                    <p class="navbar-text"><i class="fa <%= $addon->{'icon'} %>"></i> <%= $TEXT->{$addon->{'description'}} %></p>
+                </div>
+                <p class="navbar-text navbar-right" style="margin-right:15px">
+                    <i class="fa fa-user fa-fw"></i> <%= $username %>
+                    &nbsp;&nbsp;<a href="/logout"><i class="fa fa-right-from-bracket fa-fw"></i> <%= $TEXT->{'files_sign_out'} %></a>
+                </p>
+            </div>
+        </nav>
+        <div class="container-fluid">
+            <%= content %>
+        </div>
+    </body>
+</html>
