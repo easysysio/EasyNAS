@@ -641,6 +641,7 @@ sub get_addons
     my $addon_secrets;
     my $addon_service;
     my $addon_program;
+    my $addon_access;
 
     # Serve from cache while the addon dir is unchanged (see %addons_cache).
     my $mtime = (stat($addons_dir))[9];
@@ -666,6 +667,7 @@ sub get_addons
             $addon_secrets="";
             $addon_service="";
             $addon_program="";
+            $addon_access="";
 	    open(FR, "$addons_dir/$file") or die $!;
 	    while ($line = <FR>)
 	    {
@@ -750,6 +752,14 @@ sub get_addons
 		    $addon_service = substr($addon_service, 1);
 		    chop($addon_service);
 		}
+		### who may open it: "user" = signed-in NAS users too (the file
+		### manager); anything else, or nothing, = the administrator only
+		if ($line =~ /<access>/i)
+		{
+		    $addon_access = $line;
+		    $addon_access =~ s|<.?access>||g;
+		    $addon_access =~ s/^\s+|\s+$//g;
+		}
                 if ($line =~ /<enable>/i)
 		{
  		    $addon_enable = $line;
@@ -759,7 +769,7 @@ sub get_addons
  		}
 	    }
 	    ### push collected infos in %addons
-   	     $addons{$addon_name}={enable=>$addon_enable, name=>$addon_name, description=>$addon_description, icon=>$addon_icon, version=>$addon_version, author=>$addon_author, type=>$addon_type, program=>$addon_program, config=>$addon_config, config2=>$addon_config2, clients=>$addon_clients, secrets=>$addon_secrets, service=>$addon_service};
+   	     $addons{$addon_name}={enable=>$addon_enable, name=>$addon_name, description=>$addon_description, icon=>$addon_icon, version=>$addon_version, author=>$addon_author, type=>$addon_type, program=>$addon_program, config=>$addon_config, config2=>$addon_config2, clients=>$addon_clients, secrets=>$addon_secrets, service=>$addon_service, access=>$addon_access};
 
 	    close(FR);
 
@@ -776,6 +786,7 @@ sub get_addons
 	    undef($addon_secrets);
 	    undef($addon_service);
 	    undef($addon_program);
+	    undef($addon_access);
 	}
     }
  closedir(DIR);

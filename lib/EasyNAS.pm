@@ -57,17 +57,38 @@ sub startup ($self) {
     return undef;
   });
 
-  $auth->get('/')->to('dashboard#view');
-  $auth->get('/easynas')->to('dashboard#view');
-  $auth->get('/easynas/firmware.pl')->to('dashboard#view');
-  $auth->get('/firmware')->to('firmware#view');
-  $auth->get('/language')->to('language#view');
-  foreach my $item (keys %addons) {
-	  $auth->get('/'.$addons{$item}{'program'})->to($addons{$item}{'program'}.'#view');
+  # A session is either the administrator's or a NAS user's (role "user", set
+  # by login.pm when the file manager addon lets NAS accounts sign in). A NAS
+  # user reaches only the routes of addons that declare <access>user</access>;
+  # everything else sits behind this second gate. A session without a role
+  # predates roles and can only be the administrator's.
+  my @user_home;
+  my $admin = $auth->under(sub ($c) {
+    return 1 if ($c->session('role') // 'admin') eq 'admin';
+    if (@user_home) { $c->redirect_to($user_home[0]); }
+    else            { $c->render(text => 'Forbidden', status => 403); }
+    return undef;
+  });
 
+  $admin->get('/')->to('dashboard#view');
+  $admin->get('/easynas')->to('dashboard#view');
+  $admin->get('/easynas/firmware.pl')->to('dashboard#view');
+  $admin->get('/firmware')->to('firmware#view');
+  $admin->get('/language')->to('language#view');
+  foreach my $item (sort keys %addons) {
+    my $program = $addons{$item}{'program'};
+    if (($addons{$item}{'access'} // '') eq 'user') {
+      # Open to every signed-in account, and POST as well as GET: these pages
+      # change things through POST requests carrying a CSRF token.
+      $auth->any([qw(GET POST)] => "/$program")->to("$program#view");
+      push @user_home, "/$program";
+    }
+    else {
+      $admin->get("/$program")->to("$program#view");
+    }
   }
   # Cert upload is a multipart POST (a GET can't carry a file).
-  $auth->post('/settings')->to('settings#view');
+  $admin->post('/settings')->to('settings#view');
 }
 
 1;

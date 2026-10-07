@@ -63,13 +63,60 @@ sub login ($self) {
     $result="success";
     $self->session(is_auth => 1);
     $self->session(user => $user);
+    $self->session(role => 'admin');
     $self->redirect_to('/');
+  }
+  # Not the administrator: a NAS account may sign in when an installed addon
+  # is open to NAS users (the file manager). Its session carries role "user",
+  # which the router confines to that addon -- see EasyNAS.pm.
+  elsif ( ($user ne $auth_user) && (my $home = user_home()) && nas_user_ok($user, $pass) ) {
+    $result="success";
+    $self->session(is_auth => 1);
+    $self->session(user => $user);
+    $self->session(role => 'user');
+    write_log("login","INFO","NAS user $user signed in");
+    $self->redirect_to($home);
   }
   else {
     $result="failed";
     $msg="Bad Username or Password";
   }
   return;
+}
+
+# The page a NAS user lands on: the first enabled addon that declares
+# <access>user</access>. Empty when there is none, and then no NAS account can
+# sign in at all.
+sub user_home {
+  my %addons = get_addons();
+  foreach my $name (sort keys %addons) {
+    next unless ($addons{$name}{access} // '') eq 'user';
+    next if ($addons{$name}{enable} // '') eq 'false';
+    return '/'.$addons{$name}{program};
+  }
+  return '';
+}
+
+# Check a NAS account's password against its /etc/shadow hash, the same way
+# the admin's is checked against admin.conf. Only ordinary accounts -- the uid
+# range the Users page manages -- and only ones with a real password: a locked
+# ("!", "*") or empty entry never matches.
+sub nas_user_ok ($user, $pass) {
+  return 0 unless defined $user && $user =~ /^[A-Za-z_][A-Za-z0-9_.-]{0,31}$/;
+  return 0 unless defined $pass && $pass ne '';
+  return 0 if $user eq 'easynas' || $user eq 'nobody';
+  my @pw = getpwnam($user);
+  return 0 unless @pw && $pw[2] >= 1000 && $pw[2] < 65000;
+  # List form, no shell; the name was validated above.
+  open(my $sh, '-|', '/usr/bin/sudo', '-n', '/usr/bin/getent', 'shadow', $user) or return 0;
+  my $line = <$sh>;
+  close($sh);
+  return 0 unless defined $line;
+  chomp $line;
+  my ($name, $stored) = split(/:/, $line);
+  return 0 unless defined $name && $name eq $user && defined $stored && $stored =~ /^\$/;
+  my $hash = crypt($pass, $stored);
+  return (defined $hash && ct_eq($hash, $stored)) ? 1 : 0;
 }
 
 # Read "<user>:<hash>" from admin.conf; returns (undef,undef) if unreadable.
