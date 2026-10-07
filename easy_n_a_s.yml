@@ -1,3 +1,4 @@
 ---
-secrets:
-  - 780fd71980d75700f7e3ae04af5b52aa46e97212
+# Session secrets are NOT configured here: each appliance generates its own on
+# first start and keeps it in /etc/easynas/session.secret (see lib/EasyNAS.pm).
+name: EasyNAS

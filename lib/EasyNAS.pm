@@ -3,6 +3,33 @@ use lib '/easynas/lib/EasyNAS/Controller';
 use Mojo::Base 'Mojolicious', -signatures;
 use easynas;
 
+my $secret_file = '/etc/easynas/session.secret';
+
+# The secret that signs session cookies. Whoever knows it can mint a cookie
+# saying "is_auth", so it has to be unique to this appliance and never leave
+# it: generated from the kernel RNG on first start and kept on the config
+# layer (0600, owned by the service user), which persists across OS updates.
+# It used to be a fixed value in easy_n_a_s.yml -- the same on every appliance
+# and published with the source.
+sub session_secret {
+  if (open(my $fh, '<', $secret_file)) {
+    my $s = <$fh>;
+    close $fh;
+    if (defined $s) { chomp $s; return $s if length($s) >= 32; }
+  }
+  open(my $rnd, '<:raw', '/dev/urandom') or die "session secret: /dev/urandom: $!";
+  my $n = read($rnd, my $bytes, 32);
+  close $rnd;
+  die "session secret: short read from /dev/urandom" unless defined $n && $n == 32;
+  my $s = unpack('H*', $bytes);
+  # If the config layer can't be written the secret still works, for this
+  # process only: sessions end at the next restart instead of surviving it.
+  my $old = umask 0077;
+  if (open(my $out, '>', $secret_file)) { print $out "$s\n"; close $out; }
+  umask $old;
+  return $s;
+}
+
 # This method will run once at server start
 sub startup ($self) {
 
@@ -10,11 +37,11 @@ sub startup ($self) {
   my $config = $self->plugin('NotYAMLConfig');
 
   # Configure the application
-  $self->secrets($config->{secrets});
+  $self->secrets([session_secret()]);
 
   # Router
   my $r = $self->routes;
-  
+
   my %addons=get_addons();
 
   # Login/logout are reachable without a session.
