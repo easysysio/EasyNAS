@@ -22,6 +22,16 @@ my %addon_icon = (
  radius  => "fa-circle",            iscsi  => "fa-external-link",
 );
 
+# Flag per language add-on, keyed by its package name (easynas-lang-<name>).
+# The images ship with the core package in public/images, so a language that
+# isn't installed yet gets its flag too. Each lang/*/iso.txt names the same
+# image, but under the language's display name ("Simplified Chinese"), which
+# doesn't match the package name.
+my %lang_flag = (
+ german     => "flag_germany.png", polish  => "flag_poland.png",
+ portuguese => "flag_brasil.png",  chinese => "flag_china.png",
+);
+
 
 
 sub view ($self) {
@@ -65,12 +75,6 @@ sub view ($self) {
  my %upd=addon_updates();                # package -> new version (from easynas.updates)
  my @updates;                            # addons with an available update
  my %by_cat;                             # category -> [addon tiles]
- # Flag image per installed language (keyed by lower-cased name), so language
- # addons render their country flag instead of a generic icon.
- my %lang_flag;
- foreach my $l (get_lang_list()) {
-  $lang_flag{lc $l->{name}} = $l->{flag} if ($l->{flag});
- }
  foreach my $package (sort keys %addons) {
   my ($name,$group,$desc,$status,$ver)=@{$addons{$package}};
   my $installed=(defined $status && $status eq "up-to-date") ? 1 : 0;
@@ -85,8 +89,8 @@ sub view ($self) {
   # text (main catalog -- present even when the addon isn't installed, and
   # the same text its own page shows) over the terse zypper summary.
   $desc=$TEXT{"about_$name"} if (defined $TEXT{"about_$name"} && $TEXT{"about_$name"} ne "");
-  # A language addon shows its country flag image when we know it (installed).
-  my $flag=($group eq "lang") ? ($lang_flag{lc $name} // "") : "";
+  # A language addon shows its country flag (dimmed until installed).
+  my $flag=($group eq "lang") ? ($lang_flag{$name} // "") : "";
   # Category = the package group code (fs/mm/srv/stg/lang); the template maps it
   # to a friendly label (File Sharing / Multimedia / Service / Storage).
   my $cat = $group;
