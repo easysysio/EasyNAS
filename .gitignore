@@ -3,3 +3,6 @@
 
 # macOS Finder metadata
 .DS_Store
+
+# Old EasyNAS v1 code, kept locally for reference
+/easynasv1/
