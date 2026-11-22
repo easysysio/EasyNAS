@@ -591,6 +591,15 @@ sub get_lang_text
 	}
     }
     close(DIR);
+
+    # The language files are UTF-8 but are read as bytes (they have no "use
+    # utf8"), and Mojolicious encodes what a page outputs as UTF-8, so every
+    # letter outside ASCII went out encoded twice and showed as two or three
+    # garbage characters. Decode each string once; strings from files loaded
+    # on an earlier call (require loads a file only once) are already text.
+    foreach my $v (values %TEXT) {
+	utf8::decode($v) unless utf8::is_utf8($v);
+    }
     return(%TEXT);
 }
 
