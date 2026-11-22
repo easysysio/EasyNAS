@@ -38,7 +38,30 @@ sub view ($self) {
   if (!($self->session('is_auth'))) {
         $self->redirect_to('login');
   }
-  my $action=$self->param('action'); 
+  my $action=$self->param('action') // "";
+
+  # Progress for the update banner every page shows while the queue runs (see
+  # layouts/default.html.ep): a percentage from zypper's step counters in
+  # update.log -- "Retrieving package ... (n/m)" is the download half (0-50%),
+  # "( n/m) Installing:" the install half (50-100%). The worker appends to the
+  # log, so the last counters in it are the running op's.
+  if ($action eq "progress") {
+    my $state = get_update_state();
+    my ($pct,$phase) = (0,"");
+    if ($state eq "updating") {
+      my $log = `/usr/bin/sudo /bin/cat /var/log/easynas/update.log 2>/dev/null`;
+      my ($r_n,$r_m,$i_n,$i_m);
+      while ($log =~ /Retrieving(?: package)?:?\s+\S+\s+\(\s*(\d+)\/(\d+)\)/g) { ($r_n,$r_m)=($1,$2); }
+      while ($log =~ /\(\s*(\d+)\/(\d+)\)\s+Installing:/g)                    { ($i_n,$i_m)=($1,$2); }
+      if    (defined $i_n && $i_m) { $pct = 50 + int($i_n / $i_m * 50); $phase = "installing";  }
+      elsif (defined $r_n && $r_m) { $pct = int($r_n / $r_m * 50);      $phase = "downloading"; }
+      else                         { $pct = 3;                          $phase = "preparing";   }
+      $pct = 99 if ($pct > 99);   # 100% only when the state flips off "updating"
+    }
+    $self->render(json => { state => $state, percent => $pct, phase => $phase });
+    return;
+  }
+
   $msg="";
   $result="";
   $self->stash( addon => $addon,

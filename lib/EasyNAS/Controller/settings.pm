@@ -11,7 +11,7 @@ my $addon = get_addon_info("settings");
 my %TEXT=get_lang_text($addon->{'name'});
 
 # The two EasyNAS update channels. Exactly one is configured at a time, under
-# these aliases: firmware.pm, addons.pm, check_update.pl and addon-worker.sh
+# these aliases: addons.pm, check_update.pl and addon-worker.sh
 # all pick the active channel by looking for the EasyNAS_Beta alias, and the
 # image (KIWI) bakes in the same ones.
 my %CHANNEL = (

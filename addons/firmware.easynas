@@ -1,8 +1,0 @@
-<addons>
- <name>firmware</name>
- <description>firmware</description>
- <version>1.2.0</version>
- <author>Yariv Hakim</author>
- <icon>fa-cloud-download</icon>
- <program>firmware</program>
-</addons>

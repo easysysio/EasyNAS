@@ -876,8 +876,8 @@ sub addons_info
  return(%addons);
 }
 
-# Background system-update state ("updating" / "ready" / "failed: ..."), written
-# by firmware.pm's zypper dup. Read by the layout so every page shows a banner.
+# "updating" while the add-on install/update queue runs (startup/addon-worker.sh
+# writes it), else "". Read by the layout so every page shows a banner.
 sub get_update_state
 {
   open(my $fh, '<', $conf_dir."/update.status") or return "";

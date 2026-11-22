@@ -119,7 +119,7 @@
           <%= ($TEXT->{'settings_channel_testing_help'} || 'preview builds with the newest changes; may have bugs') %>
          </label>
         </div>
-        <span class="help-block"><small><%= ($TEXT->{'settings_channel_help'} || 'Where EasyNAS and its add-ons are updated from. Changing the channel installs nothing; updates from the new channel show up under Firmware and Add-ons. Going back to Stable keeps the newer testing versions until Stable catches up.') %></small></span>
+        <span class="help-block"><small><%= ($TEXT->{'settings_channel_help'} || 'Where EasyNAS and its add-ons are updated from. Changing the channel installs nothing; updates from the new channel show up under Add-ons. Going back to Stable keeps the newer testing versions until Stable catches up.') %></small></span>
        </div>
        <div class="panel-footer">
         <center>

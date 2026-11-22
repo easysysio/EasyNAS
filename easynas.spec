@@ -279,7 +279,6 @@ EOF
 /easynas/addons/users.easynas
 /easynas/addons/volume.easynas
 /easynas/addons/sync.easynas
-/easynas/addons/firmware.easynas
 /easynas/addons/power.easynas
 /easynas/addons/logs.easynas
 /easynas/addons/settings.easynas
@@ -295,7 +294,6 @@ EOF
 /easynas/lib/EasyNAS/Controller/users.pm
 /easynas/lib/EasyNAS/Controller/profile.pm
 /easynas/lib/EasyNAS/Controller/groups.pm
-/easynas/lib/EasyNAS/Controller/firmware.pm
 /easynas/lib/EasyNAS/Controller/network.pm
 /easynas/lib/EasyNAS/Controller/settings.pm
 /easynas/lib/EasyNAS/Controller/power.pm
@@ -312,7 +310,6 @@ EOF
 /easynas/templates/easynas/profile.html.ep
 /easynas/templates/easynas/groups*
 /easynas/templates/easynas/network*
-/easynas/templates/easynas/firmware*
 /easynas/templates/easynas/login*
 /easynas/templates/easynas/power*
 /easynas/startup
@@ -892,6 +889,10 @@ Polish Language for EasyNAS
     menu's User Profile entry leads there instead of the Users page
   - The bare frame NAS users see is now the core's layouts/user.html.ep
     (their name links to their profile); fs-files uses it and requires it
+  - Remove the Firmware page: the Add-ons page already updates EasyNAS and
+    every add-on, one at a time through its queue. /firmware now leads to
+    Add-ons, as does the menu's Update entry, and the update banner on every
+    page reads its progress from Add-ons
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

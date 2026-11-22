@@ -43,8 +43,9 @@ and can change every setting, just like `admin`.
 
 ## Updates
 
-**Admin → Firmware** checks the EasyNAS repository and installs updates to EasyNAS and
-its add-ons. The console menu (option 5) does the same from the terminal.
+**Admin → Add-ons** checks the EasyNAS repository and installs updates to EasyNAS and
+its add-ons: the EasyNAS tile updates the core, **Update all** updates everything
+that has an update. The console menu (option 5) does the same from the terminal.
 
 <!-- TODO: OS security updates policy; document once the update channel strategy ships -->
 

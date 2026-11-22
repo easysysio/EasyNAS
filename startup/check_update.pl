@@ -62,7 +62,7 @@ foreach (`/usr/bin/sudo /usr/bin/zypper --quiet lr -E 2>/dev/null`) {
 
 ####### Core (firmware) image update #######
 # Fetch the channel's per-arch core-image manifest (version/date/file/sha256)
-# into easynas.core; the Firmware page reads this file (no live network call).
+# into easynas.core, for the core-update page to come (docs/core-update-design.md).
 my $channel = ($repo eq "EasyNAS_Beta") ? "testing" : "stable";
 # Fetch with --fail to a temp file and only replace easynas.core on success, so
 # a missing manifest (e.g. an empty channel -> HTTP 404) or an offline check

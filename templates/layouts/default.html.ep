@@ -7,8 +7,8 @@
  my %easynas = easynas_info();
  my %addons = get_addons();
  my @menu = get_menu();
- # Only surface the update banner to a logged-in admin (the login page uses this
- # layout too, and the banner carries a reboot link).
+ # Only surface the update banner to a signed-in admin (the login page uses
+ # this layout too).
  my $update_state = $username ? get_update_state() : "";
  # Pending EasyNAS package updates, for the sidebar Addons badge.
  my $addon_updates = $username ? get_update_count() : 0;
@@ -131,7 +131,7 @@
                             <li class="divider"></li>
 			    <li>
                                     <div>
-                                        <a href="firmware"><i class="fa fa-cloud-download fa-fw"></i> Update</a>
+                                        <a href="/addons"><i class="fa fa-cloud-download fa-fw"></i> Update</a>
                                     </div>
                             </li>
 			    <li>         
@@ -213,14 +213,13 @@
                       </div>
                     </div>
                     <script>
-                    // While updating, poll the progress endpoint: drive the bar,
-                    // and refresh once the state changes (ready/failed) so the
-                    // result banner appears on its own.
+                    // While updating, poll the progress endpoint to drive the
+                    // bar, and reload once the queue has drained.
                     (function poll(){
                       var PHASE={downloading:'<%= ($TEXT->{'firmware_phase_down'} || 'downloading') %>',
                                  installing:'<%= ($TEXT->{'firmware_phase_inst'} || 'installing') %>',
                                  preparing:'<%= ($TEXT->{'firmware_phase_prep'} || 'preparing') %>'};
-                      fetch('/firmware?action=progress').then(function(r){return r.json();}).then(function(d){
+                      fetch('/addons?action=progress').then(function(r){return r.json();}).then(function(d){
                         if (d.state !== 'updating') { location.replace(location.pathname + location.search); return; }
                         var b=document.getElementById('upd-bar');
                         if (b) { b.style.width=d.percent+'%'; b.textContent=d.percent+'%';
@@ -231,17 +230,6 @@
                       }).catch(function(){ setTimeout(poll, 5000); });
                     })();
                     </script>
-% } elsif ($update_state eq "ready") {
-                    <div class="alert alert-success" style="margin-top:40px">
-                      <i class="fa fa-check"></i> <%= ($TEXT->{'firmware_update_done'} || 'Update complete. Reboot to apply it.') %>
-                      <a data-post class="btn btn-warning btn-xs" onclick="return confirm('<%= ($TEXT->{'firmware_reboot_confirm'} || 'Reboot the appliance now?') %>')"
-                         href="/firmware?action=reboot"><i class="fa fa-power-off"></i> <%= ($TEXT->{'firmware_reboot'} || 'Reboot now') %></a>
-                    </div>
-% } elsif ($update_state =~ /^failed/) {
-                    <div class="alert alert-danger" style="margin-top:40px">
-                      <i class="fa fa-exclamation-triangle"></i>
-                      <%= ($TEXT->{'firmware_update_failed'} || 'The last update failed.') %>
-                      <a href="/firmware"><%= ($TEXT->{'firmware'} || 'Updates') %></a></div>
 % }
 
                     <div class="row">

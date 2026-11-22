@@ -104,7 +104,9 @@ sub startup ($self) {
   $admin->get('/')->to('dashboard#view');
   $admin->get('/easynas')->to('dashboard#view');
   $admin->get('/easynas/firmware.pl')->to('dashboard#view');
-  $admin->any([qw(GET POST)] => '/firmware')->to('firmware#view');
+  # The Firmware page is gone -- the Add-ons page updates EasyNAS and its
+  # add-ons -- so an old bookmark lands there.
+  $admin->get('/firmware' => sub ($c) { $c->redirect_to('/addons') });
   $admin->get('/language')->to('language#view');
   foreach my $item (sort keys %addons) {
     my $program = $addons{$item}{'program'};

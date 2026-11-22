@@ -475,8 +475,8 @@ my $L = 'EasyNAS::Controller::Login';
           sub view { my $c = shift; push @main::seen, [$c->req->method, $c->param('action') // '']; $c->render(text => 'nfs page') } 1 }
     or die $@;
   # A stand-in for the page behind the gate, so the real one isn't loaded.
-  eval q{ package EasyNAS::Controller::Firmware; use Mojo::Base 'Mojolicious::Controller';
-          sub view { shift->render(text => 'firmware page') } 1 } or die $@;
+  eval q{ package EasyNAS::Controller::Dashboard; use Mojo::Base 'Mojolicious::Controller';
+          sub view { shift->render(text => 'dashboard') } 1 } or die $@;
   my $ta = Test::Mojo->new('EasyNAS');
   $ta->app->log->level('fatal');
   $ta->app->routes->get('/t_signin_user/:user' => sub ($c) {
@@ -489,13 +489,13 @@ my $L = 'EasyNAS::Controller::Login';
   });
   local %easynas::NAS_ADMIN = (alice => 1);
   $ta->get_ok('/t_signin/alice');
-  $ta->get_ok('/firmware')->status_is(200)->content_is('firmware page', 'still an administrator: let through');
+  $ta->get_ok('/')->status_is(200)->content_is('dashboard', 'still an administrator: let through');
   delete $easynas::NAS_ADMIN{alice};
   @easynas::LOG = ();
-  $ta->get_ok('/firmware')->status_is(302)->header_like(Location => qr{/login$}, 'flag taken away: sent to sign in');
+  $ta->get_ok('/')->status_is(302)->header_like(Location => qr{/login$}, 'flag taken away: sent to sign in');
   ok((grep { $_->[2] eq 'signed alice out: no longer an administrator' } @easynas::LOG), 'logged');
   $easynas::NAS_ADMIN{alice} = 1;
-  $ta->get_ok('/firmware')->status_is(302, '...and the session is over, even if the flag comes back');
+  $ta->get_ok('/')->status_is(302, '...and the session is over, even if the flag comes back');
 
   # ---- changes by POST only
   $ta->get_ok('/t_signin/alice');
@@ -504,7 +504,8 @@ my $L = 'EasyNAS::Controller::Login';
      ->header_like(Location => qr{/nfs$}, 'a GET asking for a change: sent back to the bare page');
   is_deeply \@main::seen, [], '...and the page never ran';
   ok((grep { $_->[1] eq 'WARNING' && $_->[2] =~ m{refused a GET of /nfs asking for action "delete"} } @easynas::LOG), 'logged');
-  $ta->get_ok('/firmware?action=reboot')->status_is(302, 'same for the firmware page');
+  $ta->get_ok('/?action=reboot')->status_is(302, 'same for the dashboard');
+  $ta->get_ok('/firmware')->status_is(302)->header_like(Location => qr{/addons$}, 'the old Firmware page leads to Add-ons');
   @easynas::LOG = ();
   $ta->get_ok('/nfs?action=x%22%0A%3Cb%3E');
   like $easynas::LOG[0][2], qr/action "x\?\?\?b\?"/, 'the logged action is made harmless';
@@ -512,7 +513,7 @@ my $L = 'EasyNAS::Controller::Login';
   @main::seen = ();
   $ta->get_ok('/nfs')->status_is(200)->content_is('nfs page');
   $ta->get_ok('/nfs?action=createmenu')->status_is(200, 'a "...menu" action is a GET');
-  $ta->get_ok('/firmware?action=progress')->status_is(200, 'so are the polled read-only ones');
+  $ta->get_ok('/?action=progress')->status_is(200, 'so are the polled read-only ones');
   $ta->post_ok('/nfs' => form => { action => 'delete', share => 'pool/vol' })->status_is(200);
   $ta->post_ok('/nfs?action=delete')->status_is(200, 'a POST may carry the action in its URL');
   is_deeply \@main::seen, [['GET', ''], ['GET', 'createmenu'], ['POST', 'delete'], ['POST', 'delete']],
