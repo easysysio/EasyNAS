@@ -244,6 +244,10 @@ SKIP: {
   is($j->{error}, 'protected', 'a pool cannot be deleted');
   ok(-d $vol && -f "$vol/a.txt", '...and nothing was');
 }
+# The delete tests (GNU systems only) removed these two links; the tests
+# below need them back.
+-l "$vol/escape_dir" or symlink($out, "$vol/escape_dir") or die;
+-l "$vol/docs_link"  or symlink("$vol/docs", "$vol/docs_link") or die;
 
 # ---- read with a limit (text preview)
 {
