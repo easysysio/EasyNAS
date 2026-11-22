@@ -33,15 +33,15 @@
                                             <tbody>
 					    % foreach my $vol (sort keys (%$volumes)) {
                                                 <tr>
-                                                    <td><a href="?action=settings&vol=<%= $volumes->{$vol}[1] %>&fs=<%= $volumes->{$vol}[2] %>"><i class="fa fa-folder fa-2x" title="Settings"></i></a></td>
-						    <td><a href="?action=settings&vol=<%= $volumes->{$vol}[1] %>&fs=<%= $volumes->{$vol}[2] %>"><%= $volumes->{$vol}[0] %></a></td>
-						    <td><a href="?action=settings&vol=<%= $volumes->{$vol}[1] %>&fs=<%= $volumes->{$vol}[2] %>"><%= $volumes->{$vol}[1] %></a></td>
+                                                    <td><a href="?action=settingsmenu&vol=<%= $volumes->{$vol}[1] %>&fs=<%= $volumes->{$vol}[2] %>"><i class="fa fa-folder fa-2x" title="Settings"></i></a></td>
+						    <td><a href="?action=settingsmenu&vol=<%= $volumes->{$vol}[1] %>&fs=<%= $volumes->{$vol}[2] %>"><%= $volumes->{$vol}[0] %></a></td>
+						    <td><a href="?action=settingsmenu&vol=<%= $volumes->{$vol}[1] %>&fs=<%= $volumes->{$vol}[2] %>"><%= $volumes->{$vol}[1] %></a></td>
 						    <td><%= $volumes->{$vol}[2] %></td>
 						    <td><%= $volumes->{$vol}[3] %></td>
 						    <td>
                                                         <a href=?action=createsnapshotmenu&vol=<%= $volumes->{$vol}[1] %>&fs=<%= $volumes->{$vol}[2] %>><i class="fa fa-camera fa-2x" title="<%= ($TEXT->{'vol_snapshot'}) %>"></i>&nbsp;</a> 
-	    						<a href=?action=settings&vol=<%= $volumes->{$vol}[1] %>&fs=<%= $volumes->{$vol}[2] %>><i class="fa fa-edit fa-2x" title="<%= ($TEXT->{'vol_settings'}) %>"></i>&nbsp;</a>
-							<a onclick="return confirm('<%= ($TEXT->{'vol_delete?'}) %>')" href=?action=deletevol&vol=<%= $volumes->{$vol}[1] %>&fs=<%= $volumes->{$vol}[2] %>><i class="fa fa-trash fa-2x" title="<%= ($TEXT->{'vol_delete'}) %>"></i></a>
+	    						<a href=?action=settingsmenu&vol=<%= $volumes->{$vol}[1] %>&fs=<%= $volumes->{$vol}[2] %>><i class="fa fa-edit fa-2x" title="<%= ($TEXT->{'vol_settings'}) %>"></i>&nbsp;</a>
+							<a data-post onclick="return confirm('<%= ($TEXT->{'vol_delete?'}) %>')" href=?action=deletevol&vol=<%= $volumes->{$vol}[1] %>&fs=<%= $volumes->{$vol}[2] %>><i class="fa fa-trash fa-2x" title="<%= ($TEXT->{'vol_delete'}) %>"></i></a>
 						 </td>
 						</tr>
 						%} 

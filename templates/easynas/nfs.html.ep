@@ -22,10 +22,10 @@
     <label><%= ($TEXT->{$addon->{'description'}}) %></label>
     <br>
     %if ($service_active) {
-     <a href="?&action=nfsoff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
+     <a data-post href="?&action=nfsoff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
     %}
     %else {
-     <a href="?&action=nfson"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
+     <a data-post href="?&action=nfson"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
     %}
 </div><!-- end of #tab1 -->
 <div class="tab-pane fade" id="tabs-2">
@@ -39,13 +39,13 @@
    <td><%= $share->{vol} %></td>
    <td><%= $share->{path} %></td>
    <td><%= $share->{owner} %></td>
-   <td><a onclick="return confirm('<%= ($TEXT->{'nfs_delete'}) %>')" href="?action=delete&fs=<%= $share->{fs} %>&vol=<%= $share->{vol} %>"><i class="fa fa-trash" title="<%= ($TEXT->{'nfs_delete'}) %>"></i></a></td>
+   <td><a data-post onclick="return confirm('<%= ($TEXT->{'nfs_delete'}) %>')" href="?action=delete&fs=<%= $share->{fs} %>&vol=<%= $share->{vol} %>"><i class="fa fa-trash" title="<%= ($TEXT->{'nfs_delete'}) %>"></i></a></td>
   </tr>
 % }
  </tbody>
 </table>
 <br>
-<a href="?action=create">[<%= ($TEXT->{'nfs_add_nfs'}) %>]</a>
+<a href="?action=createmenu">[<%= ($TEXT->{'nfs_add_nfs'}) %>]</a>
 </div><!-- end of #tab2 -->
  </div><!-- end of .tab_container -->
  </div></div></div></div>

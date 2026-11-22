@@ -7,7 +7,7 @@
     <label><%= ($TEXT->{'fs_create'}) %></label>
    </div>
    <div class="panel-body">
-    <form role="form">
+    <form role="form" method="post" action="/filesystem">
      <input type=hidden name="action" value="createfs">
      <div class="form-group">
       <label><%= ($TEXT->{'fs_name'}) %></label>

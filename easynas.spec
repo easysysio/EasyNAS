@@ -32,6 +32,20 @@ Requires:       dmidecode
 # The Plex add-on was dropped (its plexmediaserver dependency is in no
 # repository the appliance uses). Updating EasyNAS uninstalls it.
 Obsoletes:      easynas-mm-plex < 1.99-5
+# The core only lets GETs show things (POST for changes, see lib/EasyNAS.pm);
+# these add-on releases are the first whose pages make their changes by POST,
+# so older ones are updated along with the core.
+Conflicts:      easynas-fs-ftp < %{version}-5
+Conflicts:      easynas-fs-nfs < %{version}-5
+Conflicts:      easynas-fs-rsyncd < %{version}-7
+Conflicts:      easynas-fs-samba < %{version}-5
+Conflicts:      easynas-fs-ssh < %{version}-4
+Conflicts:      easynas-fs-tftp < %{version}-5
+Conflicts:      easynas-mm-dlna < %{version}-5
+Conflicts:      easynas-srv-lxc < %{version}-7
+Conflicts:      easynas-srv-mariadb < %{version}-5
+Conflicts:      easynas-srv-radius < %{version}-7
+Conflicts:      easynas-stg-iscsi < %{version}-5
 
 %description
 EasyNAS is a Network Attached Storage Server.
@@ -316,7 +330,7 @@ fi
 #### lxc ####
 %package        srv-lxc
 Version:        %{version}
-Release:        6
+Release:        7
 Summary:        Virtualization addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -338,7 +352,7 @@ Virtualization addon for EasyNAS
 #### mariadb ####
 %package        srv-mariadb
 Version:        %{version}
-Release:        4
+Release:        5
 Summary:        MariaDB addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -358,7 +372,7 @@ MariaDB addon for EasyNAS
 ##### TFTP #####
 %package        fs-tftp
 Version:        %{version}
-Release:        4
+Release:        5
 Summary:        TFTP addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -414,7 +428,7 @@ and act with its permissions.
 ##### FTP ####
 %package        fs-ftp
 Version:        %{version}
-Release:        4
+Release:        5
 Summary:        FTP addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -437,7 +451,7 @@ FTP addon for EasyNAS
 ##### NFS ####
 %package        fs-nfs
 Version:        %{version}
-Release:        4
+Release:        5
 Summary:        NFS addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -461,7 +475,7 @@ NFS addon for EasyNAS
 ##### SAMBA ####
 %package        fs-samba
 Version:        %{version}
-Release:        4
+Release:        5
 Summary:        SAMBA addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -486,7 +500,7 @@ SAMBA addon for EasyNAS
 ##### SSH ####
 %package        fs-ssh
 Version:        %{version}
-Release:        3
+Release:        4
 Summary:        SSH addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -507,7 +521,7 @@ SSH addon for EasyNAS
 #### DLNA ####
 %package        mm-dlna
 Version:        %{version}
-Release:        4
+Release:        5
 Summary:        DLNA addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -531,7 +545,7 @@ DLNA addon for EasyNAS
 #### RSync ####
 %package        fs-rsyncd
 Version:        %{version}
-Release:        6
+Release:        7
 Summary:        RSyncd addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -582,7 +596,7 @@ fi
 #### Radius ####
 %package        srv-radius
 Version:        %{version}
-Release:        6
+Release:        7
 Summary:        Radius addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -627,7 +641,7 @@ fi
 #### iSCSI ####
 %package        stg-iscsi
 Version:        %{version}
-Release:        4
+Release:        5
 Summary:        iSCSI Initiator addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -815,6 +829,18 @@ Polish Language for EasyNAS
     unknown groups and accounts the page doesn't list are refused; the
     settings form shows the user's current groups instead of clearing them
     on save
+  - Every admin page makes its changes by POST only. The router turns away a
+    GET asking for anything but a display action (one ending in "menu", or
+    stats/status/progress/display) and logs it, so a link or redirect from
+    another site can no longer delete, format, reboot or install anything for
+    a signed-in administrator. Links keep working: those marked data-post
+    are sent as POST forms by the layout. The pages that reload themselves
+    (add-on queue, filesystem jobs, the update banner) reload with a GET, so
+    a reload never repeats a change. "create" form pages are now
+    "createmenu", Network "edit" "editmenu", Volume "settings"
+    "settingsmenu". The add-ons whose pages changed are bumped, and the core
+    conflicts with their older releases so they update together.
+    t/templates-post.t fails on any template that asks for a change by GET
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

@@ -22,7 +22,7 @@
           <td><%= $health->{$disk}[5] %></td></tr>
  	 </table>
        <BR>
-      <form role="form">
+      <form role="form" method="post" action="/disk">
        <input type=hidden name="action" value="clean_errs">
        <input type=hidden name="disk" value="<%= $disk %>">
        <button type="submit" class="btn btn-default"><%= ($TEXT->{'disk_clean_errs'}) %></button>

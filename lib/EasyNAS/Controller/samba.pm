@@ -111,7 +111,7 @@ sub view ($self) {
  }
 
 ##### create menu #####
- if (defined($action) && $action eq "create") {
+ if (defined($action) && $action eq "createmenu") {
   my %vol = vol_info();
   $self->stash(volumes => \%vol, edit => 0,
                sname => "", svol => "",

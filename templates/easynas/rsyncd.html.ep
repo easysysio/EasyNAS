@@ -22,10 +22,10 @@
     <label><%= ($TEXT->{$addon->{'description'}}) %></label>
     <br>
     %if ($service_active) {
-     <a href="?action=rsyncdoff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
+     <a data-post href="?action=rsyncdoff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
     %}
     %else {
-     <a href="?action=rsyncdon"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
+     <a data-post href="?action=rsyncdon"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
     %}
 </div><!-- end of #tab1 -->
 <div class="tab-pane fade" id="tabs-2">
@@ -39,13 +39,13 @@
    <td><%= $share->{name} %></td>
    <td><%= $share->{path} %></td>
    <td><%= $share->{readonly} %></td>
-   <td><a onclick="return confirm('<%= ($TEXT->{'rsyncd_delete'} || 'Delete module?') %>')" href="?action=delete&share=<%= $share->{name} %>&vol=<%= $share->{vol} %>"><i class="fa fa-trash"></i></a></td>
+   <td><a data-post onclick="return confirm('<%= ($TEXT->{'rsyncd_delete'} || 'Delete module?') %>')" href="?action=delete&share=<%= $share->{name} %>&vol=<%= $share->{vol} %>"><i class="fa fa-trash"></i></a></td>
   </tr>
 % }
  </tbody>
 </table>
 <br>
-<a href="?action=create">[<%= ($TEXT->{'rsyncd_add'} || 'Add Module') %>]</a>
+<a href="?action=createmenu">[<%= ($TEXT->{'rsyncd_add'} || 'Add Module') %>]</a>
 </div><!-- end of #tab2 -->
  </div><!-- end of .tab_container -->
  </div></div></div></div>

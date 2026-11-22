@@ -7,7 +7,7 @@
     <label><%= $interface %></label>
    </div>
    <BR>
-   <form role="form" id="networkedit">
+   <form role="form" id="networkedit" method="post" action="/network">
    <input type=hidden name="interface" value="<%= $interface %>">
    <input type=hidden name="action" value="save">
    <div class="form-group">

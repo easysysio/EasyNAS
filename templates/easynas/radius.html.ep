@@ -22,10 +22,10 @@
     <label><%= ($TEXT->{$addon->{'description'}}) %></label>
     <br>
     %if ($service_active) {
-     <a href="?action=radiusoff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
+     <a data-post href="?action=radiusoff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
     %}
     %else {
-     <a href="?action=radiuson"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
+     <a data-post href="?action=radiuson"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
     %}
 </div><!-- end of #tab1 -->
 <div class="tab-pane fade" id="tabs-2">
@@ -38,13 +38,13 @@
   <tr>
    <td><%= $c->{name} %></td>
    <td><%= $c->{ip} %></td>
-   <td><a onclick="return confirm('<%= ($TEXT->{'radius_delete'} || 'Delete client?') %>')" href="?action=delete&client=<%= $c->{name} %>"><i class="fa fa-trash"></i></a></td>
+   <td><a data-post onclick="return confirm('<%= ($TEXT->{'radius_delete'} || 'Delete client?') %>')" href="?action=delete&client=<%= $c->{name} %>"><i class="fa fa-trash"></i></a></td>
   </tr>
 % }
  </tbody>
 </table>
 <br>
-<a href="?action=create">[<%= ($TEXT->{'radius_add'} || 'Add Client') %>]</a>
+<a href="?action=createmenu">[<%= ($TEXT->{'radius_add'} || 'Add Client') %>]</a>
 </div><!-- end of #tab2 -->
  </div><!-- end of .tab_container -->
  </div></div></div></div>

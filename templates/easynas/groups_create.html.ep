@@ -7,7 +7,7 @@
     <label><%= ($TEXT->{'groups_create'}) %></label>
    </div>
    <div class="panel-body">
-        <form role="form">
+        <form role="form" method="post" action="/groups">
          <input type=hidden name="action" value="creategroup">
          <div class="form-group">
           <label><%= ($TEXT->{'group_name'}) %></label>

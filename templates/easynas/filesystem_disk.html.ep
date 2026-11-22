@@ -12,7 +12,7 @@
     % }
     </label>
    </div>
-   <form role="form">
+   <form role="form" method="post" action="/filesystem">
     % if ($mode eq "add") {
     <input type="hidden" name="action" value="addhd">
     % } else {

@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 # Tests for the Settings page's Repository tab, the sign-in throttle, NAS
-# accounts made administrators, and the Users page.
+# accounts made administrators, the Users page, and the router's rule that
+# changes come by POST only.
 #
 # The controllers are loaded for real, against a stub of the easynas helper
 # module (the real one reads the appliance's /etc and runs zypper), and pages
@@ -32,7 +33,8 @@ sub get_lang_text  { our %TEXT; do '$root/lang/en-en/lang_english_easynas.pl' or
 sub write_log      { push \@LOG, [\@_] }
 sub get_update_state { \$UPDATE_STATE }
 sub get_conf_hosts { '/dev/null' }
-sub get_addons     { () }
+our %ADDONS;
+sub get_addons     { %ADDONS }
 our %NAS_ADMIN;
 sub is_nas_admin    { \$NAS_ADMIN{\$_[0] // ''} ? 1 : 0 }
 sub get_admin_group { 'easynas-admins' }
@@ -363,6 +365,12 @@ my $L = 'EasyNAS::Controller::Login';
   # Mojolicious loads every file under EasyNAS/Controller at start; here that
   # would load the real helper module over its stand-in.
   { no warnings 'once'; *EasyNAS::warmup = sub {}; }
+  # One add-on page, standing in for every admin page; it records what reached it.
+  no warnings 'once';
+  local %easynas::ADDONS = (nfs => { program => 'nfs' });
+  eval q{ package EasyNAS::Controller::Nfs; use Mojo::Base 'Mojolicious::Controller';
+          sub view { my $c = shift; push @main::seen, [$c->req->method, $c->param('action') // '']; $c->render(text => 'nfs page') } 1 }
+    or die $@;
   # A stand-in for the page behind the gate, so the real one isn't loaded.
   eval q{ package EasyNAS::Controller::Firmware; use Mojo::Base 'Mojolicious::Controller';
           sub view { shift->render(text => 'firmware page') } 1 } or die $@;
@@ -381,6 +389,30 @@ my $L = 'EasyNAS::Controller::Login';
   ok((grep { $_->[2] eq 'signed alice out: no longer an administrator' } @easynas::LOG), 'logged');
   $easynas::NAS_ADMIN{alice} = 1;
   $ta->get_ok('/firmware')->status_is(302, '...and the session is over, even if the flag comes back');
+
+  # ---- changes by POST only
+  $ta->get_ok('/t_signin/alice');
+  @main::seen = (); @easynas::LOG = ();
+  $ta->get_ok('/nfs?action=delete&share=pool/vol')->status_is(302)
+     ->header_like(Location => qr{/nfs$}, 'a GET asking for a change: sent back to the bare page');
+  is_deeply \@main::seen, [], '...and the page never ran';
+  ok((grep { $_->[1] eq 'WARNING' && $_->[2] =~ m{refused a GET of /nfs asking for action "delete"} } @easynas::LOG), 'logged');
+  $ta->get_ok('/firmware?action=reboot')->status_is(302, 'same for the firmware page');
+  @easynas::LOG = ();
+  $ta->get_ok('/nfs?action=x%22%0A%3Cb%3E');
+  like $easynas::LOG[0][2], qr/action "x\?\?\?b\?"/, 'the logged action is made harmless';
+
+  @main::seen = ();
+  $ta->get_ok('/nfs')->status_is(200)->content_is('nfs page');
+  $ta->get_ok('/nfs?action=createmenu')->status_is(200, 'a "...menu" action is a GET');
+  $ta->get_ok('/firmware?action=progress')->status_is(200, 'so are the polled read-only ones');
+  $ta->post_ok('/nfs' => form => { action => 'delete', share => 'pool/vol' })->status_is(200);
+  $ta->post_ok('/nfs?action=delete')->status_is(200, 'a POST may carry the action in its URL');
+  is_deeply \@main::seen, [['GET', ''], ['GET', 'createmenu'], ['POST', 'delete'], ['POST', 'delete']],
+    'what reached the page';
+
+  ok EasyNAS::view_action($_), "view action: $_" for qw(createmenu settingsmenu stats status progress display);
+  ok !EasyNAS::view_action($_), "a change: $_" for qw(delete reboot nfson update refresh terminal menus);
 }
 
 done_testing;

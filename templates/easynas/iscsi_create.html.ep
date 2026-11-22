@@ -7,7 +7,7 @@
     <label><%= ($TEXT->{'iscsi_add'} || 'Add Target') %></label>
    </div>
    <div class="panel-body">
-        <form role="form">
+        <form role="form" method="post" action="/iscsi">
          <input type=hidden name="action" value="add">
          <div class="form-group">
           <label><%= ($TEXT->{'iscsi_target'} || 'Target name (IQN)') %></label>

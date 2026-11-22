@@ -30,6 +30,12 @@ sub session_secret {
   return $s;
 }
 
+# Actions a GET may ask for (see the admin gate in startup): the ones that
+# only show something. Every page names its forms and dialogs "...menu";
+# these are the read-only ones that don't, polled by the pages' scripts.
+my %view_action = map { $_ => 1 } qw(stats status progress display);
+sub view_action ($action) { return ($action =~ /menu$/ || $view_action{$action}) ? 1 : 0; }
+
 # This method will run once at server start
 sub startup ($self) {
 
@@ -70,18 +76,35 @@ sub startup ($self) {
   # user reaches only the routes of addons that declare <access>user</access>;
   # everything else sits behind this second gate. A session without a role
   # predates roles and can only be the administrator's.
+  #
+  # The administrator's pages change things only through POST. The session
+  # cookie is SameSite=Lax, which a browser still sends when a page on another
+  # site sends it here with a plain link or redirect (a GET), never with a
+  # cross-site POST. So a GET may carry only an action that just shows
+  # something -- a name ending in "menu", or one of %view_action -- and a GET
+  # asking for any other action is sent back to the bare page, having done
+  # nothing. Pages carry their changes in POST forms (or links marked
+  # data-post, which the layout turns into one).
   my @user_home;
   my $admin = $auth->under(sub ($c) {
-    return 1 if ($c->session('role') // 'admin') eq 'admin';
-    if (@user_home) { $c->redirect_to($user_home[0]); }
-    else            { $c->render(text => 'Forbidden', status => 403); }
+    if (($c->session('role') // 'admin') ne 'admin') {
+      if (@user_home) { $c->redirect_to($user_home[0]); }
+      else            { $c->render(text => 'Forbidden', status => 403); }
+      return undef;
+    }
+    return 1 unless $c->req->method eq 'GET';
+    my $action = $c->req->query_params->param('action');
+    return 1 if !defined $action || $action eq '' || view_action($action);
+    write_log("easynas","WARNING","refused a GET of ".$c->req->url->path." asking for action \"".
+              substr($action =~ s/[^A-Za-z0-9_-]/?/gr, 0, 32)."\": changes are made by POST only");
+    $c->redirect_to($c->req->url->path->to_string);
     return undef;
   });
 
   $admin->get('/')->to('dashboard#view');
   $admin->get('/easynas')->to('dashboard#view');
   $admin->get('/easynas/firmware.pl')->to('dashboard#view');
-  $admin->get('/firmware')->to('firmware#view');
+  $admin->any([qw(GET POST)] => '/firmware')->to('firmware#view');
   $admin->get('/language')->to('language#view');
   foreach my $item (sort keys %addons) {
     my $program = $addons{$item}{'program'};
@@ -92,13 +115,9 @@ sub startup ($self) {
       push @user_home, "/$program";
     }
     else {
-      $admin->get("/$program")->to("$program#view");
+      $admin->any([qw(GET POST)] => "/$program")->to("$program#view");
     }
   }
-  # Cert upload is a multipart POST (a GET can't carry a file).
-  $admin->post('/settings')->to('settings#view');
-  # User changes are POST only (see users.pm).
-  $admin->post('/users')->to('users#view');
 }
 
 1;

@@ -34,7 +34,7 @@ sub view ($self) {
   }
 
    ##### edit #####
-  if (defined $action && $action eq "edit") {
+  if (defined $action && $action eq "editmenu") {
    my $interface=$self->param("interface");
    my %networks=networks_info();
    $self->stash(networks => \%networks,

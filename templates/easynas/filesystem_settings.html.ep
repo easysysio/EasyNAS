@@ -12,7 +12,7 @@
     <li><a href="#tab-default-4" data-toggle="tab"><%= ($TEXT->{'fs_disks'}) %></a></li></ul>
     <div class="tab-content">
      <div class="tab-pane fade in active" id="tab-default-1"><br><br>
-      <form>
+      <form method="post" action="/filesystem">
        <input type="hidden" name="fs" value="<%= $fs_name %>" >
        <input type="hidden" name="action" value="changename" >
        <div class="form-group">
@@ -24,7 +24,7 @@
       </form>
      </div><!-- end of #tab1 -->
      <div class="tab-pane fade" id="tab-default-2">
-      <form>
+      <form method="post" action="/filesystem">
       <div class="form-group">
        <label><%= ($TEXT->{'fs_raid_level'}) %></label>
        <BR>
@@ -85,7 +85,7 @@
      </form></div><!-- end of #tab2 -->
      <div class="tab-pane fade" id="tab-default-3">
       <br><br>
-      <form>
+      <form method="post" action="/filesystem">
       <input type="hidden" name="fs" value="<%= $fs_name %>" >
       <input type="hidden" name="action" value="changesettings" >
       <div class="form-group">
@@ -139,11 +139,11 @@
 <td><%= $d->{size} %></td>
 <td><%= $d->{used} %></td>
 <td><%= $d->{status} %></td>
-<td><a href="disk?action=display&menu=settings&disk=<%= $d->{disk} %>"><i class="fa fa-sliders fa-2x" title="Settings"></i>&nbsp;</a><a onclick="return confirm('Are you sure you want to remove the hardisk ?')" href="?action=removehd&menu=none&fs=<%= $fs_name %>&uuid=<%= $uuid %>&disk=<%= $d->{disk} %>"><i class="fa fa-trash fa-2x" title="Remove HD"></i>&nbsp;</a><a href="?action=display&menu=exchange&disk=<%= $d->{disk} %>&fs=<%= $fs_name %>"><i class="fa fa-exchange fa-2x" title="Replace HD"></i>&nbsp;</a><a onclick="return confirm('Are you sure you want to repair the hardisk ?')" href="?action=repairhd&menu=none&fs=<%= $fs_name %>&uuid=<%= $uuid %>&disk=<%= $d->{disk} %>"><i class="fa fa-wrench fa-2x" title="Repair HD"></i></a></td>
+<td><a href="disk?action=display&menu=settings&disk=<%= $d->{disk} %>"><i class="fa fa-sliders fa-2x" title="Settings"></i>&nbsp;</a><a data-post onclick="return confirm('Are you sure you want to remove the hardisk ?')" href="?action=removehd&menu=none&fs=<%= $fs_name %>&uuid=<%= $uuid %>&disk=<%= $d->{disk} %>"><i class="fa fa-trash fa-2x" title="Remove HD"></i>&nbsp;</a><a href="?action=display&menu=exchange&disk=<%= $d->{disk} %>&fs=<%= $fs_name %>"><i class="fa fa-exchange fa-2x" title="Replace HD"></i>&nbsp;</a><a data-post onclick="return confirm('Are you sure you want to repair the hardisk ?')" href="?action=repairhd&menu=none&fs=<%= $fs_name %>&uuid=<%= $uuid %>&disk=<%= $d->{disk} %>"><i class="fa fa-wrench fa-2x" title="Repair HD"></i></a></td>
 </tr>
 % }
 </tbody>
 </table>
 <br><a href="?menu=add_hd&action=display&fs=<%= $fs_name %>&uuid=<%= $uuid %>">[Add Hard Disk]</a><br><br>
-<form method="get"><input type="submit" name="action" value="Balance" /><input type="submit" name="action" value="Scrub" /><input type="hidden" name="menu" value="none"  /><input type="hidden" name="fs" value="<%= $fs_name %>"  /><input type="hidden" name="uuid" value="<%= $uuid %>"  /></form></div><!-- end of #tab4 --></div><!-- end of .tab_container --></div></div></div></div>
+<form method="post" action="/filesystem"><input type="submit" name="action" value="Balance" /><input type="submit" name="action" value="Scrub" /><input type="hidden" name="menu" value="none"  /><input type="hidden" name="fs" value="<%= $fs_name %>"  /><input type="hidden" name="uuid" value="<%= $uuid %>"  /></form></div><!-- end of #tab4 --></div><!-- end of .tab_container --></div></div></div></div>
 

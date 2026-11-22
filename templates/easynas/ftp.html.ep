@@ -21,10 +21,10 @@
     <label><%= ($TEXT->{$addon->{'description'}}) %></label>
     <br>
     %if ($service_active) {
-     <a href="?action=ftpoff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
+     <a data-post href="?action=ftpoff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
     %}
     %else {
-     <a href="?action=ftpon"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
+     <a data-post href="?action=ftpon"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
     %}
 </div><!-- end of #tab1 -->
  </div><!-- end of .tab_container -->

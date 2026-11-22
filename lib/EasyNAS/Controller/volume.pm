@@ -86,7 +86,7 @@ sub view ($self) {
  }
 
 ##### settings #####
- if (defined $action && $action eq "settings")
+ if (defined $action && $action eq "settingsmenu")
  {
   my %users=users_info();
   my %groups=groups_info();

@@ -24,7 +24,7 @@
 <div class="alert alert-warning">
  <%= ($TEXT->{'network_manager_down'}) %><BR>
  <%= ($TEXT->{'network_settings_can_not_change'}) %><BR><BR>
- <a href=?action=activate><%= ($TEXT->{'network_click_here_to_activate'}) %></a> 
+ <a data-post href=?action=activate><%= ($TEXT->{'network_click_here_to_activate'}) %></a> 
 </div>
 
 %}
@@ -46,18 +46,18 @@
                                                 <tr>
 						<td>
 						 %if ($networks->{$network}[1] eq "ethernet") {
-                                                 <a href="?action=edit&interface=<%= $network %>"><i class="fa fa-ethernet fa-2x" title="<%= ($TEXT->{'network_edit'}) %>"></i></a>
+                                                 <a href="?action=editmenu&interface=<%= $network %>"><i class="fa fa-ethernet fa-2x" title="<%= ($TEXT->{'network_edit'}) %>"></i></a>
 						 %}
 						 %if ($networks->{$network}[1] eq "wifi") {
-                                                 <a href="?action=edit&interface=<%= $network %>"><i class="fa fa-wifi fa-2x" title="<%= ($TEXT->{'network_edit'}) %>"></i></a>
+                                                 <a href="?action=editmenu&interface=<%= $network %>"><i class="fa fa-wifi fa-2x" title="<%= ($TEXT->{'network_edit'}) %>"></i></a>
                                                  %}
 						 </td>
-						  <td><a href="?action=edit&interface=<%= $network %>"><%= $network %></a></td>
+						  <td><a href="?action=editmenu&interface=<%= $network %>"><%= $network %></a></td>
 						    <td><%= $networks->{$network}[1] %></td>
 						    <td><%= $networks->{$network}[2] %></td>
 						    <td><%= $networks->{$network}[3] %></td>
 						    <td>
-						    <a href="?action=edit&interface=<%= $network %>"><i class="fa fa-pencil fa-2x" title="<%= ($TEXT->{'network_edit'}) %>"></i>&nbsp;</a>
+						    <a href="?action=editmenu&interface=<%= $network %>"><i class="fa fa-pencil fa-2x" title="<%= ($TEXT->{'network_edit'}) %>"></i>&nbsp;</a>
 						</td></tr>
 					 	%}
                                             </tbody>

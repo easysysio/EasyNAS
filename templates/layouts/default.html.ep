@@ -221,7 +221,7 @@
                                  installing:'<%= ($TEXT->{'firmware_phase_inst'} || 'installing') %>',
                                  preparing:'<%= ($TEXT->{'firmware_phase_prep'} || 'preparing') %>'};
                       fetch('/firmware?action=progress').then(function(r){return r.json();}).then(function(d){
-                        if (d.state !== 'updating') { location.reload(); return; }
+                        if (d.state !== 'updating') { location.replace(location.pathname + location.search); return; }
                         var b=document.getElementById('upd-bar');
                         if (b) { b.style.width=d.percent+'%'; b.textContent=d.percent+'%';
                                  b.setAttribute('aria-valuenow',d.percent); }
@@ -234,7 +234,7 @@
 % } elsif ($update_state eq "ready") {
                     <div class="alert alert-success" style="margin-top:40px">
                       <i class="fa fa-check"></i> <%= ($TEXT->{'firmware_update_done'} || 'Update complete. Reboot to apply it.') %>
-                      <a class="btn btn-warning btn-xs" onclick="return confirm('<%= ($TEXT->{'firmware_reboot_confirm'} || 'Reboot the appliance now?') %>')"
+                      <a data-post class="btn btn-warning btn-xs" onclick="return confirm('<%= ($TEXT->{'firmware_reboot_confirm'} || 'Reboot the appliance now?') %>')"
                          href="/firmware?action=reboot"><i class="fa fa-power-off"></i> <%= ($TEXT->{'firmware_reboot'} || 'Reboot now') %></a>
                     </div>
 % } elsif ($update_state =~ /^failed/) {
@@ -266,7 +266,7 @@
 	    <div class="modal-body">Restart the appliance now? Services stop and filesystems unmount cleanly during the reboot.</div>
 	    <div class="modal-footer">
 	      <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
-	      <a class="btn btn-warning" href="/power?action=reboot"><i class="fa fa-rotate-right fa-fw"></i> Restart</a>
+	      <a data-post class="btn btn-warning" href="/power?action=reboot"><i class="fa fa-rotate-right fa-fw"></i> Restart</a>
 	    </div>
 	  </div></div>
 	</div>
@@ -280,7 +280,7 @@
 	    <div class="modal-body">Shut the appliance down now? Services stop and filesystems unmount cleanly during shutdown.</div>
 	    <div class="modal-footer">
 	      <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
-	      <a class="btn btn-danger" href="/power?action=shutdown"><i class="fa fa-power-off fa-fw"></i> Shutdown</a>
+	      <a data-post class="btn btn-danger" href="/power?action=shutdown"><i class="fa fa-power-off fa-fw"></i> Shutdown</a>
 	    </div>
 	  </div></div>
 	</div>
@@ -351,6 +351,30 @@
         })();
         </script>
 
+        <script>
+        // Changes are made by POST only (see lib/EasyNAS.pm): a link marked
+        // data-post sends its query string as a POST form to its own page, so
+        // the many "?action=..." links keep working. An onclick that cancels
+        // the click (a confirm() answered No) still cancels it. Opened in a new
+        // tab, such a link is a plain GET, which the router refuses.
+        document.addEventListener('click', function (e) {
+          var a = e.target.closest ? e.target.closest('a[data-post]') : null;
+          if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+          e.preventDefault();
+          var u = new URL(a.getAttribute('href'), location.href);
+          var f = document.createElement('form');
+          f.method = 'post';
+          f.action = u.pathname;
+          if (a.target) f.target = a.target;
+          u.searchParams.forEach(function (v, k) {
+            var i = document.createElement('input');
+            i.type = 'hidden'; i.name = k; i.value = v;
+            f.appendChild(i);
+          });
+          document.body.appendChild(f);
+          f.submit();
+        });
+        </script>
     </body>
 
 </html>

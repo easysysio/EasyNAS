@@ -7,7 +7,7 @@
     <label><%= $edit ? ($TEXT->{'samba_edit_smb'} || 'Edit Share') : ($TEXT->{'samba_add_smb'}) %></label>
    </div>
    <div class="panel-body">
-        <form role="form">
+        <form role="form" method="post" action="/samba">
          <input type=hidden name="action" value="<%= $edit ? 'change' : 'add' %>">
          <div class="form-group">
           <label><%= ($TEXT->{'samba_share_name'}) %></label>

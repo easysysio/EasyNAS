@@ -40,7 +40,7 @@
 % if ($qactive) {
  <span class="btn btn-default btn-sm pull-right disabled"><i class="fa fa-refresh"></i> <%= ($TEXT->{'addons_check'} || 'Check for updates') %></span>
 % } else {
- <a class="btn btn-default btn-sm pull-right" href="?action=check_updates"
+ <a data-post class="btn btn-default btn-sm pull-right" href="?action=check_updates"
     onclick="return easynasBusy(this,'<%= ($TEXT->{'addons_checking'} || 'Checking for updates') %>')"><i class="fa fa-refresh"></i> <%= ($TEXT->{'addons_check'} || 'Check for updates') %></a>
 % }
 </div>
@@ -50,7 +50,7 @@
 <div class="panel panel-default easynas-cat" id="cat-updates">
  <div class="panel-heading">
   <b><%= ($TEXT->{'addons_updates'} || 'Updates') %>: <%= scalar @$updates %></b>
-  <a class="btn btn-success btn-xs pull-right"
+  <a data-post class="btn btn-success btn-xs pull-right"
      onclick="if(!confirm('<%= ($TEXT->{'addons_update_all_confirm'} || 'Update all add-ons now?') %>'))return false; return easynasBusy(this,'<%= ($TEXT->{'addons_updating_all'} || 'Updating all') %>')"
      href="?action=update_all"><i class="fa fa-refresh"></i> <%= ($TEXT->{'addons_update_all'} || 'Update all') %></a>
  </div>
@@ -70,7 +70,7 @@
     <i class="fa <%= $qs eq 'waiting' ? 'fa-clock-o' : 'fa-spinner fa-spin' %>"></i>
     <%= ($TEXT->{"addons_q_$qs"} || ($qs eq 'waiting' ? 'Waiting' : $qs eq 'installing' ? 'Installing' : 'Updating')) %></span>
 % } else {
-   <a class="btn btn-success btn-xs" style="margin-top:4px"
+   <a data-post class="btn btn-success btn-xs" style="margin-top:4px"
       onclick="return easynasBusy(this,'<%= ($TEXT->{'addons_updating_one'} || 'Updating') %>')"
       href="?action=update_addon&package=<%= $a->{pkg} %>"><i class="fa fa-refresh"></i> <%= ($TEXT->{'addons_update'} || 'Update') %></a>
 % }
@@ -112,12 +112,12 @@
 %     if ($a->{program} ne "") {
    <a class="btn btn-default btn-xs" style="margin-top:4px" href="/<%= $a->{program} %>"><%= ($TEXT->{'addons_open'} || 'Open') %></a>
 %     }
-   <a class="btn btn-default btn-xs" style="margin-top:4px"
+   <a data-post class="btn btn-default btn-xs" style="margin-top:4px"
       onclick="return confirm('<%= ($TEXT->{'addons_delete_confirm'} || 'Remove this add-on?') %>')"
       href="?action=delete_addon&package=<%= $a->{pkg} %>"><i class="fa fa-trash"></i></a>
 %   }
 % } else {
-   <a class="btn btn-primary btn-xs" style="margin-top:4px"
+   <a data-post class="btn btn-primary btn-xs" style="margin-top:4px"
       onclick="return easynasBusy(this,'<%= ($TEXT->{'addons_installing'} || 'Installing') %>')"
       href="?action=install_addon&package=<%= $a->{pkg} %>"><i class="fa fa-download"></i> <%= ($TEXT->{'addons_install'} || 'Install') %></a>
 % }
@@ -201,6 +201,6 @@ document.addEventListener('click', function(e){
 <script>
 // An install/update queue is running: refresh so each tile's badge tracks
 // waiting -> installing -> done as the worker drains the queue.
-setTimeout(function(){ location.reload(); }, 4000);
+setTimeout(function(){ location.replace(location.pathname + location.search); }, 4000);
 </script>
 % }

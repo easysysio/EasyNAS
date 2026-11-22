@@ -22,10 +22,10 @@
     <label><%= ($TEXT->{$addon->{'description'}}) %></label>
     <br>
     %if ($service_active) {
-     <a href="?action=iscsioff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
+     <a data-post href="?action=iscsioff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
     %}
     %else {
-     <a href="?action=iscsion"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
+     <a data-post href="?action=iscsion"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
     %}
 </div><!-- end of #tab1 -->
 <div class="tab-pane fade" id="tabs-2">
@@ -39,13 +39,13 @@
    <td><%= $t->{tid} %></td>
    <td><%= $t->{name} %></td>
    <td><%= $t->{path} %></td>
-   <td><a onclick="return confirm('<%= ($TEXT->{'iscsi_delete'} || 'Delete target?') %>')" href="?action=delete&tid=<%= $t->{tid} %>"><i class="fa fa-trash"></i></a></td>
+   <td><a data-post onclick="return confirm('<%= ($TEXT->{'iscsi_delete'} || 'Delete target?') %>')" href="?action=delete&tid=<%= $t->{tid} %>"><i class="fa fa-trash"></i></a></td>
   </tr>
 % }
  </tbody>
 </table>
 <br>
-<a href="?action=create">[<%= ($TEXT->{'iscsi_add'} || 'Add Target') %>]</a>
+<a href="?action=createmenu">[<%= ($TEXT->{'iscsi_add'} || 'Add Target') %>]</a>
 </div><!-- end of #tab2 -->
  </div><!-- end of .tab_container -->
  </div></div></div></div>

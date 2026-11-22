@@ -37,7 +37,7 @@ sub view ($self) {
  }
 
 ##### create menu #####
- if (defined($action) && $action eq "create") {
+ if (defined($action) && $action eq "createmenu") {
   $self->render(template => 'easynas/radius_create');
   return;
  }

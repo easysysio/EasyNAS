@@ -7,7 +7,7 @@
     <label><%= ($TEXT->{'vol_create_snapshot'}) %></label>
    </div>
    <div class="panel-body">
-        <form role="form">
+        <form role="form" method="post" action="/volume">
          <input type=hidden name="action" value="createsnapshot">
 	 <input type=hidden name="vol" value="<%= $vol %>">
 	 <input type=hidden name="fs" value="<%= $fs %>">

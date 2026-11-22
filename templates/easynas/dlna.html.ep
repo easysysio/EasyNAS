@@ -23,16 +23,16 @@
     <label><%= ($TEXT->{$addon->{'description'}}) %></label>
     <br>
     %if ($service_active) {
-     <a href="?action=dlnaoff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
+     <a data-post href="?action=dlnaoff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
     %}
     %else {
-     <a href="?action=dlnaon"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
+     <a data-post href="?action=dlnaon"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
     %}
 </div><!-- end of #tab1 -->
 <div class="tab-pane fade" id="tabs-2">
 <br>
 <p><b><%= ($TEXT->{'dlna_current'} || 'Serving') %>:</b> <%= $cfg->{media_dir} || '-' %></p>
-<form role="form">
+<form role="form" method="post" action="/dlna">
  <input type=hidden name="action" value="update">
  <div class="radio"><label><input type="radio" name="radio_sel" value="nas" <%= $sel_nas %>><%= ($TEXT->{'dlna_all'} || 'Whole NAS') %></label></div>
  <div class="radio"><label><input type="radio" name="radio_sel" value="fs" <%= $sel_fs %>><%= ($TEXT->{'dlna_fs'} || 'File system') %></label>
@@ -52,7 +52,7 @@
 </div><!-- end of #tab2 -->
 <div class="tab-pane fade" id="tabs-3">
 <br>
-<form role="form">
+<form role="form" method="post" action="/dlna">
  <input type=hidden name="action" value="change">
  <div class="form-group"><label><%= ($TEXT->{'dlna_port'} || 'Port') %></label>
   <input class="form-control" name="port" value="<%= $cfg->{port} %>"></div>

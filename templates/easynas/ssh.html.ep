@@ -18,10 +18,10 @@
     <label><%= ($TEXT->{'ssh'}) %></label> 
     <br>
     %if ($service_active) {
-     <a href="?&action=sshoff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
+     <a data-post href="?&action=sshoff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
     %}
     %else {
-     <a href="?&action=sshon"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
+     <a data-post href="?&action=sshon"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
     %}
 </div><!-- end of #tab1 -->
 <div class="tab-pane fade" id="tabs-2">

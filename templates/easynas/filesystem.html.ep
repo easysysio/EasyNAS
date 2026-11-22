@@ -58,20 +58,20 @@
 %# An operation is running: only pause/resume/stop are allowed.
 %  if ($fs_ops->{$fs}{type} eq 'balance') {
 %   if ($fs_ops->{$fs}{paused}) {
-  <a href="?action=resumeop&fs=<%= $fs %>"><i class="fa fa-play fa-2x" title="<%= ($TEXT->{'resume'} || 'Resume') %>"></i>&nbsp;</a>
+  <a data-post href="?action=resumeop&fs=<%= $fs %>"><i class="fa fa-play fa-2x" title="<%= ($TEXT->{'resume'} || 'Resume') %>"></i>&nbsp;</a>
 %   } else {
-  <a href="?action=pauseop&fs=<%= $fs %>"><i class="fa fa-pause fa-2x" title="<%= ($TEXT->{'fs_pause'} || 'Pause') %>"></i>&nbsp;</a>
+  <a data-post href="?action=pauseop&fs=<%= $fs %>"><i class="fa fa-pause fa-2x" title="<%= ($TEXT->{'fs_pause'} || 'Pause') %>"></i>&nbsp;</a>
 %   }
 %  }
-  <a onclick="return confirm('<%= ($TEXT->{'fs_stop_op?'} || 'Stop this operation?') %>')" href="?action=stopop&fs=<%= $fs %>"><i class="fa fa-stop fa-2x" title="<%= ($TEXT->{'fs_stop'} || 'Stop') %>"></i></a>
+  <a data-post onclick="return confirm('<%= ($TEXT->{'fs_stop_op?'} || 'Stop this operation?') %>')" href="?action=stopop&fs=<%= $fs %>"><i class="fa fa-stop fa-2x" title="<%= ($TEXT->{'fs_stop'} || 'Stop') %>"></i></a>
 % } else {
   <a href="?action=settingsmenu&fs=<%= $fs %>"><i class="fa fa-sliders fa-2x" title="<%= ($TEXT->{'settings'}) %>"></i>&nbsp;</a>
   %if ($fs ne "ROOT"){
    %if ( $filesystems->{$fs}[8] eq "Mounted"){
-     <a href=?action=unmount&fs=<%= $fs %>><i class="fa fa-unlink fa-2x" title="<%= $TEXT->{'fs_unmount'} %>"></i>&nbsp;</a>
+     <a data-post href=?action=unmount&fs=<%= $fs %>><i class="fa fa-unlink fa-2x" title="<%= $TEXT->{'fs_unmount'} %>"></i>&nbsp;</a>
    %}else{
-    <a href=?action=mount&fs=<%= $fs %>><i class="fa fa-link fa-2x" title="<%= $TEXT->{'fs_mount'} %>"></i>&nbsp;</a>
-    <a onclick="return confirm('<%= ($TEXT->{'fs_delete?'}) %>')" href="?action=deletefs&fs=<%= $fs %>&uuid=<%= $filesystems->{$fs}[0] %>"><i class="fa fa-trash fa-2x" title="<%= ($TEXT->{'delete'}) %>"></i></a>
+    <a data-post href=?action=mount&fs=<%= $fs %>><i class="fa fa-link fa-2x" title="<%= $TEXT->{'fs_mount'} %>"></i>&nbsp;</a>
+    <a data-post onclick="return confirm('<%= ($TEXT->{'fs_delete?'}) %>')" href="?action=deletefs&fs=<%= $fs %>&uuid=<%= $filesystems->{$fs}[0] %>"><i class="fa fa-trash fa-2x" title="<%= ($TEXT->{'delete'}) %>"></i></a>
    %}
  %}
 % }
@@ -90,6 +90,6 @@
 <script>
 // A balance/scrub/replace is running: refresh so the progress indicator
 // and the settings lock track reality without manual reloads.
-setTimeout(function(){ location.reload(); }, 10000);
+setTimeout(function(){ location.replace(location.pathname + location.search); }, 10000);
 </script>
 % }

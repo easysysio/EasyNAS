@@ -35,7 +35,7 @@
 						    <td><%= $groups->{$group}[0] %></td>
 						    <td><%= $groups->{$group}[1] %></td>
 						    <td>
-						     <a onclick="return confirm('<%= ($TEXT->{'groups_delete?'}) %>')" href=?action=deletegroup&group=<%= $groups->{$group}[1] %>><i class="fa fa-trash fa-2x" title="<%= ($TEXT->{'group_delete'}) %>"></i></a>	
+						     <a data-post onclick="return confirm('<%= ($TEXT->{'groups_delete?'}) %>')" href=?action=deletegroup&group=<%= $groups->{$group}[1] %>><i class="fa fa-trash fa-2x" title="<%= ($TEXT->{'group_delete'}) %>"></i></a>	
 						     </td>
 						</tr>
 						%}

@@ -34,10 +34,10 @@
     <label><%= ($TEXT->{$addon->{'description'}}) %></label>
     <br>
     %if ($service_active) {
-     <a href="?action=mariadboff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
+     <a data-post href="?action=mariadboff"><i class="fa fa-toggle-on fa-3x"></i>&nbsp;</a>
     %}
     %else {
-     <a href="?action=mariadbon"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
+     <a data-post href="?action=mariadbon"><i class="fa fa-toggle-off fa-3x"></i>&nbsp;</a>
     %}
     </div><!-- end of #tab1 -->
 
@@ -54,7 +54,7 @@
       <tr>
        <td><%= $db %></td>
        <td class="text-right">
-        <a class="btn btn-default btn-xs"
+        <a data-post class="btn btn-default btn-xs"
            onclick="return confirm('<%= ($TEXT->{'mariadb_delete_confirm'} || 'Delete this database? All its data will be lost.') %>')"
            href="?action=deletedb&dbname=<%= $db %>"><i class="fa fa-trash"></i></a>
        </td>
@@ -65,7 +65,7 @@
 % }
      </tbody>
     </table>
-    <form role="form" class="form-inline">
+    <form role="form" class="form-inline" method="post" action="/mariadb">
      <input type="hidden" name="action" value="createdb">
      <div class="form-group">
       <input type="text" class="form-control" name="dbname" placeholder="<%= ($TEXT->{'mariadb_new_db'} || 'New database name') %>"
@@ -83,7 +83,7 @@
     <p class="text-muted"><%= ($TEXT->{'mariadb_not_running'} || 'Start the MariaDB service to manage databases.') %></p>
 % } else {
     <p class="text-muted"><%= ($TEXT->{'mariadb_root_pw_help'} || 'Set the MariaDB root password used by database clients. Local appliance management keeps working regardless.') %></p>
-    <form role="form">
+    <form role="form" method="post" action="/mariadb">
      <input type="hidden" name="action" value="setrootpw">
      <div class="form-group">
       <label><%= ($TEXT->{'mariadb_new_pw'} || 'New password') %></label>
@@ -104,7 +104,7 @@
     <p class="text-muted"><%= ($TEXT->{'mariadb_storage_help'} || 'Keep the database on a volume so it survives firmware updates (internal storage on the system disk is wiped when the firmware is updated).') %></p>
     <p><b><%= ($TEXT->{'mariadb_current_storage'} || 'Current location') %>:</b>
        <%= $storage_vol ne "" ? $storage_vol : ($TEXT->{'mariadb_internal'} || 'Internal (system disk)') %></p>
-    <form role="form">
+    <form role="form" method="post" action="/mariadb">
      <input type="hidden" name="action" value="setstorage">
      <div class="radio"><label>
       <input type="radio" name="radio_sel" value="internal" <%= $storage_vol eq "" ? "checked" : "" %>>

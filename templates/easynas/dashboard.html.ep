@@ -44,16 +44,16 @@
 <tr>
 % foreach my $disk (keys (%$disks)) {
  % if ( $disks->{$disk}[3] eq "disk_system") {
-<td><a href="<%= ($addons->{'disk'}->{program}) %>?action=settings&disk=<%= $disk %>"><i class="fa-regular fa-hard-drive fa-5x" style="color:blue" title="<%= $disk %>"></i></a>&nbsp</td>
+<td><a href="<%= ($addons->{'disk'}->{program}) %>?disk=<%= $disk %>"><i class="fa-regular fa-hard-drive fa-5x" style="color:blue" title="<%= $disk %>"></i></a>&nbsp</td>
  %}
  % if ( $disks->{$disk}[3] eq "disk_failed") {
-<td><a href="<%= ($addons->{'disk'}->{program}) %>?action=settings&disk=<%= $disk %>"><i class="fa-regular fa-hard-drive fa-5x" style="color:red" title="<%= $disk %>"></i></a>&nbsp</td>
+<td><a href="<%= ($addons->{'disk'}->{program}) %>?disk=<%= $disk %>"><i class="fa-regular fa-hard-drive fa-5x" style="color:red" title="<%= $disk %>"></i></a>&nbsp</td>
  %}
  % if ( $disks->{$disk}[3] eq "disk_used") {
-<td><a href="<%= ($addons->{'disk'}->{program}) %>?action=settings&disk=<%= $disk %>"><i class="fa-regular fa-hard-drive fa-5x" style="color:green" title="<%= $disk %>"></i></a>&nbsp</td>
+<td><a href="<%= ($addons->{'disk'}->{program}) %>?disk=<%= $disk %>"><i class="fa-regular fa-hard-drive fa-5x" style="color:green" title="<%= $disk %>"></i></a>&nbsp</td>
  %}
  % if ( $disks->{$disk}[3] eq "disk_free") {
-<td><a href="<%= ($addons->{'disk'}->{program}) %>?action=settings&disk=<%= $disk %>"><i class="fa-regular fa-hard-drive fa-5x" style="color:gray" title="<%= $disk %>"></i></a>&nbsp</td>
+<td><a href="<%= ($addons->{'disk'}->{program}) %>?disk=<%= $disk %>"><i class="fa-regular fa-hard-drive fa-5x" style="color:gray" title="<%= $disk %>"></i></a>&nbsp</td>
  %}
 %}
 </tr>

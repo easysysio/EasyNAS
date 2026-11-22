@@ -23,7 +23,7 @@
 % } elsif ($update_state eq "ready") {
 <div class="alert alert-success">
   <%= ($TEXT->{'firmware_update_done'} || 'Update complete. Reboot to apply it.') %>
-  <a class="btn btn-warning btn-sm" onclick="return confirm('<%= ($TEXT->{'firmware_reboot_confirm'} || 'Reboot the appliance now?') %>')"
+  <a data-post class="btn btn-warning btn-sm" onclick="return confirm('<%= ($TEXT->{'firmware_reboot_confirm'} || 'Reboot the appliance now?') %>')"
      href="?action=reboot"><i class="fa fa-power-off"></i> <%= ($TEXT->{'firmware_reboot'} || 'Reboot now') %></a>
 </div>
 % } elsif ($update_state eq "failed") {
@@ -70,10 +70,10 @@
 			</div>
 			<BR>
 % if ($update_state ne "updating") {
-			<a class="btn btn-primary" onclick="return confirm('<%= ($TEXT->{'firmware_update_r_u_sure'} || 'Update the whole system (OS + EasyNAS)? A snapshot is taken first where supported.') %>')"
+			<a data-post class="btn btn-primary" onclick="return confirm('<%= ($TEXT->{'firmware_update_r_u_sure'} || 'Update the whole system (OS + EasyNAS)? A snapshot is taken first where supported.') %>')"
 			   href="?action=update"><i class="fa fa-cloud-download"></i> <%= ($TEXT->{'firmware_update'} || 'Update system') %></a>
 % }
-			&nbsp;<a href="?action=refresh">[<%= ($TEXT->{'firmware_refresh'}) %>]</a>
+			&nbsp;<a data-post href="?action=refresh">[<%= ($TEXT->{'firmware_refresh'}) %>]</a>
 
 
 

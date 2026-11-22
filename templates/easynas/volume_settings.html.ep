@@ -7,7 +7,7 @@
     <label><%= $vol %></label>
    </div>
    <div class="panel-body">
-        <form role="form">
+        <form role="form" method="post" action="/volume">
          <input type=hidden name="action" value="savevol">
 	 <input type=hidden name="vol" value="<%= $vol %>">
 	 <input type=hidden name="fs" value="<%= $fs %>">

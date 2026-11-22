@@ -7,7 +7,7 @@
     <label><%= ($TEXT->{'vol_create'}) %></label>
    </div>
    <div class="panel-body">
-        <form role="form">
+        <form role="form" method="post" action="/volume">
          <input type=hidden name="action" value="createvol">
          <div class="form-group">
           <label><%= ($TEXT->{'vol_name'}) %></label>

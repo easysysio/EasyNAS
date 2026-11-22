@@ -7,7 +7,7 @@
     <label><%= ($TEXT->{'radius_add'} || 'Add Client') %></label>
    </div>
    <div class="panel-body">
-        <form role="form">
+        <form role="form" method="post" action="/radius">
          <input type=hidden name="action" value="add">
          <div class="form-group">
           <label><%= ($TEXT->{'radius_client'} || 'Client name') %></label>
