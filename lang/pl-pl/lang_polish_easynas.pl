@@ -670,7 +670,6 @@ $TEXT{'about_ssh'} = "Bezpieczny dostęp powłoki do urządzenia, w tym transfer
 $TEXT{'about_rsyncd'} = "Demon rsync: wolumeny jako moduły rsync do szybkiej zdalnej synchronizacji i kopii zapasowych.";
 $TEXT{'about_tftp'} = "Serwer TFTP: udostępnianie jednego wolumenu przez Trivial FTP, np. dla obrazów PXE i urządzeń sieciowych.";
 $TEXT{'about_dlna'} = "Serwer multimediów DLNA/UPnP (minidlna): strumieniowanie muzyki, zdjęć i filmów do telewizorów i odtwarzaczy.";
-$TEXT{'about_plex'} = "Plex Media Server: organizacja i strumieniowanie biblioteki multimediów; zarządzanie w aplikacji Plex na porcie 32400.";
 $TEXT{'about_iscsi'} = "Cel iSCSI: obrazy dysków przechowywane na wolumenie jako urządzenia blokowe (LUN) dla inicjatorów iSCSI.";
 $TEXT{'about_radius'} = "Serwer FreeRADIUS: centralne uwierzytelnianie urządzeń sieciowych, np. punktów dostępowych Wi-Fi i przełączników.";
 $TEXT{'about_lxc'} = "Kontenery Linux (LXC): lekkie kontenery na urządzeniu z terminalem WWW.";

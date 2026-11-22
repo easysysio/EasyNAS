@@ -29,6 +29,9 @@ Requires:       tar
 Requires:       rsync
 Requires:       NetworkManager
 Requires:       dmidecode
+# The Plex add-on was dropped (its plexmediaserver dependency is in no
+# repository the appliance uses). Updating EasyNAS uninstalls it.
+Obsoletes:      easynas-mm-plex < 1.99-5
 
 %description
 EasyNAS is a Network Attached Storage Server.
@@ -76,7 +79,6 @@ cat > %{buildroot}/etc/easynas/addons/easynas.addons << 'EOF'
 <solvable status="not-installed" name="easynas-lang-polish" summary="Polish Language for EasyNAS" kind="package"/>
 <solvable status="not-installed" name="easynas-lang-portuguese" summary="Portuguese Language for EasyNAS" kind="package"/>
 <solvable status="not-installed" name="easynas-mm-dlna" summary="DLNA addon for EasyNAS" kind="package"/>
-<solvable status="not-installed" name="easynas-mm-plex" summary="PLEX addon for EasyNAS" kind="package"/>
 <solvable status="not-installed" name="easynas-srv-lxc" summary="Virtualization addon for EasyNAS" kind="package"/>
 <solvable status="not-installed" name="easynas-srv-mariadb" summary="MariaDB addon for EasyNAS" kind="package"/>
 <solvable status="not-installed" name="easynas-srv-radius" summary="Radius addon for EasyNAS" kind="package"/>
@@ -526,26 +528,6 @@ DLNA addon for EasyNAS
 /easynas/lang/pl-pl/lang_polish_dlna.pl
 
 
-#### Plex ####
-%package        mm-plex
-Version:        %{version}
-Release:        4
-Summary:        PLEX addon for EasyNAS
-Group:          easynas/addon
-Requires:       easynas >= %{version}
-Requires:       plexmediaserver
-
-%description mm-plex
-Plex Server addon for EasyNAS
-
-%files mm-plex
-/easynas/addons/plex.easynas
-/easynas/lib/EasyNAS/Controller/plex.pm
-/easynas/templates/easynas/plex.html.ep
-/easynas/lang/en-en/lang_english_plex.pl
-/easynas/lang/pl-pl/lang_polish_plex.pl
-
-
 #### RSync ####
 %package        fs-rsyncd
 Version:        %{version}
@@ -666,7 +648,7 @@ iSCSI addon for EasyNAS
 ##### German Language ####
 %package        lang-german
 Version:        %{version}
-Release:        5
+Release:        6
 Summary:        German Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -682,7 +664,7 @@ German Language for EasyNAS
 ##### Portuguese Language ####
 %package        lang-portuguese
 Version:        %{version}
-Release:        5
+Release:        6
 Summary:        Portuguese Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -698,7 +680,7 @@ Portuguese Language for EasyNAS
 ##### Chinese Language ####
 %package        lang-chinese
 Version:        %{version}
-Release:        5
+Release:        6
 Summary:        Simplified Chinese Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -714,7 +696,7 @@ Simplified Chinese Language for EasyNAS
 ##### Polish Language ####
 %package        lang-polish
 Version:        %{version}
-Release:        5
+Release:        6
 Summary:        Polish Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -816,6 +798,11 @@ Polish Language for EasyNAS
   - Translations: language strings are decoded from UTF-8 once loaded; they
     were sent to the browser encoded twice, so every non-ASCII letter on a
     translated page showed as garbage
+  - Add-ons: the Plex add-on is removed. It could not install (Plex Media
+    Server comes only from Plex's own repository), its on/off switch drove a
+    service nothing shipped, and its one setting moved Plex's own data folder.
+    Updating EasyNAS uninstalls it; Plex itself, if installed, is left alone.
+    The "Not available on ARM" label, used only by Plex, is gone too
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

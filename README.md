@@ -60,7 +60,7 @@ Install them from the **Add-ons** page in the web interface.
 | Category | Add-ons |
 |----------|---------|
 | **File sharing** | Samba, NFS, FTP, AFP, TFTP, rsync, SSH |
-| **Media** | DLNA, Plex |
+| **Media** | DLNA |
 | **Services** | LXC containers, MariaDB, RADIUS |
 | **Storage** | iSCSI target |
 | **Languages** | German, Portuguese, Chinese, Polish |

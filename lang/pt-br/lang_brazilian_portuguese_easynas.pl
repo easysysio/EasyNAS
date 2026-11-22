@@ -670,7 +670,6 @@ $TEXT{'about_ssh'} = "Acesso shell seguro ao dispositivo, incluindo transferênc
 $TEXT{'about_rsyncd'} = "Daemon rsync: exponha volumes como módulos rsync para sincronização remota rápida e backups.";
 $TEXT{'about_tftp'} = "Servidor TFTP: sirva um volume por Trivial FTP, por exemplo para imagens de boot PXE e equipamentos de rede.";
 $TEXT{'about_dlna'} = "Servidor de mídia DLNA/UPnP (minidlna): transmita músicas, fotos e vídeos para TVs e players.";
-$TEXT{'about_plex'} = "Plex Media Server: organize e transmita sua biblioteca de mídia; gerencie no app web do Plex na porta 32400.";
 $TEXT{'about_iscsi'} = "Alvo iSCSI: publique imagens de disco armazenadas em um volume como dispositivos de bloco (LUNs) para iniciadores iSCSI.";
 $TEXT{'about_radius'} = "Servidor FreeRADIUS: autenticação central para equipamentos de rede como pontos de acesso Wi-Fi e switches.";
 $TEXT{'about_lxc'} = "Contêineres Linux (LXC): execute contêineres leves no dispositivo com terminal web.";

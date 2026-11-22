@@ -70,6 +70,5 @@ download, upload, copy, move, rename and delete, with no client to set up.
 | rsync daemon | `fs-rsyncd` | backups/replication |
 | iSCSI | `stg-iscsi` | block storage for hypervisors |
 | DLNA | `mm-dlna` | media players/TVs |
-| Plex | `mm-plex` | media server |
 
 See [Add-ons](addons.md) for installation.

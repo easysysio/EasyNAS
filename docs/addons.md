@@ -29,7 +29,6 @@ updates.
 | Add-on | Provides |
 |---|---|
 | `mm-dlna` | DLNA media server (minidlna) |
-| `mm-plex` | Plex Media Server |
 
 ### Services
 

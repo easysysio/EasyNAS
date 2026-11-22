@@ -670,7 +670,6 @@ $TEXT{'about_ssh'} = "对设备的安全 Shell 访问，包括 SFTP 文件传输
 $TEXT{'about_rsyncd'} = "rsync 守护进程：将卷作为 rsync 模块，用于快速远程同步和备份。";
 $TEXT{'about_tftp'} = "TFTP 服务器：通过简单 FTP 提供一个卷，例如用于 PXE 启动镜像和网络设备。";
 $TEXT{'about_dlna'} = "DLNA/UPnP 媒体服务器（minidlna）：向电视和播放器串流音乐、照片和视频。";
-$TEXT{'about_plex'} = "Plex 媒体服务器：整理并串流媒体库；在 32400 端口的 Plex Web 应用中管理。";
 $TEXT{'about_iscsi'} = "iSCSI 目标：将卷上的磁盘镜像作为块设备（LUN）发布给 iSCSI 启动器。";
 $TEXT{'about_radius'} = "FreeRADIUS 服务器：为 Wi-Fi 接入点和交换机等网络设备提供集中认证。";
 $TEXT{'about_lxc'} = "Linux 容器（LXC）：在设备上运行轻量级容器，带 Web 终端。";

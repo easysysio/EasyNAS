@@ -316,14 +316,13 @@ Three categories:
 | **RADIUS** (freeradius) | own user store | Self-auth (optional) | freeradius LDAP module = future per-addon work |
 | **TFTP** | none (anonymous) | Self-auth | no user auth |
 | **DLNA** (minidlna) | none (serves everyone) | Self-auth | no per-user auth |
-| **Plex** | Plex accounts | Self-auth | own identity system; not domain-integrable |
 | **MariaDB** | SQL user table | Self-auth | own users |
 | **iSCSI** | CHAP secrets in target config | Self-auth | own credentials |
 | **LXC** | container mgmt, not user auth | N/A | — |
 
 **The realistic promise:** the realm is one user store for the human
 file-access protocols — **SMB, SSH, FTP, AFP** (plus NFS ownership) — across all
-backends. App-level services (Plex, MariaDB, RADIUS, iSCSI, …) keep their own
+backends. App-level services (MariaDB, RADIUS, iSCSI, …) keep their own
 credentials, as they do on every NAS.
 
 Optional future integrations: **RADIUS → LDAP** and **rsyncd → over-SSH** are the

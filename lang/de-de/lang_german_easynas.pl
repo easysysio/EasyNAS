@@ -670,7 +670,6 @@ $TEXT{'about_ssh'} = "Sicherer Shell-Zugriff auf die Appliance, einschließlich 
 $TEXT{'about_rsyncd'} = "rsync-Daemon: Volumes als rsync-Module für schnelle Fernsynchronisation und Backups bereitstellen.";
 $TEXT{'about_tftp'} = "TFTP-Server: ein Volume über Trivial FTP bereitstellen, z. B. für PXE-Boot-Images und Netzwerkgeräte.";
 $TEXT{'about_dlna'} = "DLNA/UPnP-Medienserver (minidlna): Musik, Fotos und Videos an Fernseher und Player streamen.";
-$TEXT{'about_plex'} = "Plex Media Server: Medienbibliothek organisieren und streamen; Verwaltung in der Plex-Web-App auf Port 32400.";
 $TEXT{'about_iscsi'} = "iSCSI-Target: auf einem Volume gespeicherte Disk-Images als Blockgeräte (LUNs) für iSCSI-Initiatoren bereitstellen.";
 $TEXT{'about_radius'} = "FreeRADIUS-Server: zentrale Authentifizierung für Netzwerkgeräte wie WLAN-Access-Points und Switches.";
 $TEXT{'about_lxc'} = "Linux-Container (LXC): leichtgewichtige Container auf der Appliance mit Web-Terminal betreiben.";

@@ -218,7 +218,7 @@ installs (requirement #1); the online OS update path must be in-place
 
 ## 9. Addon persistence across upgrades
 
-Addons (`easynas-fs-ssh`, `easynas-fs-samba`, `easynas-mm-plex`, …) are optional
+Addons (`easynas-fs-ssh`, `easynas-fs-samba`, `easynas-mm-dlna`, …) are optional
 RPMs the user installs *after* the base image is built. They drop files into the
 **OS tree** (`/easynas/lib`, `/easynas/templates`, `/easynas/lang`,
 `/easynas/addons`, `/usr/lib/systemd/system`) as well as config

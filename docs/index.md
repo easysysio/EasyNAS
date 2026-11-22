@@ -154,7 +154,7 @@ Get started
 <li><code>fs-ftp</code> · <code>fs-tftp</code> for legacy clients and network boot</li>
 <li><code>fs-rsyncd</code> for backups and replication</li>
 <li><code>stg-iscsi</code> for block storage a hypervisor can boot from</li>
-<li><code>mm-dlna</code> · <code>mm-plex</code> for TVs and media players</li>
+<li><code>mm-dlna</code> for TVs and media players</li>
 </ul>
 </div>
 <div class="es-card en-group">
