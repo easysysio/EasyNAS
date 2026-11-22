@@ -87,7 +87,7 @@ chown -R mysql:mysql "$db"
 
 # Persist: bind <volume>/mariadb onto /var/lib/mysql, after the volume mount.
 volmnt=$(echo "$target" | sed -E 's%(/mnt/[^/]+).*%\1%')
-printf '%s %s none bind,x-systemd.requires-mount-for=%s 0 0 %s\n' \
+printf '%s %s none bind,x-systemd.requires-mounts-for=%s 0 0 %s\n' \
     "$db" "$DATADIR" "$volmnt" "$MARKER" >> "$FSTAB"
 mkdir -p "$(dirname "$DROPIN")"
 printf '[Unit]\nRequiresMountsFor=%s\n' "$DATADIR" > "$DROPIN"

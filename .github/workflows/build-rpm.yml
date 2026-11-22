@@ -37,12 +37,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: File manager helper, template and port tests
-        run: prove -v t/files-helper.t t/templates-post.t t/web-port.t
+      - name: File manager helper, template, port and LXC helper tests
+        run: prove -v t/files-helper.t t/templates-post.t t/web-port.t t/lxc-helper.t
       - name: Install Mojolicious
         run: sudo apt-get update && sudo apt-get install -y libmojolicious-perl
-      - name: Settings, sign-in and file manager web tests
-        run: prove -v t/web.t t/files-web.t
+      - name: Settings, sign-in, file manager and LXC web tests
+        run: prove -v t/web.t t/files-web.t t/lxc-web.t
 
   build:
     needs: test

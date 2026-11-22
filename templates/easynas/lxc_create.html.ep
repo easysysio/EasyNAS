@@ -1,220 +1,55 @@
 % layout 'default';
 
-
 <div class="row">
- <div class="col-lg-10">
+ <div class="col-lg-8">
   <div class="panel panel-default">
-   <div class="panel-heading">
-    <label><%= ($TEXT->{'create_lxc'}) %></label>
-   </div>
+   <div class="panel-heading"><label><%= ($TEXT->{'lxc_create'}) %></label></div>
+   <form role="form" method="post" action="/lxc">
+   <input type="hidden" name="action" value="create">
    <div class="panel-body">
-    <div class="row">
-      <div class="col-lg-6">
-        <form role="form" method="post" action="/lxc">
-         <input type=hidden name="action" value="savepolicy">
-	 <input type=hidden name="update" value="false">
-         <div class="form-group">
-          <label>Policy Name</label>
-          <input class="form-control" name="name">
-          <p class="help-block">The referance name of the policy.</p>
-         </div>
-	 <div class="form-group">
-           <label>Mode</label>
-	   <BR>
-           <label class="radio-inline">
-            <input type="radio" name="roleengine" id="optionsRadiosInline1" value="DetectionOnly" checked>DetectionOnly
-           </label>
-           <label class="radio-inline">
-            <input type="radio" name="roleengine" id="optionsRadiosInline2" value="ON">ON
-           </label>
-           <label class="radio-inline">
-            <input type="radio" name="roleengine" id="optionsRadiosInline3" value="OFF">OFF
-           </label>
-         </div>
-	  <BR>
-	  <div class="form-group">
-           <label>Category Action</label>
-           <BR>
-	   <div class="col-lg-12">
-           <!-- /.panel-heading -->
-            <div class="table-responsive">
-             <table class="table table-striped table-bordered table-hover" id="dataTables">
-             <thead>
-              <tr>
-               <th>Enable</th>
-               <th>Attack Name</th>
-	       <th>Numeric</th>
- 	       <th>Score</th>
-	       <th>Action</th>
-              </tr>
-             </thead>
-             <tbody>
-	   <tr><td><input type="checkbox" name="XSS"></td>
-           <td>Cross Site Scripting</td>  
-           <td><select name="action">
-            <option>></option>
-            <option>>=</option>
-	    <option><=</option>
-            <option><</option>
-           </select></td>
-	   <td><select name="score">
-            <option>0</option>
-            <option>1</opyion>
-	    <option>2</option>
-            <option>3</opyion>
-	    <option>4</option>
-            <option>5</opyion>
-	    <option>6</option>
-            <option>7</opyion>
-	    <option>8</option>
-            <option>9</opyion>
-           </select></td>
-           <td><select name="policy">
-            <option>BLOCK</option>
-	    <option>ALLOW</option>
-	    <option>DROP</option>
-	    <option>LOG</option>
-           </select></td></tr>
-	   <tr><td><input type="checkbox" name="XSS"></td>
-           <td>SQL Injection</td>
-           <td><select name="action">
-            <option>></option>
-            <option>>=</option>
-            <option><=</option>
-            <option><</option>
-           </select></td>
-           <td><select name="score">
-            <option>0</option>
-            <option>1</opyion>
-            <option>2</option>
-            <option>3</opyion>
-            <option>4</option>
-            <option>5</opyion>
-            <option>6</option>
-            <option>7</opyion>
-            <option>8</option>
-            <option>9</opyion>
-           </select></td>
-           <td><select name="policy">
-            <option>BLOCK</option>
-            <option>ALLOW</option>
-            <option>DROP</option>
-            <option>LOG</option>
-           </select></td></tr>
-	   <tr><td><input type="checkbox" name="XSS"></td>
-           <td>File Traversal</td>
-           <td><select name="action">
-            <option>></option>
-            <option>>=</option>
-            <option><=</option>
-            <option><</option>
-           </select></td>
-           <td><select name="score">
-            <option>0</option>
-            <option>1</opyion>
-            <option>2</option>
-            <option>3</opyion>
-            <option>4</option>
-            <option>5</opyion>
-            <option>6</option>
-            <option>7</opyion>
-            <option>8</option>
-            <option>9</opyion>
-           </select></td>
-           <td><select name="policy">
-            <option>BLOCK</option>
-            <option>ALLOW</option>
-            <option>DROP</option>
-            <option>LOG</option>
-           </select></td></tr>
-	   <tr><td><input type="checkbox" name="XSS"></td>
-           <td>Remote File Inclusion</td>
-           <td><select name="action">
-            <option>></option>
-            <option>>=</option>
-            <option><=</option>
-            <option><</option>
-           </select></td>
-           <td><select name="score">
-            <option>0</option>
-            <option>1</opyion>
-            <option>2</option>
-            <option>3</opyion>
-            <option>4</option>
-            <option>5</opyion>
-            <option>6</option>
-            <option>7</opyion>
-            <option>8</option>
-            <option>9</opyion>
-           </select></td>
-           <td><select name="policy">
-            <option>BLOCK</option>
-            <option>ALLOW</option>
-            <option>DROP</option>
-            <option>LOG</option>
-           </select></td></tr>
-	   <tr><td><input type="checkbox" name="XSS"></td>
-           <td>Evade</td>
-           <td><select name="action">
-            <option>></option>
-            <option>>=</option>
-            <option><=</option>
-            <option><</option>
-           </select></td>
-           <td><select name="score">
-            <option>0</option>
-            <option>1</opyion>
-            <option>2</option>
-            <option>3</opyion>
-            <option>4</option>
-            <option>5</opyion>
-            <option>6</option>
-            <option>7</opyion>
-            <option>8</option>
-            <option>9</opyion>
-           </select></td>
-           <td><select name="policy">
-            <option>BLOCK</option>
-            <option>ALLOW</option>
-            <option>DROP</option>
-            <option>LOG</option>
-           </select></td></tr>
-	   <tr><td><input type="checkbox" name="XSS"></td>
-           <td>Uploads</td>
-           <td><select name="action">
-            <option>></option>
-            <option>>=</option>
-            <option><=</option>
-            <option><</option>
-           </select></td>
-           <td><select name="score">
-            <option>0</option>
-            <option>1</opyion>
-            <option>2</option>
-            <option>3</opyion>
-            <option>4</option>
-            <option>5</opyion>
-            <option>6</option>
-            <option>7</opyion>
-            <option>8</option>
-            <option>9</opyion>
-           </select></td>
-           <td><select name="policy">
-            <option>BLOCK</option>
-            <option>ALLOW</option>
-            <option>DROP</option>
-            <option>LOG</option>
-           </select></td></tr>
-	   </tbody>
-	   </table>
-        </div>
-	</div>
-       <button type="submit" class="btn btn-default">Save Policy</button>
-       <button type="reset" class="btn btn-default">Reset</button>
-      </form>
-      </div>
+% if ($storage_vol eq "") {
+    <div class="alert alert-warning">
+     <%= ($TEXT->{'lxc_internal_warning'} || 'Containers are kept on the system disk, which a firmware update wipes.') %>
+     <a href="?action=storagemenu" class="alert-link"><%= ($TEXT->{'lxc_choose_volume'} || 'Keep them on a volume') %></a>
     </div>
+% }
+    <div class="form-group">
+     <label><%= ($TEXT->{'lxc_name'}) %></label>
+     <input class="form-control" name="name" required maxlength="64" pattern="[A-Za-z0-9][A-Za-z0-9._\-]*">
+    </div>
+    <div class="form-group">
+     <label><%= ($TEXT->{'lxc_image'} || 'Image') %></label>
+% if (keys %$images) {
+     <select class="form-control" name="image">
+%   foreach my $dist (sort keys %$images) {
+      <optgroup label="<%= $dist %>">
+%     foreach my $rel (@{$images->{$dist}}) {
+       <option value="<%= $dist %>:<%= $rel %>" <%= ($dist eq 'debian' && $rel eq 'trixie') ? 'selected' : '' %>><%= $dist %> <%= $rel %></option>
+%     }
+      </optgroup>
+%   }
+     </select>
+     <p class="help-block"><%= ($TEXT->{'lxc_image_help'} || 'Downloaded from images.linuxcontainers.org for this machine') %> (<%= $arch %>).</p>
+% } else {
+     <p class="text-danger"><%= ($TEXT->{'lxc_no_images'} || "Couldn't get the list of images from images.linuxcontainers.org. Is the appliance online?") %></p>
+% }
+    </div>
+    <div class="form-group">
+     <label><%= ($TEXT->{'lxc_network'} || 'Network') %></label>
+     <div class="radio"><label><input type="radio" name="network" value="nat" checked>
+      <b><%= ($TEXT->{'lxc_network_nat'} || 'Private') %></b> &mdash;
+      <%= ($TEXT->{'lxc_network_nat_help'} || 'an address on a private network inside the NAS (10.0.3.x). It reaches the internet; other devices on your network cannot reach it.') %></label></div>
+     <div class="radio"><label><input type="radio" name="network" value="lan">
+      <b><%= ($TEXT->{'lxc_network_lan'} || 'Your network') %></b> &mdash;
+      <%= ($TEXT->{'lxc_network_lan_help'} || 'its own address from your router, like another computer on the network. Other devices can reach it; the NAS itself cannot.') %></label></div>
+    </div>
+    <div class="checkbox"><label><input type="checkbox" name="autostart" value="1"> <%= ($TEXT->{'lxc_autostart'} || 'Start at boot') %></label></div>
    </div>
+   <div class="panel-footer"><center>
+    <button type="submit" class="btn btn-primary" <%= (keys %$images) ? '' : 'disabled' %>><%= ($TEXT->{'lxc_create_button'} || 'Create') %></button>
+    <a class="btn btn-default" href="/lxc"><%= ($TEXT->{'lxc_cancel'} || 'Cancel') %></a>
+   </center></div>
+   </form>
   </div>
  </div>
 </div>

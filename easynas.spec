@@ -34,6 +34,7 @@ Requires:       dmidecode
 Obsoletes:      easynas-mm-plex < 1.99-5
 # The NAS-user frame, templates/layouts/user.html.ep (needed by fs-files).
 Provides:       easynas(user-layout)
+Provides:       easynas(lxc-helper)
 # The core only lets GETs show things (POST for changes, see lib/EasyNAS.pm);
 # these add-on releases are the first whose pages make their changes by POST,
 # so older ones are updated along with the core.
@@ -329,6 +330,11 @@ EOF
 %post
 systemctl enable easynas.socket easynas.service easynas-firstboot.service
 
+# MariaDB's storage bind line used to say x-systemd.requires-mount-for, which
+# systemd doesn't know, so at boot the bind could run before its volume was
+# mounted. Correct lines written by older releases.
+sed -i '/# easynas-mariadb-storage/s/x-systemd\.requires-mount-for=/x-systemd.requires-mounts-for=/' /etc/fstab 2>/dev/null || :
+
 # On a live system, seed the config layer (cert, port, cron) and restart now.
 # During an image build there is no running systemd, so this is skipped and the
 # enabled firstboot service seeds at the first real boot instead -- which keeps
@@ -360,16 +366,30 @@ fi
 #### lxc ####
 %package        srv-lxc
 Version:        %{version}
-Release:        7
+Release:        8
 Summary:        Virtualization addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
+Requires:       easynas(lxc-helper)
 Requires:       lxc
 Requires:       ttyd
-Requires:       libwebsockets-devel
+# lxc-create's download template
+Requires:       wget
+Requires:       tar
+Requires:       xz
+# lxc-net: the lxcbr0 bridge's DHCP and its NAT rules
+Requires:       dnsmasq
+Requires:       nftables
 
 %description srv-lxc
 Virtualization addon for EasyNAS
+
+%post srv-lxc
+# Switch on the lxcbr0 bridge new containers connect to (openSUSE ships it
+# off) and autostart at boot. Only on a live system.
+if [ -d /run/systemd/system ]; then
+    /easynas/startup/lxc-helper.sh net >/dev/null 2>&1 || :
+fi
 
 %files srv-lxc
 /easynas/addons/lxc.easynas
@@ -377,6 +397,7 @@ Virtualization addon for EasyNAS
 /easynas/lang/en-en/lang_english_lxc.pl
 /easynas/templates/easynas/lxc.html.ep
 /easynas/templates/easynas/lxc_create.html.ep
+/easynas/templates/easynas/lxc_storage.html.ep
 
 
 #### mariadb ####
@@ -889,6 +910,20 @@ Polish Language for EasyNAS
     menu's User Profile entry leads there instead of the Users page
   - The bare frame NAS users see is now the core's layouts/user.html.ep
     (their name links to their profile); fs-files uses it and requires it
+  - LXC add-on, finished (srv-lxc 8): create containers from the images on
+    images.linuxcontainers.org (in the background; the list shows them as
+    "creating"), on a private NAT network or with their own address on the
+    LAN; delete them; start them at boot; keep them on a volume (bind-mounted
+    onto /var/lib/lxc, like MariaDB's data) so firmware updates don't wipe
+    them. The lxcbr0 bridge openSUSE's lxc points containers at but ships
+    switched off is now turned on, which is why containers failed to start.
+    The terminal waits until ttyd listens and replaces a stale one. The root
+    work is in startup/lxc-helper.sh (core, easynas(lxc-helper)). Requires
+    wget/tar/xz (download template) and dnsmasq/nftables (bridge); no longer
+    libwebsockets-devel
+  - MariaDB storage: the fstab bind line now says x-systemd.requires-mounts-for
+    (was requires-mount-for, which systemd ignores, so the bind could beat its
+    volume at boot); %post corrects existing lines
   - Remove the Firmware page: the Add-ons page already updates EasyNAS and
     every add-on, one at a time through its queue. /firmware now leads to
     Add-ons, as does the menu's Update entry, and the update banner on every

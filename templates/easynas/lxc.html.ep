@@ -5,55 +5,82 @@
  <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
  <%= $msg %>
 </div>
- %}
-
- %if ($result eq "success"){
+%}
+%if ($result eq "success"){
 <div class="alert alert-success alert-dismissible">
  <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
  <%= $msg %>
 </div>
- %}
-
+%}
 
 <div class="row">
-                        <div class="col-lg-12">
-    <p class="text-muted"><%= $TEXT->{'about_lxc'} %></p>
-                                <!-- /.panel-heading -->
-                                    <div class="table-responsive">
-                                        <table class="table table-striped table-bordered table-hover" id="dataTables-example">
-                                            <thead>
-                                                <tr>
-						<th></th>
-						<th><%= ($TEXT->{'lxc_name'}) %></th>
-						<th><%= ($TEXT->{'lxc_state'}) %></th>
-						<th><%= ($TEXT->{'lxc_ip'}) %></th>
-						<th><%= ($TEXT->{'lxc_action'}) %></th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-						% foreach my $system (sort keys (%$systems)) {
-%   my $running = ($systems->{$system}[1] eq 'RUNNING');
-                                                <tr>
-                                                    <td><i class="fa fa-desktop fa-2x"></i></td>
-						    <td><%= $systems->{$system}[0] %></td>
-						    <td><%= $systems->{$system}[1] %></td>
-						    <td><%= $systems->{$system}[2] %></td>
-						    <td>
-% if ($running) {
-						     <a data-post href="?action=terminal&name=<%= $system %>" target="_blank" rel="noopener noreferrer" title="<%= ($TEXT->{'lxc_terminal'} || 'Terminal') %>"><i class="fa fa-terminal fa-2x">&nbsp;</i></a>
-						     <a data-post href="?action=stop&name=<%= $system %>" title="<%= ($TEXT->{'lxc_stop'} || 'Stop') %>"><i class="fa fa-stop fa-2x"></i></a>
+ <div class="col-lg-12">
+  <p class="text-muted"><%= $TEXT->{'about_lxc'} %></p>
+% if ($storage_vol eq "") {
+  <div class="alert alert-warning">
+   <i class="fa fa-exclamation-triangle"></i>
+   <%= ($TEXT->{'lxc_internal_warning'} || 'Containers are kept on the system disk, which a firmware update wipes.') %>
+   <a href="?action=storagemenu" class="alert-link"><%= ($TEXT->{'lxc_choose_volume'} || 'Keep them on a volume') %></a>
+  </div>
 % } else {
-						     <a data-post href="?action=start&name=<%= $system %>" title="<%= ($TEXT->{'lxc_start'} || 'Start') %>"><i class="fa fa-play fa-2x"></i></a>
+  <p><i class="fa fa-hdd-o"></i> <%= ($TEXT->{'lxc_kept_on'} || 'Containers are kept on') %> <b><%= $storage_vol %></b>
+     &nbsp;<a href="?action=storagemenu">[<%= ($TEXT->{'lxc_change'} || 'Change') %>]</a></p>
 % }
-						    </td>
-						</tr>
-					 	%}
+  <div class="table-responsive">
+   <table class="table table-striped table-bordered table-hover">
+    <thead>
+     <tr>
+      <th></th>
+      <th><%= ($TEXT->{'lxc_name'}) %></th>
+      <th><%= ($TEXT->{'lxc_state'}) %></th>
+      <th><%= ($TEXT->{'lxc_ip'}) %></th>
+      <th><%= ($TEXT->{'lxc_autostart'} || 'Start at boot') %></th>
+      <th><%= ($TEXT->{'lxc_action'}) %></th>
+     </tr>
+    </thead>
+    <tbody>
+% foreach my $system (sort keys (%$systems)) {
+%   my ($name, $state, $ip, $auto) = @{$systems->{$system}};
+%   my $running = ($state eq 'RUNNING');
+     <tr>
+      <td><i class="fa fa-desktop fa-2x"></i></td>
+      <td><%= $name %></td>
+% if ($state eq 'CREATING') {
+      <td><i class="fa fa-spinner fa-spin"></i> <%= ($TEXT->{'lxc_state_creating'} || 'Creating...') %></td><td>-</td><td></td><td></td>
+% } elsif ($state eq 'FAILED') {
+      <td class="text-danger"><%= ($TEXT->{'lxc_state_failed'} || 'Creating it failed (see /var/log/easynas/lxc.log)') %></td><td>-</td><td></td>
+      <td><a data-post href="?action=delete&name=<%= $name %>" title="<%= ($TEXT->{'lxc_dismiss'} || 'Dismiss') %>"><i class="fa fa-times fa-2x"></i></a></td>
+% } else {
+      <td><%= $state %></td>
+      <td><%= $ip %></td>
+      <td><a data-post href="?action=autostart&name=<%= $name %>&on=<%= $auto ? 0 : 1 %>"
+             title="<%= $auto ? ($TEXT->{'lxc_autostart_off'} || "Don't start at boot") : ($TEXT->{'lxc_autostart_on'} || 'Start at boot') %>">
+           <i class="fa <%= $auto ? 'fa-toggle-on text-success' : 'fa-toggle-off text-muted' %> fa-2x"></i></a></td>
+      <td>
+%   if ($running) {
+       <a data-post href="?action=terminal&name=<%= $name %>" target="_blank" rel="noopener noreferrer" title="<%= ($TEXT->{'lxc_terminal'} || 'Terminal') %>"><i class="fa fa-terminal fa-2x">&nbsp;</i></a>
+       <a data-post href="?action=stop&name=<%= $name %>" title="<%= ($TEXT->{'lxc_stop'} || 'Stop') %>"><i class="fa fa-stop fa-2x">&nbsp;</i></a>
+%   } else {
+       <a data-post href="?action=start&name=<%= $name %>" title="<%= ($TEXT->{'lxc_start'} || 'Start') %>"><i class="fa fa-play fa-2x">&nbsp;</i></a>
+%   }
+       <a data-post href="?action=delete&name=<%= $name %>" title="<%= ($TEXT->{'lxc_delete'} || 'Delete') %>"
+          onclick="return confirm('<%= ($TEXT->{'lxc_delete_confirm'} || 'Delete this container and everything in it? This cannot be undone.') %>')"><i class="fa fa-trash fa-2x"></i></a>
+      </td>
+% }
+     </tr>
+% }
 % unless (keys %$systems) {
-						<tr><td colspan="5" class="text-muted"><%= ($TEXT->{'lxc_none'} || 'No containers.') %></td></tr>
+     <tr><td colspan="6" class="text-muted"><%= ($TEXT->{'lxc_none'} || 'No containers.') %></td></tr>
 % }
-                                            </tbody>
-                                        </table>
-                                    </div>
-				</div>
-				 <br><br><br><br><br><a href="?action=createlxcmenu">[<%= ($TEXT->{'lxc_create'}) %>]</a>
-			
+    </tbody>
+   </table>
+  </div>
+  <a class="btn btn-default" href="?action=createlxcmenu"><i class="fa fa-plus"></i> <%= ($TEXT->{'lxc_create'}) %></a>
+ </div>
+</div>
+% if ($busy) {
+<script>
+// A container is being created: look again every few seconds until it is done.
+setTimeout(function () { location.replace(location.pathname); }, 5000);
+</script>
+% }

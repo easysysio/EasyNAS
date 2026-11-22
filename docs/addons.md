@@ -51,4 +51,25 @@ The web UI is English by default; language packs add translations:
 
 After installing a language pack, select the language in **Admin → Settings**.
 
+## Containers (LXC)
+
+**Services → Virtualization** runs Linux containers: a whole Linux system
+(Debian, Ubuntu, Alpine, openSUSE and more) sharing the NAS's kernel.
+
+1. **Keep them on a volume first.** Click *Keep them on a volume* (or
+   *Change*) and pick one. Containers left on the system disk are lost at the
+   next firmware update.
+2. **Create new System**: name it, pick an image (downloaded from
+   images.linuxcontainers.org for your machine), and pick the network:
+    - **Private**: an address on a network inside the NAS (10.0.3.x). It
+      reaches the internet; other devices can't reach it.
+    - **Your network**: its own address from your router. Other devices can
+      reach it, but the NAS itself can't.
+3. Downloading takes a few minutes; the list shows it as *Creating...* and
+   updates by itself.
+
+Then start it, open a **terminal** into it (a new tab on port 8080, for that
+one session), turn **Start at boot** on, or delete it. Problems are logged in
+`/var/log/easynas/lxc.log`.
+
 <!-- TODO: keep this list generated/synced with the repository -->

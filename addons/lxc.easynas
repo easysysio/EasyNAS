@@ -6,6 +6,6 @@
  <author>Yariv Hakim</author>
  <type>services</type>
  <program>lxc</program>
- <service>easynas-lxc.service</service>
+ <service>lxc.service</service>
  <icon>fa-desktop</icon>
 </addon>
