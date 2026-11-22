@@ -35,13 +35,21 @@
                                                 <tr>
 						    <td><a href=?action=settingsmenu&username=<%= $users->{$user}[1] %>><i class="fa fa-user fa-2x" title="<%= ($TEXT->{'users_settings'}) %>"></i></a></td>
 						    <td><%= $users->{$user}[0] %></td>
-						    <td><%= $users->{$user}[1] %></td>
+						    <td><%= $users->{$user}[1] %>
+						     % if ($users->{$user}[4]) {
+						     <span class="label label-primary" style="margin-left:6px"><%= ($TEXT->{'users_admin'} || 'Administrator') %></span>
+						     % }
+						    </td>
 						    <td><%= $users->{$user}[2] %></td>
 						    <td><%= $users->{$user}[3] %></td>
 						    <td>
 						     <a href=?action=passwordmenu&username=<%= $users->{$user}[1] %>><i class="fa fa-key fa-2x" title="<%= ($TEXT->{'users_change_password'}) %>"></i>&nbsp;</a>
 						     <a href=?action=settingsmenu&username=<%= $users->{$user}[1] %>><i class="fa fa-sliders fa-2x" title="<%= ($TEXT->{'users_settings'}) %>"></i>&nbsp;</a>
-						     <a onclick="return confirm('<%= ($TEXT->{'users_delete?'}) %>')" href=?action=deleteuser&username=<%= $users->{$user}[1] %>><i class="fa fa-trash fa-2x" title="<%= ($TEXT->{'users_delete'}) %>"></i></a>	
+						     <form method="post" action="/users" style="display:inline" onsubmit="return confirm('<%= ($TEXT->{'users_delete?'}) %>')">
+						      <input type="hidden" name="action" value="deleteuser">
+						      <input type="hidden" name="username" value="<%= $users->{$user}[1] %>">
+						      <button type="submit" class="btn btn-link" style="padding:0;vertical-align:baseline"><i class="fa fa-trash fa-2x" title="<%= ($TEXT->{'users_delete'}) %>"></i></button>
+						     </form>	
 						     </td>
 						</tr>
 						%}

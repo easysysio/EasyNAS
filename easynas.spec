@@ -648,7 +648,7 @@ iSCSI addon for EasyNAS
 ##### German Language ####
 %package        lang-german
 Version:        %{version}
-Release:        6
+Release:        7
 Summary:        German Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -664,7 +664,7 @@ German Language for EasyNAS
 ##### Portuguese Language ####
 %package        lang-portuguese
 Version:        %{version}
-Release:        6
+Release:        7
 Summary:        Portuguese Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -680,7 +680,7 @@ Portuguese Language for EasyNAS
 ##### Chinese Language ####
 %package        lang-chinese
 Version:        %{version}
-Release:        6
+Release:        7
 Summary:        Simplified Chinese Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -696,7 +696,7 @@ Simplified Chinese Language for EasyNAS
 ##### Polish Language ####
 %package        lang-polish
 Version:        %{version}
-Release:        6
+Release:        7
 Summary:        Polish Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -803,6 +803,18 @@ Polish Language for EasyNAS
     service nothing shipped, and its one setting moved Plex's own data folder.
     Updating EasyNAS uninstalls it; Plex itself, if installed, is left alone.
     The "Not available on ARM" label, used only by Plex, is gone too
+  - Add-ons: Chinese and Portuguese show their flags; languages not yet
+    installed show theirs dimmed
+  - Users: an "Administrator" option when creating a user or in its settings.
+    Administrators sign in with their own account and have the same access as
+    admin; taking the flag away or deleting the account ends their sessions
+    on their next request. The flag is membership of the easynas-admins
+    system group, created when first needed
+  - Users: changes (create, delete, password, settings) are POST only, so a
+    link on another site can't make them; commands run without a shell;
+    unknown groups and accounts the page doesn't list are refused; the
+    settings form shows the user's current groups instead of clearing them
+    on save
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

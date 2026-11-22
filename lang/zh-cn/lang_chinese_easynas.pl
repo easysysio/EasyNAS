@@ -627,6 +627,11 @@ $TEXT{'users_password_changed'} = "密码修改成功";
 $TEXT{'users_save'} = "保存";
 $TEXT{'users_settings_failed_to_save'} = "设置保存失败";
 $TEXT{'users_settings_saved'} = "设置保存成功";
+$TEXT{'users_admin'} = "管理员";
+$TEXT{'users_admin_help'} = "可用此帐户登录本网页界面，并像 admin 帐户一样更改所有设置。";
+$TEXT{'users_bad_name'} = "用户名以字母或 '_' 开头，只能包含字母、数字、'.'、'_' 和 '-'（最多 32 个）。";
+$TEXT{'users_failed_to_change_password'} = "修改密码失败";
+$TEXT{'users_failed_to_delete_samba_user'} = "删除 Samba 用户失败";
 
 
 #### Groups ####

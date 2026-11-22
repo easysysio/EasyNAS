@@ -35,13 +35,16 @@ our @EXPORT    = qw( get_mount_dir get_conf_cron get_addons_file get_update_file
                      disk_info health_info networks_info cpu_info memory_info
                      write_share_marker remove_share_marker rediscover_shares
                      get_update_state raid_status
-                     set_current_lang);
+                     set_current_lang get_admin_group is_nas_admin);
 
 ############# Declarations #####################
 my $authentication_enable = 1;
 my $demo_site   = "demo.easynas.org";
 my $lang_default="en-en";
 my $group_default = "users";
+# NAS accounts made administrators on the Users page are members of this
+# system group (a gid below 1000, so the Groups page never lists it).
+my $admin_group = "easynas-admins";
 my %compress = ( 'no'=>'None','lzo'=>'Faster','zlib'=>'Better');
 my %mount_options = ( 'rw'=>'Read&Write','ro'=>'ReadOnly');
 
@@ -286,6 +289,25 @@ sub get_mount_dir
 sub get_group_default
 {
  return($group_default);
+}
+
+############# get_admin_group ###############
+sub get_admin_group
+{
+ return($admin_group);
+}
+
+############# is_nas_admin ###############
+# 1 when the NAS account $user is an administrator: a member of the admin
+# group. Read from the group database on every call, so taking the flag away
+# (or deleting the account) counts at once.
+sub is_nas_admin
+{
+ my ($user)=@_;
+ return 0 unless defined $user && $user ne '';
+ my @g = getgrnam($admin_group);
+ return 0 unless @g;
+ return (grep { $_ eq $user } split(' ', $g[3] // '')) ? 1 : 0;
 }
 
 ############# get_conf_cron ###############
@@ -877,8 +899,10 @@ sub users_info
         next if ($username eq 'easynas' || $username eq 'nobody');
         if (($uid >= 1000) && ($uid < 65000))
         {
-            my $groups = `/usr/bin/id -Gn $username 2>/dev/null`;
-            $users{$username}=[$uid,$username,$desc,$groups];
+            # The admin group shows as the Administrator flag, not as a group.
+            my $groups = join(' ', grep { $_ ne $admin_group }
+                                   split(' ', `/usr/bin/id -Gn $username 2>/dev/null`));
+            $users{$username}=[$uid,$username,$desc,$groups,is_nas_admin($username)];
         }
     }
    return(%users);

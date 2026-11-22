@@ -51,8 +51,16 @@ sub startup ($self) {
   # Everything else requires an authenticated session. This 'under' gate stops
   # dispatch for unauthenticated requests -- previously each controller called
   # redirect_to('login') but did NOT return, so the requested action still ran.
+  # A NAS account signed in as an administrator (nas_admin, see login.pm)
+  # stays one only while it still is: once the flag is taken away on the Users
+  # page or the account is deleted, its session ends on its next request
+  # instead of keeping full access until the cookie expires.
   my $auth = $r->under(sub ($c) {
-    return 1 if $c->session('is_auth');
+    if ($c->session('is_auth') && $c->session('nas_admin') && !is_nas_admin($c->session('user'))) {
+      write_log("login","INFO","signed ".($c->session('user') // '?')." out: no longer an administrator");
+      $c->session(expires => 1);
+    }
+    elsif ($c->session('is_auth')) { return 1; }
     $c->redirect_to('login');
     return undef;
   });
@@ -89,6 +97,8 @@ sub startup ($self) {
   }
   # Cert upload is a multipart POST (a GET can't carry a file).
   $admin->post('/settings')->to('settings#view');
+  # User changes are POST only (see users.pm).
+  $admin->post('/users')->to('users#view');
 }
 
 1;

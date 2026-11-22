@@ -9,7 +9,7 @@
    <div class="panel-body">
     <div class="row">
       <div class="col-lg-6">
-        <form role="form">
+        <form role="form" method="post" action="/users">
          <input type=hidden name="action" value="changesettings">
          <input type=hidden name="username" value="<%= $username %>">
          <div class="form-group">
@@ -23,12 +23,19 @@
 	 <div class="form-group">
           <label><%= ($TEXT->{'users_groups'}) %></label>
 	  <BR>
-	  % foreach my $group (keys (%$groups)) {
-          <input type="checkbox" name="groups" value="<%= $group %>">
+	  % my %member = map { $_ => 1 } split(' ', $users->{$username}[3] // '');
+	  % foreach my $group (sort keys (%$groups)) {
+          <input type="checkbox" name="groups" value="<%= $group %>"<%= $member{$group} ? ' checked' : '' %>>
 	  <label><%= $group %></label>
 	  <BR>
           %}
          </div>
+	 <div class="form-group">
+	  <div class="checkbox">
+	   <label><input type="checkbox" name="admin" value="1"<%= $users->{$username}[4] ? ' checked' : '' %>> <b><%= ($TEXT->{'users_admin'} || 'Administrator') %></b></label>
+	  </div>
+	  <p class="help-block"><%= ($TEXT->{'users_admin_help'} || 'Can sign in to this web interface with this account and change every setting, like the admin account.') %></p>
+	 </div>
        <BR>
        <button type="submit" class="btn btn-default"><%= ($TEXT->{'users_save'}) %></button>
        <button type="reset" class="btn btn-default"><%= ($TEXT->{'users_reset'}) %></button>

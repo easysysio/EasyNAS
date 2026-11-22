@@ -91,17 +91,27 @@ sub login ($self) {
     $self->session(role => 'admin');
     $self->redirect_to('/');
   }
-  # Not the administrator: a NAS account may sign in when an installed addon
-  # is open to NAS users (the file manager). Its session carries role "user",
-  # which the router confines to that addon -- see EasyNAS.pm.
-  elsif ( ($user ne $auth_user) && (my $home = user_home()) && nas_user_ok($user, $pass) ) {
+  # Not the administrator: a NAS account may sign in when it was made an
+  # administrator on the Users page -- then it gets the same session as admin,
+  # marked nas_admin so the router re-checks the flag on every request (see
+  # EasyNAS.pm) -- or when an installed addon is open to NAS users (the
+  # file manager). That session carries role "user", which the router confines
+  # to such addons -- see EasyNAS.pm.
+  elsif ( ($user ne $auth_user) && (is_nas_admin($user) || user_home()) && nas_user_ok($user, $pass) ) {
     $result="success";
     $self->session(is_auth => 1);
     $self->session(user => $user);
     clear_failures($ip);
-    $self->session(role => 'user');
-    write_log("login","INFO","NAS user $user signed in");
-    $self->redirect_to($home);
+    if (is_nas_admin($user)) {
+      $self->session(role => 'admin', nas_admin => 1);
+      write_log("login","INFO","NAS user $user signed in as an administrator");
+      $self->redirect_to('/');
+    }
+    else {
+      $self->session(role => 'user');
+      write_log("login","INFO","NAS user $user signed in");
+      $self->redirect_to(user_home());
+    }
   }
   else {
     $result="failed";

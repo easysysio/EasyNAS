@@ -1,5 +1,6 @@
 #!/usr/bin/perl
-# Tests for the Settings page's Repository tab and the sign-in throttle.
+# Tests for the Settings page's Repository tab, the sign-in throttle, NAS
+# accounts made administrators, and the Users page.
 #
 # The controllers are loaded for real, against a stub of the easynas helper
 # module (the real one reads the appliance's /etc and runs zypper), and pages
@@ -22,7 +23,8 @@ put_file($stub->child('easynas.pm'), <<"EOF");
 package easynas;
 use Exporter 'import';
 our \@EXPORT = qw(get_addon_info get_lang_text write_log get_update_state
-                 get_conf_hosts get_addons);
+                 get_conf_hosts get_addons is_nas_admin get_admin_group
+                 users_info groups_info get_group_default get_mount_dir);
 our \@LOG;
 our \$UPDATE_STATE = '';
 sub get_addon_info { return { name => \$_[0], program => \$_[0] } }
@@ -31,6 +33,14 @@ sub write_log      { push \@LOG, [\@_] }
 sub get_update_state { \$UPDATE_STATE }
 sub get_conf_hosts { '/dev/null' }
 sub get_addons     { () }
+our %NAS_ADMIN;
+sub is_nas_admin    { \$NAS_ADMIN{\$_[0] // ''} ? 1 : 0 }
+sub get_admin_group { 'easynas-admins' }
+sub users_info  { (alice => [1000, 'alice', 'Alice', 'users staff', is_nas_admin('alice')],
+                   bob   => [1001, 'bob',   'Bob',   'users',       is_nas_admin('bob')]) }
+sub groups_info { (users => [100, 'users'], staff => [1000, 'staff']) }
+sub get_group_default { 'users' }
+sub get_mount_dir { '/mnt' }
 1;
 EOF
 $stub->child('layouts')->make_path;
@@ -42,6 +52,7 @@ BEGIN {
 }
 require "$root/lib/EasyNAS/Controller/settings.pm";
 require "$root/lib/EasyNAS/Controller/login.pm";
+require "$root/lib/EasyNAS/Controller/users.pm";
 
 app->renderer->paths(["$stub", "$root/templates"]);
 app->routes->namespaces(['EasyNAS::Controller']);
@@ -228,6 +239,148 @@ my $L = 'EasyNAS::Controller::Login';
   my $tl = Test::Mojo->new;
   $tl->post_ok('/login' => form => { action => 'login', user => 'admin', pass => 'secret' })
      ->status_is(302, 'another address signs in');
+}
+
+# ===================== NAS accounts as administrators =====================
+{
+  no warnings 'redefine';
+  my $hash = crypt('secret', '$6$testsalt$');
+  local *EasyNAS::Controller::Login::read_admin_credential = sub { ('admin', $hash) };
+  no warnings 'once';
+  local *EasyNAS::Controller::Login::nas_user_ok = sub ($u, $p) { $p eq 'pw' ? 1 : 0 };
+  my $orig = \&Mojo::Transaction::remote_address;
+  local *Mojo::Transaction::remote_address = sub { my $tx = shift; @_ ? $tx->$orig(@_) : '192.0.2.20' };
+  get '/whoami' => sub ($c) { $c->render(json => { role => $c->session('role'), nas_admin => $c->session('nas_admin'),
+                                                    user => $c->session('user') }) };
+  local %easynas::NAS_ADMIN = (alice => 1);
+
+  my $tl = Test::Mojo->new;
+  $tl->post_ok('/login' => form => { action => 'login', user => 'alice', pass => 'pw' })
+     ->status_is(302)->header_is(Location => '/', 'an administrator lands on the dashboard');
+  $tl->get_ok('/whoami')->json_is('/role' => 'admin')->json_is('/nas_admin' => 1)->json_is('/user' => 'alice');
+  ok((grep { $_->[2] eq 'NAS user alice signed in as an administrator' } @easynas::LOG), 'logged');
+
+  $tl = Test::Mojo->new;
+  $tl->post_ok('/login' => form => { action => 'login', user => 'alice', pass => 'nope' })
+     ->content_like(qr/Bad Username or Password/, 'an administrator still needs the right password');
+  $tl = Test::Mojo->new;
+  $tl->post_ok('/login' => form => { action => 'login', user => 'bob', pass => 'pw' })
+     ->content_like(qr/Bad Username or Password/,
+                    'not an administrator, and no add-on open to NAS users: no sign-in');
+  $tl->get_ok('/whoami')->json_is('/role' => undef);
+}
+
+# ===================== Users page =====================
+{
+  no warnings qw(redefine once);
+  my @pw;
+  local *EasyNAS::Controller::Users::set_passwords = sub { push @pw, [@_]; '' };
+  any '/users' => sub ($c) { EasyNAS::Controller::Users::view($c) };
+  my $tu = Test::Mojo->new;
+  $tu->get_ok('/signin');
+  my $cmd = sub ($tool) { [grep { ($_->[1] // '') eq $tool } @SYS] };
+  local %easynas::NAS_ADMIN = (alice => 1);
+
+  # The form and the list
+  $tu->get_ok('/users?action=createusermenu')->status_is(200)
+     ->element_exists('form[method="post"][action="/users"] input[name="admin"][type="checkbox"]')
+     ->content_like(qr/Administrator/);
+  $tu->get_ok('/users')->status_is(200)
+     ->element_exists('form[method="post"] input[name="action"][value="deleteuser"]', 'delete is a POST')
+     ->content_like(qr{alice\s*<span class="label label-primary"[^>]*>Administrator</span>}, 'administrators are marked');
+  unlike $tu->tx->res->body, qr{bob\s*<span class="label}, '...others are not';
+  $tu->get_ok('/users?action=settingsmenu&username=alice')
+     ->element_exists('input[name="admin"][checked]', 'settings: Administrator ticked for an administrator')
+     ->element_exists('input[name="groups"][value="staff"][checked]', '...and the groups the user is in');
+  $tu->get_ok('/users?action=settingsmenu&username=bob')
+     ->element_exists_not('input[name="admin"][checked]')
+     ->element_exists_not('input[name="groups"][value="staff"][checked]');
+
+  # Changes only by POST: a link can't create an administrator.
+  @SYS = ();
+  $tu->get_ok('/users?action=createuser&name=evil&password1=x&password2=x&admin=1');
+  is scalar @SYS, 0, 'GET changes nothing';
+  $tu->get_ok('/users?action=deleteuser&username=bob');
+  is scalar @SYS, 0, '...not even a delete';
+
+  # Create an administrator
+  @SYS = (); @pw = ();
+  $tu->post_ok('/users' => form => { action => 'createuser', name => 'carol', desc => "Carol: IT\n",
+                                     password1 => 'p w$', password2 => 'p w$', groups => ['staff', 'nosuch'], admin => 1 })
+     ->content_like(qr/User created successfully/);
+  is_deeply $cmd->('/usr/sbin/groupadd')->[0], ['/usr/bin/sudo', '/usr/sbin/groupadd', '--system', 'easynas-admins'],
+    'the admin group is created when missing' if !getgrnam('easynas-admins');
+  is_deeply $cmd->('/usr/sbin/useradd')->[0],
+    ['/usr/bin/sudo', '/usr/sbin/useradd', '-g', 'users', '-d', '/mnt', '-c', 'Carol IT',
+     '-G', 'staff,easynas-admins', '--', 'carol'],
+    'useradd: no shell, unknown groups dropped, admin group added, description cleaned';
+  is_deeply \@pw, [['carol', 'p w$']], 'password set, handed over as data';
+
+  @SYS = ();
+  $tu->post_ok('/users' => form => { action => 'createuser', name => 'dave', password1 => 'a', password2 => 'a' })
+     ->content_like(qr/User created successfully/);
+  is_deeply [grep { $_ eq '-G' } @{$cmd->('/usr/sbin/useradd')->[0]}], [], 'no groups ticked: no -G';
+  is scalar @{$cmd->('/usr/sbin/groupadd')}, 0, 'not an administrator: no admin group';
+
+  @SYS = ();
+  $tu->post_ok('/users' => form => { action => 'createuser', name => 'x;reboot', password1 => 'a', password2 => 'a' })
+     ->content_like(qr/A user name starts with a letter/);
+  is scalar @SYS, 0, 'a bad name runs nothing';
+
+  # Take the flag away / give it
+  @SYS = (); @easynas::LOG = ();
+  $tu->post_ok('/users' => form => { action => 'changesettings', username => 'alice', desc => 'Alice', groups => ['staff'] })
+     ->content_like(qr/Settings Saved/);
+  is_deeply $cmd->('/usr/sbin/usermod')->[0],
+    ['/usr/bin/sudo', '/usr/sbin/usermod', '-g', 'users', '-G', 'staff', '-d', '/mnt', '-c', 'Alice', '--', 'alice'],
+    'unticked: the admin group is dropped from the list';
+  ok((grep { $_->[2] eq 'user alice is no longer an administrator' } @easynas::LOG), 'logged');
+
+  @SYS = (); @easynas::LOG = ();
+  $tu->post_ok('/users' => form => { action => 'changesettings', username => 'bob', desc => 'Bob', admin => 1 });
+  is $cmd->('/usr/sbin/usermod')->[0][5], 'easynas-admins', 'ticked: the admin group is added';
+  ok((grep { $_->[2] eq 'user bob made an administrator' } @easynas::LOG), 'logged');
+
+  @SYS = ();
+  $tu->post_ok('/users' => form => { action => 'changesettings', username => 'root', admin => 1 })
+     ->content_like(qr/Settings failed to be saved/);
+  $tu->post_ok('/users' => form => { action => 'deleteuser', username => 'root' })
+     ->content_like(qr/Failed to delete user/);
+  $tu->post_ok('/users' => form => { action => 'changepassword', username => 'root', password1 => 'a', password2 => 'a' })
+     ->content_like(qr/Failed to change the password/);
+  is scalar @SYS, 0, 'accounts the page does not list are left alone';
+
+  @SYS = ();
+  $tu->post_ok('/users' => form => { action => 'deleteuser', username => 'bob' })->content_like(qr/User deleted/);
+  is_deeply $cmd->('/usr/sbin/userdel')->[0], ['/usr/bin/sudo', '/usr/sbin/userdel', '-f', 'bob'], 'userdel, no shell';
+}
+
+# ===================== the router's re-check =====================
+# The real app: a NAS administrator's session ends once the flag is gone.
+{
+  unshift @INC, "$root/lib";
+  require EasyNAS;
+  # Mojolicious loads every file under EasyNAS/Controller at start; here that
+  # would load the real helper module over its stand-in.
+  { no warnings 'once'; *EasyNAS::warmup = sub {}; }
+  # A stand-in for the page behind the gate, so the real one isn't loaded.
+  eval q{ package EasyNAS::Controller::Firmware; use Mojo::Base 'Mojolicious::Controller';
+          sub view { shift->render(text => 'firmware page') } 1 } or die $@;
+  my $ta = Test::Mojo->new('EasyNAS');
+  $ta->app->log->level('fatal');
+  $ta->app->routes->get('/t_signin/:user' => sub ($c) {
+    $c->session(is_auth => 1, role => 'admin', nas_admin => 1, user => $c->param('user'));
+    $c->render(text => 'ok');
+  });
+  local %easynas::NAS_ADMIN = (alice => 1);
+  $ta->get_ok('/t_signin/alice');
+  $ta->get_ok('/firmware')->status_is(200)->content_is('firmware page', 'still an administrator: let through');
+  delete $easynas::NAS_ADMIN{alice};
+  @easynas::LOG = ();
+  $ta->get_ok('/firmware')->status_is(302)->header_like(Location => qr{/login$}, 'flag taken away: sent to sign in');
+  ok((grep { $_->[2] eq 'signed alice out: no longer an administrator' } @easynas::LOG), 'logged');
+  $easynas::NAS_ADMIN{alice} = 1;
+  $ta->get_ok('/firmware')->status_is(302, '...and the session is over, even if the flag comes back');
 }
 
 done_testing;

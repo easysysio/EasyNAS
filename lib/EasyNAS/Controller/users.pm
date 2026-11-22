@@ -19,24 +19,28 @@ sub view ($self) {
   $self->stash(addon => $addon,
                 TEXT =>\%TEXT);
 
+# Every change is a POST: the session cookie is SameSite=Lax, so a page on
+# another site can make a signed-in browser GET this page -- a link that, as a
+# GET, could create an administrator -- but not POST to it.
+  my $post = ($self->req->method eq "POST");
+
 ##### createuser #####
-  if (defined $action && $action eq "createuser") {
+  if ($post && defined $action && $action eq "createuser") {
    createuser($self);
   }
 
 ##### deleteuser #####
-  if (defined $action && $action eq "deleteuser") {
+  if ($post && defined $action && $action eq "deleteuser") {
    deleteuser($self);
   }
 
 ##### changepassword #####
-  if (defined $action && $action eq "changepassword") {
+  if ($post && defined $action && $action eq "changepassword") {
    changepassword($self);
   }
 
-
 #### changesettings #####
-  if (defined $action && $action eq "changesettings") {
+  if ($post && defined $action && $action eq "changesettings") {
    changesettings($self);
   }
 
@@ -82,28 +86,64 @@ sub view ($self) {
 }
 
 
+##### account checks ######
+# Names as useradd and the sign-in page accept them.
+sub good_name { my ($n)=@_; return (defined $n && $n =~ /^[A-Za-z_][A-Za-z0-9_.-]{0,31}$/) ? 1 : 0; }
+
+# The supplementary groups to give an account: the ticked ones that exist,
+# plus the admin group when "Administrator" is ticked. As one -G list.
+sub group_list($self) {
+ my %known=groups_info();
+ my @groups=grep { exists $known{$_} } @{$self->every_param("groups")};
+ push @groups, get_admin_group() if $self->param("admin");
+ return join(",", @groups);
+}
+
+# The admin group is created the first time someone is made an administrator.
+sub ensure_admin_group {
+ my $g=get_admin_group();
+ return 1 if getgrnam($g);
+ return system("/usr/bin/sudo","/usr/sbin/groupadd","--system",$g) == 0 ? 1 : 0;
+}
+
+# The description is the passwd comment field: no ":" or line breaks.
+sub clean_desc { my ($d)=@_; $d //= ""; $d =~ s/[:\r\n]//g; return $d; }
+
+# Write "name:password" to chpasswd and the password twice to smbpasswd on
+# stdin, never on a command line or through a shell.
+sub set_passwords {
+ my ($name,$password)=@_;
+ open(my $cp,"|-","/usr/bin/sudo","/usr/sbin/chpasswd") or return 'users_failed_to_change_password';
+ print $cp "$name:$password\n";
+ close($cp);
+ return 'users_failed_to_change_password' if $? != 0;
+ if (-f "/usr/bin/smbpasswd") {
+  open(my $sp,"|-","/usr/bin/sudo","/usr/bin/smbpasswd","-s","-a",$name) or return 'users_failed_to_add_samba_user';
+  print $sp "$password\n$password\n";
+  close($sp);
+  return 'users_failed_to_add_samba_user' if $? != 0;
+ }
+ return '';
+}
+
 ##### createuser ######
 sub createuser($self) {
  my $name=$self->param("name");
- my $desc=$self->param("desc");
+ my $desc=clean_desc($self->param("desc"));
  my $password1=$self->param("password1");
  my $password2=$self->param("password2");
- my @groups=$self->param("groups");
- my $mount_dir=get_mount_dir;
- my $group_default=get_group_default;
- my $groups;
- my $rc;
-
- foreach(@groups)
-    {
-	$groups=$groups.$_.",";
-    }
-    chop($groups);
+ my $admin=$self->param("admin") ? 1 : 0;
 
  if (!$name)
     {
      $result="fail";
      $msg=$TEXT{'users_user_must_exist'};
+     return;
+    }
+ if (!good_name($name))
+    {
+     $result="fail";
+     $msg=$TEXT{'users_bad_name'} || "A user name starts with a letter and has only letters, digits, '.', '_' and '-'.";
      return;
     }
  if (!$password1)
@@ -112,43 +152,39 @@ sub createuser($self) {
      $msg=$TEXT{'users_password_must_exist'};
      return;
     }
- if ($password1 ne $password2) 
+ if ($password1 ne $password2)
     {
      $result="fail";
      $msg=$TEXT{'users_passwords_do_no_match'};
      return;
     }
-
-
- # Local accounts: POSIX account + Samba (tdbsam) NT hash.
- $rc = system("/usr/bin/sudo /usr/sbin/useradd -g $group_default -G \"$groups\" -d $mount_dir -c \"$desc\" $name");
- if ($rc ne 0)
+ if ($admin && !ensure_admin_group())
     {
      $result="fail";
      $msg=$TEXT{'users_failed_to_add_user'};
      return;
     }
- $rc = system("/usr/bin/echo $name:$password1 | /usr/bin/sudo /usr/sbin/chpasswd");
- if ($rc ne 0)
+
+ # Local accounts: POSIX account + Samba (tdbsam) NT hash.
+ my @cmd=("/usr/bin/sudo","/usr/sbin/useradd","-g",get_group_default(),"-d",get_mount_dir(),"-c",$desc);
+ my $groups=group_list($self);
+ push @cmd, "-G", $groups if $groups ne "";
+ if (system(@cmd, "--", $name) != 0)
     {
      $result="fail";
-     $msg=$TEXT{'users_failed_to_change_password'};
+     $msg=$TEXT{'users_failed_to_add_user'};
      return;
     }
- if( -f "/usr/bin/smbpasswd" )
+ if (my $err=set_passwords($name,$password1))
     {
-     $rc = system("/usr/bin/echo -e \"$password1\n$password1\" | /usr/bin/sudo /usr/bin/smbpasswd -s -a $name >/dev/null");
-     if ($rc ne 0)
-        {
-         $result="fail";
-         $msg=$TEXT{'users_failed_to_add_samba_user'};
-         return;
-        }
+     $result="fail";
+     $msg=$TEXT{$err};
+     return;
     }
-
-    $result="success";
-    $msg=$TEXT{'users_created'};
-    return;
+ write_log("users","INFO","user $name created".($admin ? " as an administrator" : ""));
+ $result="success";
+ $msg=$TEXT{'users_created'};
+ return;
 }
 
 
@@ -156,12 +192,18 @@ sub createuser($self) {
 ###### deleteuser #######
 sub deleteuser($self) {
   my $username = $self->param("username");
-  my $rc;
+  my %users=users_info();
+  # Only the accounts this page lists (no system or service accounts).
+  unless (defined $username && exists $users{$username})
+    {
+     $result="fail";
+     $msg=$TEXT{'users_failed_to_delete_user'};
+     return;
+    }
 
   if( -f "/usr/bin/smbpasswd" )
    {
-    $rc = system("/usr/bin/sudo /usr/bin/smbpasswd -x $username >/dev/null");
-    if ($rc ne 0)
+    if (system("/usr/bin/sudo","/usr/bin/smbpasswd","-x",$username) != 0)
     {
      $result="fail";
      $msg=$TEXT{'users_failed_to_delete_samba_user'};
@@ -169,19 +211,16 @@ sub deleteuser($self) {
     }
    }
 
-    $rc = system("/usr/bin/sudo /usr/sbin/userdel -f $username");
-    if ($rc ne 0)
+    if (system("/usr/bin/sudo","/usr/sbin/userdel","-f",$username) != 0)
     {
      $result="fail";
      $msg=$TEXT{'users_failed_to_delete_user'};
      return;
     }
-    else
-    {
-     $result="success";
-     $msg=$TEXT{'users_deleted'};
-     return;
-    }
+    write_log("users","INFO","user $username deleted");
+    $result="success";
+    $msg=$TEXT{'users_deleted'};
+    return;
 }
 
 
@@ -237,28 +276,18 @@ sub changepassword($self) {
      return;
     }
 
- # Feed "user:password" to chpasswd on stdin via list-form open (no shell),
- # so a password containing spaces, $, ` or ; can't break or inject.
- my $ok=open(my $cp,"|-","/usr/bin/sudo","/usr/sbin/chpasswd");
- if (!$ok) { $result="fail"; $msg=$TEXT{'users_failed_to_change_password'}; return; }
- print $cp "$name:$password1\n";
- close($cp);
- if ($? != 0)
+ my %users=users_info();
+ unless (defined $name && exists $users{$name})
     {
      $result="fail";
      $msg=$TEXT{'users_failed_to_change_password'};
      return;
     }
- if( -f "/usr/bin/smbpasswd" )
+ if (my $err=set_passwords($name,$password1))
     {
-     my $sok=open(my $sp,"|-","/usr/bin/sudo","/usr/bin/smbpasswd","-s","-a",$name);
-     if ($sok) { print $sp "$password1\n$password1\n"; close($sp); }
-     if (!$sok || $? != 0)
-        {
-         $result="fail";
-         $msg=$TEXT{'users_failed_to_add_samba_user'};
-         return;
-        }
+     $result="fail";
+     $msg=$TEXT{$err};
+     return;
     }
 
     $result="success";
@@ -270,32 +299,37 @@ sub changepassword($self) {
 ##### changesettings #####
 sub changesettings($self) {
  my $name=$self->param("username");
- my $desc=$self->param("desc");
- my @groups=$self->param("groups");
- my $mount_dir=get_mount_dir;
- my $group_default=get_group_default;
- my $groups;
- my $rc;
-
- foreach(@groups)
-    {
-	$groups = $groups.$_.",";
-    }
-    chop($groups);
-
-    $rc = system("/usr/bin/sudo /usr/sbin/usermod -g $group_default -G \"$groups\" -d $mount_dir -c \"$desc\" $name");
-    if ($rc ne 0)
+ my $desc=clean_desc($self->param("desc"));
+ my $admin=$self->param("admin") ? 1 : 0;
+ my %users=users_info();
+ unless (defined $name && exists $users{$name})
     {
      $result="fail";
      $msg=$TEXT{'users_settings_failed_to_save'};
-
+     return;
     }
-    else
+ my $was_admin=is_nas_admin($name);
+ if ($admin && !ensure_admin_group())
     {
-     $result="success";
-     $msg=$TEXT{'users_settings_saved'};
+     $result="fail";
+     $msg=$TEXT{'users_settings_failed_to_save'};
+     return;
     }
-    return;
+
+ # -G replaces the whole supplementary list (an empty one clears it), so the
+ # admin group stays only while "Administrator" is ticked.
+ if (system("/usr/bin/sudo","/usr/sbin/usermod","-g",get_group_default(),"-G",group_list($self),
+            "-d",get_mount_dir(),"-c",$desc,"--",$name) != 0)
+    {
+     $result="fail";
+     $msg=$TEXT{'users_settings_failed_to_save'};
+     return;
+    }
+ write_log("users","INFO","user $name made an administrator") if $admin && !$was_admin;
+ write_log("users","INFO","user $name is no longer an administrator") if !$admin && $was_admin;
+ $result="success";
+ $msg=$TEXT{'users_settings_saved'};
+ return;
 }
 
 1;

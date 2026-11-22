@@ -627,6 +627,11 @@ $TEXT{'users_password_changed'} = "Hasło zmienione pomyślnie";
 $TEXT{'users_save'} = "Zapisz";
 $TEXT{'users_settings_failed_to_save'} = "Nie udało się zapisać ustawień";
 $TEXT{'users_settings_saved'} = "Ustawienia zapisane pomyślnie";
+$TEXT{'users_admin'} = "Administrator";
+$TEXT{'users_admin_help'} = "Może logować się tym kontem do interfejsu WWW i zmieniać wszystkie ustawienia, tak jak konto admin.";
+$TEXT{'users_bad_name'} = "Nazwa użytkownika zaczyna się od litery lub '_' i zawiera tylko litery, cyfry, '.', '_' i '-' (najwyżej 32).";
+$TEXT{'users_failed_to_change_password'} = "Nie udało się zmienić hasła";
+$TEXT{'users_failed_to_delete_samba_user'} = "Nie udało się usunąć użytkownika Samby";
 
 
 #### Groups ####

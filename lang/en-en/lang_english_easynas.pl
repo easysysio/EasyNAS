@@ -659,6 +659,11 @@ $TEXT{'users_password_changed'} = "Password Changed Succesfully";
 $TEXT{'users_save'} = "Save";
 $TEXT{'users_settings_failed_to_save'} = "Settings failed to be saved";
 $TEXT{'users_settings_saved'} = "Settings Saved Succesfully";
+$TEXT{'users_admin'} = "Administrator";
+$TEXT{'users_admin_help'} = "Can sign in to this web interface with this account and change every setting, like the admin account.";
+$TEXT{'users_bad_name'} = "A user name starts with a letter or '_' and uses only letters, digits, '.', '_' and '-' (32 at most).";
+$TEXT{'users_failed_to_change_password'} = "Failed to change the password";
+$TEXT{'users_failed_to_delete_samba_user'} = "Failed to delete the Samba user";
 
 
 #### Groups ####

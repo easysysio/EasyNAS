@@ -7,7 +7,7 @@
     <label><%= ($TEXT->{'users_create'}) %></label>
    </div>
    <div class="panel-body">
-        <form role="form">
+        <form role="form" method="post" action="/users">
          <input type=hidden name="action" value="createuser">
          <div class="form-group">
           <label><%= ($TEXT->{'users_name'}) %></label>
@@ -28,12 +28,18 @@
 	 <div class="form-group">
           <label><%= ($TEXT->{'users_groups'}) %></label>
 	  <BR>
-	  % foreach my $group (keys (%$groups)) {
+	  % foreach my $group (sort keys (%$groups)) {
           <input type="checkbox" name="groups" value="<%= $group %>">
 	  <label><%= $group %></label>
 	  <BR>
           %}
          </div>
+	 <div class="form-group">
+	  <div class="checkbox">
+	   <label><input type="checkbox" name="admin" value="1"> <b><%= ($TEXT->{'users_admin'} || 'Administrator') %></b></label>
+	  </div>
+	  <p class="help-block"><%= ($TEXT->{'users_admin_help'} || 'Can sign in to this web interface with this account and change every setting, like the admin account.') %></p>
+	 </div>
         </div>
       <div class="panel-footer">
        <center>

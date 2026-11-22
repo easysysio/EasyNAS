@@ -627,6 +627,11 @@ $TEXT{'users_password_changed'} = "Passwort erfolgreich geändert";
 $TEXT{'users_save'} = "Speichern";
 $TEXT{'users_settings_failed_to_save'} = "Einstellungen konnten nicht gespeichert werden";
 $TEXT{'users_settings_saved'} = "Einstellungen erfolgreich gespeichert";
+$TEXT{'users_admin'} = "Administrator";
+$TEXT{'users_admin_help'} = "Kann sich mit diesem Konto an dieser Weboberfläche anmelden und wie das Konto admin alle Einstellungen ändern.";
+$TEXT{'users_bad_name'} = "Ein Benutzername beginnt mit einem Buchstaben oder '_' und enthält nur Buchstaben, Ziffern, '.', '_' und '-' (höchstens 32).";
+$TEXT{'users_failed_to_change_password'} = "Das Passwort konnte nicht geändert werden";
+$TEXT{'users_failed_to_delete_samba_user'} = "Der Samba-Benutzer konnte nicht gelöscht werden";
 
 
 #### Groups ####

@@ -627,6 +627,11 @@ $TEXT{'users_password_changed'} = "Senha alterada com sucesso";
 $TEXT{'users_save'} = "Salvar";
 $TEXT{'users_settings_failed_to_save'} = "Falha ao salvar as configurações";
 $TEXT{'users_settings_saved'} = "Configurações salvas com sucesso";
+$TEXT{'users_admin'} = "Administrador";
+$TEXT{'users_admin_help'} = "Pode entrar nesta interface web com esta conta e alterar todas as configurações, como a conta admin.";
+$TEXT{'users_bad_name'} = "Um nome de usuário começa com uma letra ou '_' e usa apenas letras, dígitos, '.', '_' e '-' (no máximo 32).";
+$TEXT{'users_failed_to_change_password'} = "Falha ao alterar a senha";
+$TEXT{'users_failed_to_delete_samba_user'} = "Falha ao excluir o usuário do Samba";
 
 
 #### Groups ####

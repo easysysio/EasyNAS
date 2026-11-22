@@ -15,7 +15,22 @@
 against. Creating a user sets up shell and Samba credentials together; volumes can be
 owned by a user/group from the Storage pages.
 
-<!-- TODO: roles/permissions model; planned directory integration -->
+### Administrators
+
+Tick **Administrator** when you create a user (or later, in the user's
+**Settings**) to let that person run the appliance with their own account. They
+sign in at the same address as `admin`, with their own user name and password,
+and can change every setting, just like `admin`.
+
+- Untick it, or delete the user, and their open sessions end on their next
+  click: they are sent back to the sign-in page.
+- Each sign-in as an administrator, and each change to the flag, is logged.
+- The flag is membership of the `easynas-admins` system group, which the
+  **Groups** page doesn't list.
+
+!!! warning
+    An administrator's password is also their password for the file shares
+    (Samba, SSH, FTP). Make it as strong as the `admin` password.
 
 ## Updates
 
