@@ -108,11 +108,14 @@ sub startup ($self) {
   $admin->get('/language')->to('language#view');
   foreach my $item (sort keys %addons) {
     my $program = $addons{$item}{'program'};
-    if (($addons{$item}{'access'} // '') eq 'user') {
+    my $access = $addons{$item}{'access'} // '';
+    if ($access eq 'user' || $access eq 'all') {
       # Open to every signed-in account, and POST as well as GET: these pages
-      # change things through POST requests carrying a CSRF token.
+      # make their changes by POST only. "user" pages (the file manager) are
+      # also what NAS accounts sign in for and land on; "all" ones (the
+      # profile page) are only reachable once signed in.
       $auth->any([qw(GET POST)] => "/$program")->to("$program#view");
-      push @user_home, "/$program";
+      push @user_home, "/$program" if $access eq 'user';
     }
     else {
       $admin->any([qw(GET POST)] => "/$program")->to("$program#view");

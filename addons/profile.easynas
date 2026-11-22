@@ -5,4 +5,5 @@
  <icon>fa-user</icon>
  <author>Yariv Hakim</author>
  <program>profile</program>
+ <access>all</access>
 </addon>

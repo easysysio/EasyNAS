@@ -39,6 +39,9 @@ download, upload, copy, move, rename and delete, with no client to set up.
 - **Admin → Add-ons**, install *File Manager*. It appears under **Sharing**.
 - NAS users sign in at the same address as the administrator, with the account
   created under **Admin → Users**. They see the file manager and nothing else.
+- A user changes their own password by clicking their name at the top right
+  (their **User Profile**), giving the current one first. It is their
+  password for the file shares too (Samba, SSH, FTP).
 - Everything runs as the signed-in Linux account, so a user can do exactly what
   they could over Samba or SSH: ownership and permission bits decide, and
   membership of a share's group is what gives access to it.

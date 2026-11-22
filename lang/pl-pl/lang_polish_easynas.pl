@@ -132,6 +132,19 @@ $TEXT{'disable'} = "Wyłącz";
 
 #### User Profile ####
 $TEXT{'user_profile'} = "Profil Użytkownika";
+$TEXT{'sign_out'} = "Wyloguj";
+$TEXT{'profile_change_password'} = "Zmień hasło";
+$TEXT{'profile_current'} = "Obecne hasło";
+$TEXT{'profile_new'} = "Nowe hasło";
+$TEXT{'profile_retype'} = "Powtórz nowe hasło";
+$TEXT{'profile_shares_note'} = "To jest też Twoje hasło do udziałów plików (Samba, SSH, FTP).";
+$TEXT{'profile_empty'} = "Wpisz nowe hasło.";
+$TEXT{'profile_mismatch'} = "Nowe hasła nie są takie same.";
+$TEXT{'profile_wrong_current'} = "Obecne hasło jest nieprawidłowe.";
+$TEXT{'profile_failed'} = "Nie udało się zmienić hasła.";
+$TEXT{'profile_changed'} = "Twoje hasło zostało zmienione.";
+$TEXT{'profile_changed_shares'} = "Twoje hasło zostało zmienione. Jest to też Twoje hasło do udziałów plików (Samba, SSH, FTP).";
+$TEXT{'login_locked'} = "Zbyt wiele nieudanych prób logowania. Spróbuj ponownie za %d min.";
 
 
 #### Backup ####

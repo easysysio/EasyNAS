@@ -132,6 +132,19 @@ $TEXT{'disable'} = "Deaktivieren";
 
 #### User Profile ####
 $TEXT{'user_profile'} = "Benutzerprofil";
+$TEXT{'sign_out'} = "Abmelden";
+$TEXT{'profile_change_password'} = "Passwort ändern";
+$TEXT{'profile_current'} = "Aktuelles Passwort";
+$TEXT{'profile_new'} = "Neues Passwort";
+$TEXT{'profile_retype'} = "Neues Passwort wiederholen";
+$TEXT{'profile_shares_note'} = "Das ist auch Ihr Passwort für die Dateifreigaben (Samba, SSH, FTP).";
+$TEXT{'profile_empty'} = "Geben Sie ein neues Passwort ein.";
+$TEXT{'profile_mismatch'} = "Die neuen Passwörter stimmen nicht überein.";
+$TEXT{'profile_wrong_current'} = "Das aktuelle Passwort ist nicht richtig.";
+$TEXT{'profile_failed'} = "Das Passwort konnte nicht geändert werden.";
+$TEXT{'profile_changed'} = "Ihr Passwort wurde geändert.";
+$TEXT{'profile_changed_shares'} = "Ihr Passwort wurde geändert. Es ist auch Ihr Passwort für die Dateifreigaben (Samba, SSH, FTP).";
+$TEXT{'login_locked'} = "Zu viele fehlgeschlagene Anmeldeversuche. Versuchen Sie es in %d Minute(n) erneut.";
 
 
 #### Backup ####

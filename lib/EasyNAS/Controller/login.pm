@@ -80,10 +80,7 @@ sub login ($self) {
     return;
   }
 
-  # crypt() with the stored hash as salt re-derives it from the entered
-  # password; compare in constant time so a wrong guess leaks no timing.
-  my $hash = crypt($pass, $stored);
-  if ( ($user eq $auth_user) && defined($hash) && ct_eq($hash, $stored) ) {
+  if ( admin_ok($user, $pass) ) {
     $result="success";
     $self->session(is_auth => 1);
     $self->session(user => $user);
@@ -184,6 +181,20 @@ sub nas_user_ok ($user, $pass) {
   my $hash = crypt($pass, $stored);
   return (defined $hash && ct_eq($hash, $stored)) ? 1 : 0;
 }
+
+# 1 when $user/$pass are the web administrator's (admin.conf). crypt() with
+# the stored hash as salt re-derives it from the entered password; compare in
+# constant time so a wrong guess leaks no timing.
+sub admin_ok ($user, $pass) {
+  my ($auth_user, $stored) = read_admin_credential();
+  return 0 unless defined $stored && $stored ne '' && defined $user && defined $pass;
+  return 0 unless $user eq $auth_user;
+  my $hash = crypt($pass, $stored);
+  return (defined $hash && ct_eq($hash, $stored)) ? 1 : 0;
+}
+
+# The web administrator's account name ("admin"), or undef before first boot.
+sub admin_name { my ($u) = read_admin_credential(); return $u; }
 
 # Read "<user>:<hash>" from admin.conf; returns (undef,undef) if unreadable.
 sub read_admin_credential {

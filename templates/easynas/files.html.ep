@@ -1,6 +1,6 @@
 % # File manager. The administrator sees it inside the normal layout; a NAS
-% # user gets the bare frame in files_user.html.ep -- no menu, nothing else.
-% if ($is_admin) { layout 'default'; } else { extends 'easynas/files_user'; }
+% # user gets the bare frame in layouts/user.html.ep -- no menu, nothing else.
+% if ($is_admin) { layout 'default'; } else { stash(home => '/files'); layout 'user'; }
 % use Mojo::JSON ();
 % my %strings = map { $_ => $TEXT->{$_} } grep { /^files_/ } keys %$TEXT;
 

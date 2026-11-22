@@ -152,6 +152,18 @@ $TEXT{'disable'} = "Disable";
 
 #### User Profile ####
 $TEXT{'user_profile'} = "User Profile";
+$TEXT{'sign_out'} = "Sign out";
+$TEXT{'profile_change_password'} = "Change password";
+$TEXT{'profile_current'} = "Current password";
+$TEXT{'profile_new'} = "New password";
+$TEXT{'profile_retype'} = "Retype the new password";
+$TEXT{'profile_shares_note'} = "This is also your password for the file shares (Samba, SSH, FTP).";
+$TEXT{'profile_empty'} = "Enter a new password.";
+$TEXT{'profile_mismatch'} = "The new passwords don't match.";
+$TEXT{'profile_wrong_current'} = "The current password is not right.";
+$TEXT{'profile_failed'} = "The password could not be changed.";
+$TEXT{'profile_changed'} = "Your password has been changed.";
+$TEXT{'profile_changed_shares'} = "Your password has been changed. It is your password for the file shares (Samba, SSH, FTP) too.";
 
 
 #### Backup ####

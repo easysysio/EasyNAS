@@ -52,6 +52,7 @@ require "$root/lib/EasyNAS/Controller/files.pm";
 app->renderer->paths(["$stub", "$root/templates"]);
 any '/files'  => sub ($c) { EasyNAS::Controller::Files::view($c) };
 get '/signin' => sub ($c) { $c->session(is_auth => 1, role => 'admin', user => 'admin'); $c->render(text => 'ok') };
+get '/signin_user' => sub ($c) { $c->session(is_auth => 1, role => 'user', user => 'bob'); $c->render(text => 'ok') };
 
 # The volumes: <pool>/<volume>/...
 mkdir "$vols/pool"; mkdir "$vols/pool/vol"; mkdir "$vols/pool/vol/dir"; mkdir "$vols/pool/vol/dir/sub";
@@ -79,6 +80,21 @@ sub security_headers ($what) {
   like $h->header('Content-Security-Policy') // '', qr/\bsandbox\b/, "$what: sandboxed";
   like $h->header('Content-Security-Policy') // '', qr/default-src 'none'/, "$what: no scripts";
   is $h->header('X-Content-Type-Options'), 'nosniff', "$what: nosniff";
+}
+
+# ---- a NAS user's page: the core's bare frame, with their profile a click away
+{
+  no warnings 'redefine';
+  # bob isn't an account on the test machine; the page needs only who it is.
+  local *EasyNAS::Controller::Files::runas = sub { { name => 'bob', uid => 1000, gid => 100 } };
+  my $tu = Test::Mojo->new;
+  $tu->get_ok('/signin_user');
+  $tu->get_ok('/files')->status_is(200)
+     ->element_exists('nav.navbar a.navbar-brand[href="/files"]', 'the frame, its title leading back to the files')
+     ->element_exists('nav a[href="/profile"]', 'the user name links to their profile')
+     ->element_exists('nav a[href="/logout"]')
+     ->text_like('nav a[href="/profile"]' => qr/bob/)
+     ->element_exists_not('#side-menu', 'nothing of the administration interface');
 }
 
 # ---- download

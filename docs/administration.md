@@ -15,6 +15,15 @@
 against. Creating a user sets up shell and Samba credentials together; volumes can be
 owned by a user/group from the Storage pages.
 
+### Your own password
+
+**User Profile** (your name at the top right) changes the password of the
+account you're signed in with, after you enter the current one. For `admin`
+that is the web interface's password; for any other account it is also their
+password for the file shares (Samba, SSH, FTP). NAS users signed in to the
+[File Manager](sharing.md#file-manager-web) reach the same page. Wrong current
+passwords count towards the same lockout as wrong sign-ins.
+
 ### Administrators
 
 Tick **Administrator** when you create a user (or later, in the user's

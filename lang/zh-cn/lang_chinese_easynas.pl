@@ -132,6 +132,19 @@ $TEXT{'disable'} = "禁用";
 
 #### User Profile ####
 $TEXT{'user_profile'} = "用户资料";
+$TEXT{'sign_out'} = "退出登录";
+$TEXT{'profile_change_password'} = "修改密码";
+$TEXT{'profile_current'} = "当前密码";
+$TEXT{'profile_new'} = "新密码";
+$TEXT{'profile_retype'} = "再次输入新密码";
+$TEXT{'profile_shares_note'} = "这也是您访问文件共享（Samba、SSH、FTP）的密码。";
+$TEXT{'profile_empty'} = "请输入新密码。";
+$TEXT{'profile_mismatch'} = "两次输入的新密码不一致。";
+$TEXT{'profile_wrong_current'} = "当前密码不正确。";
+$TEXT{'profile_failed'} = "无法修改密码。";
+$TEXT{'profile_changed'} = "您的密码已修改。";
+$TEXT{'profile_changed_shares'} = "您的密码已修改。它也是您访问文件共享（Samba、SSH、FTP）的密码。";
+$TEXT{'login_locked'} = "登录失败次数过多。请在 %d 分钟后重试。";
 
 
 #### Backup ####

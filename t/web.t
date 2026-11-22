@@ -47,6 +47,7 @@ sub get_mount_dir { '/mnt' }
 EOF
 $stub->child('layouts')->make_path;
 put_file($stub->child('layouts', $_), '<%= content %>') for qw(default.html.ep login.html.ep);
+put_file($stub->child('layouts', 'user.html.ep'), '<nav id="user-frame"><%= $username %></nav><%= content %>');
 
 unshift @INC, "$stub";
 BEGIN {
@@ -55,6 +56,7 @@ BEGIN {
 require "$root/lib/EasyNAS/Controller/settings.pm";
 require "$root/lib/EasyNAS/Controller/login.pm";
 require "$root/lib/EasyNAS/Controller/users.pm";
+require "$root/lib/EasyNAS/Controller/profile.pm";
 
 app->renderer->paths(["$stub", "$root/templates"]);
 app->routes->namespaces(['EasyNAS::Controller']);
@@ -376,6 +378,86 @@ my $L = 'EasyNAS::Controller::Login';
   is_deeply $cmd->('/usr/sbin/userdel')->[0], ['/usr/bin/sudo', '/usr/sbin/userdel', '-f', 'bob'], 'userdel, no shell';
 }
 
+# ===================== profile: change your own password =====================
+{
+  no warnings qw(redefine once);
+  my (@set, @admin_set);
+  local *EasyNAS::Controller::Users::set_passwords      = sub { push @set, [@_]; '' };
+  local *EasyNAS::Controller::Users::set_admin_password = sub { push @admin_set, [@_]; '' };
+  local *EasyNAS::Controller::Login::nas_user_ok = sub ($u, $p) { $p eq 'old' ? 1 : 0 };
+  local *EasyNAS::Controller::Login::admin_ok    = sub ($u, $p) { $u eq 'admin' && $p eq 'adminpw' ? 1 : 0 };
+  my $orig = \&Mojo::Transaction::remote_address;
+  my $ip = '192.0.2.30';
+  local *Mojo::Transaction::remote_address = sub { my $tx = shift; @_ ? $tx->$orig(@_) : $ip };
+  any '/profile' => sub ($c) { EasyNAS::Controller::Profile::view($c) };
+  get '/signin_as' => sub ($c) {
+    $c->session(is_auth => 1, role => $c->param('role'), user => $c->param('user'),
+                nas_admin => $c->param('nas_admin') ? 1 : undef);
+    $c->render(text => 'ok');
+  };
+  my $change = sub ($t, %f) { $t->post_ok('/profile' => form => { action => 'changepassword', %f }) };
+
+  # A NAS user, signed in for the file manager
+  my $tp = Test::Mojo->new;
+  $tp->get_ok('/signin_as?role=user&user=bob');
+  $tp->get_ok('/profile')->status_is(200)
+     ->element_exists('nav#user-frame', 'a NAS user gets the bare frame')
+     ->element_exists('form[method="post"][action="/profile"] input[name="current"][type="password"]')
+     ->element_exists('input[name="password1"]')->element_exists('input[name="password2"]')
+     ->content_like(qr/also your password for the file shares/);
+
+  @set = ();
+  $change->($tp, current => 'nope', password1 => 'new1', password2 => 'new1')
+     ->content_like(qr/The current password is not right/);
+  is scalar @set, 0, 'wrong current password: nothing changed';
+  $change->($tp, current => 'old', password1 => 'new1', password2 => 'new2')
+     ->content_like(qr/The new passwords don&#39;t match/);
+  $change->($tp, current => 'old', password1 => '', password2 => '')
+     ->content_like(qr/Enter a new password/);
+  is scalar @set, 0, '...nor with a mismatch or an empty one';
+
+  $tp->get_ok('/profile?action=changepassword&current=old&password1=x&password2=x');
+  is scalar @set, 0, 'a GET changes nothing';
+
+  @easynas::LOG = ();
+  $change->($tp, current => 'old', password1 => 'n3w pw', password2 => 'n3w pw')
+     ->content_like(qr/Your password has been changed\. It is your password for the file shares/);
+  is_deeply \@set, [['bob', 'n3w pw']], 'system and Samba passwords set for that account';
+  ok((grep { $_->[2] eq 'bob changed their own password' } @easynas::LOG), 'logged');
+  $change->($tp, username => 'alice', current => 'old', password1 => 'x', password2 => 'x');
+  is $set[-1][0], 'bob', 'always the signed-in account, whatever the form says';
+
+  # Wrong current passwords count towards the sign-in lockout
+  $ip = '192.0.2.31';
+  $change->($tp, current => 'nope', password1 => 'x', password2 => 'x') for 1 .. 5;
+  @set = ();
+  $change->($tp, current => 'old', password1 => 'x', password2 => 'x')
+     ->content_like(qr/Too many failed sign-in attempts/);
+  is scalar @set, 0, 'locked out: not even the right one';
+  $ip = '192.0.2.30';
+
+  # The web administrator: admin.conf
+  @set = (); @admin_set = ();
+  my $ta = Test::Mojo->new;
+  $ta->get_ok('/signin_as?role=admin&user=admin');
+  $ta->get_ok('/profile')->element_exists_not('nav#user-frame', 'administrators get the normal layout')
+     ->content_unlike(qr/file shares/);
+  $change->($ta, current => 'old', password1 => 'a', password2 => 'a')->content_like(qr/not right/,
+     'the admin is checked against admin.conf, not the NAS accounts');
+  $change->($ta, current => 'adminpw', password1 => 'a2', password2 => 'a2')
+     ->content_like(qr/Your password has been changed\.\s*</);
+  is_deeply \@admin_set, [['a2']], 'admin.conf rewritten';
+  is scalar @set, 0, '...and no system account touched';
+
+  # A NAS account made an administrator: its own system password
+  @set = (); @admin_set = ();
+  my $tn = Test::Mojo->new;
+  $tn->get_ok('/signin_as?role=admin&user=alice&nas_admin=1');
+  $change->($tn, current => 'old', password1 => 'b', password2 => 'b');
+  is_deeply \@set, [['alice', 'b']], 'a NAS administrator changes their system password';
+  is scalar @admin_set, 0, '...not the admin one';
+}
+
 # ===================== the router's re-check =====================
 # The real app: a NAS administrator's session ends once the flag is gone.
 {
@@ -386,7 +468,9 @@ my $L = 'EasyNAS::Controller::Login';
   { no warnings 'once'; *EasyNAS::warmup = sub {}; }
   # One add-on page, standing in for every admin page; it records what reached it.
   no warnings 'once';
-  local %easynas::ADDONS = (nfs => { program => 'nfs' });
+  local %easynas::ADDONS = (nfs => { program => 'nfs' }, user_profile => { program => 'profile', access => 'all' });
+  eval q{ package EasyNAS::Controller::Profile; no warnings 'redefine';
+          sub view { shift->render(text => 'profile page') } 1 } or die $@;
   eval q{ package EasyNAS::Controller::Nfs; use Mojo::Base 'Mojolicious::Controller';
           sub view { my $c = shift; push @main::seen, [$c->req->method, $c->param('action') // '']; $c->render(text => 'nfs page') } 1 }
     or die $@;
@@ -395,6 +479,10 @@ my $L = 'EasyNAS::Controller::Login';
           sub view { shift->render(text => 'firmware page') } 1 } or die $@;
   my $ta = Test::Mojo->new('EasyNAS');
   $ta->app->log->level('fatal');
+  $ta->app->routes->get('/t_signin_user/:user' => sub ($c) {
+    $c->session(is_auth => 1, role => 'user', nas_admin => undef, user => $c->param('user'));
+    $c->render(text => 'ok');
+  });
   $ta->app->routes->get('/t_signin/:user' => sub ($c) {
     $c->session(is_auth => 1, role => 'admin', nas_admin => 1, user => $c->param('user'));
     $c->render(text => 'ok');
@@ -429,6 +517,11 @@ my $L = 'EasyNAS::Controller::Login';
   $ta->post_ok('/nfs?action=delete')->status_is(200, 'a POST may carry the action in its URL');
   is_deeply \@main::seen, [['GET', ''], ['GET', 'createmenu'], ['POST', 'delete'], ['POST', 'delete']],
     'what reached the page';
+
+  # <access>all</access>: every signed-in account reaches it, a NAS user too
+  $ta->get_ok('/t_signin_user/bob');
+  $ta->get_ok('/profile')->status_is(200)->content_is('profile page', 'a NAS user reaches an "all" page');
+  $ta->get_ok('/nfs')->status_is(403, '...but not an administrator\'s page');
 
   ok EasyNAS::view_action($_), "view action: $_" for qw(createmenu settingsmenu stats status progress display);
   ok !EasyNAS::view_action($_), "a change: $_" for qw(delete reboot nfson update refresh terminal menus);

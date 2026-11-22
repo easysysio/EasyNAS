@@ -32,6 +32,8 @@ Requires:       dmidecode
 # The Plex add-on was dropped (its plexmediaserver dependency is in no
 # repository the appliance uses). Updating EasyNAS uninstalls it.
 Obsoletes:      easynas-mm-plex < 1.99-5
+# The NAS-user frame, templates/layouts/user.html.ep (needed by fs-files).
+Provides:       easynas(user-layout)
 # The core only lets GETs show things (POST for changes, see lib/EasyNAS.pm);
 # these add-on releases are the first whose pages make their changes by POST,
 # so older ones are updated along with the core.
@@ -291,6 +293,7 @@ EOF
 /easynas/lib/EasyNAS/Controller/login.pm
 /easynas/lib/EasyNAS/Controller/addons.pm
 /easynas/lib/EasyNAS/Controller/users.pm
+/easynas/lib/EasyNAS/Controller/profile.pm
 /easynas/lib/EasyNAS/Controller/groups.pm
 /easynas/lib/EasyNAS/Controller/firmware.pm
 /easynas/lib/EasyNAS/Controller/network.pm
@@ -306,6 +309,7 @@ EOF
 /easynas/templates/easynas/settings*
 /easynas/templates/easynas/addons*
 /easynas/templates/easynas/users*
+/easynas/templates/easynas/profile.html.ep
 /easynas/templates/easynas/groups*
 /easynas/templates/easynas/network*
 /easynas/templates/easynas/firmware*
@@ -427,10 +431,12 @@ TFTP addon for EasyNAS
 # download its CRCs.
 %package        fs-files
 Version:        %{version}
-Release:        2
+Release:        3
 Summary:        File Manager addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
+# The frame NAS users see (templates/layouts/user.html.ep) is the core's.
+Requires:       easynas(user-layout)
 Requires:       util-linux
 Requires:       coreutils
 Requires:       perl(Compress::Raw::Zlib)
@@ -446,7 +452,6 @@ and act with its permissions.
 /easynas/lib/EasyNAS/Controller/files.pm
 /easynas/lib/EasyNAS/files-helper.pl
 /easynas/templates/easynas/files.html.ep
-/easynas/templates/easynas/files_user.html.ep
 /easynas/lang/en-en/lang_english_files.pl
 /easynas/lang/de-de/lang_german_files.pl
 /easynas/lang/pt-br/lang_brazilian_portuguese_files.pl
@@ -691,7 +696,7 @@ iSCSI addon for EasyNAS
 ##### German Language ####
 %package        lang-german
 Version:        %{version}
-Release:        7
+Release:        8
 Summary:        German Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -707,7 +712,7 @@ German Language for EasyNAS
 ##### Portuguese Language ####
 %package        lang-portuguese
 Version:        %{version}
-Release:        7
+Release:        8
 Summary:        Portuguese Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -723,7 +728,7 @@ Portuguese Language for EasyNAS
 ##### Chinese Language ####
 %package        lang-chinese
 Version:        %{version}
-Release:        7
+Release:        8
 Summary:        Simplified Chinese Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -739,7 +744,7 @@ Simplified Chinese Language for EasyNAS
 ##### Polish Language ####
 %package        lang-polish
 Version:        %{version}
-Release:        7
+Release:        8
 Summary:        Polish Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -878,6 +883,15 @@ Polish Language for EasyNAS
     socket's drop-in at boot and when Settings changes it. The service also
     restarts itself if it crashes. The console menu's stop/start covers the
     socket. The Settings page refuses a port that isn't a plain number
+  - User Profile: every signed-in account changes its own password there,
+    after entering the current one: the admin its web password, a NAS
+    account (an administrator, or a user of the File Manager) its system and
+    Samba passwords. Wrong current passwords count towards the sign-in
+    lockout. The page is open to every signed-in account (<access>all</access>)
+    without being a reason for NAS accounts to sign in at all. The admin
+    menu's User Profile entry leads there instead of the Users page
+  - The bare frame NAS users see is now the core's layouts/user.html.ep
+    (their name links to their profile); fs-files uses it and requires it
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

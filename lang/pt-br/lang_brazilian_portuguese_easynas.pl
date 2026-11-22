@@ -132,6 +132,19 @@ $TEXT{'disable'} = "Desativar";
 
 #### User Profile ####
 $TEXT{'user_profile'} = "Perfil do usuário";
+$TEXT{'sign_out'} = "Sair";
+$TEXT{'profile_change_password'} = "Alterar senha";
+$TEXT{'profile_current'} = "Senha atual";
+$TEXT{'profile_new'} = "Nova senha";
+$TEXT{'profile_retype'} = "Repita a nova senha";
+$TEXT{'profile_shares_note'} = "Esta também é a sua senha para os compartilhamentos de arquivos (Samba, SSH, FTP).";
+$TEXT{'profile_empty'} = "Digite uma nova senha.";
+$TEXT{'profile_mismatch'} = "As novas senhas não coincidem.";
+$TEXT{'profile_wrong_current'} = "A senha atual não está correta.";
+$TEXT{'profile_failed'} = "Não foi possível alterar a senha.";
+$TEXT{'profile_changed'} = "Sua senha foi alterada.";
+$TEXT{'profile_changed_shares'} = "Sua senha foi alterada. Ela também é a sua senha para os compartilhamentos de arquivos (Samba, SSH, FTP).";
+$TEXT{'login_locked'} = "Muitas tentativas de entrada sem sucesso. Tente novamente em %d minuto(s).";
 
 
 #### Backup ####

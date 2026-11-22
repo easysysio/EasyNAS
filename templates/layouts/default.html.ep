@@ -86,7 +86,7 @@
                         </a>
                         <ul class="dropdown-menu dropdown-user">
                             <li>
-                                <a href="users?action=passwordmenu&username=<%= $username %>"><i class="fa fa-user fa-fw"></i> User Profile</a>
+                                <a href="/profile"><i class="fa fa-user fa-fw"></i> <%= ($TEXT->{'user_profile'} || 'User Profile') %></a>
                             </li>
                             <li class="divider"></li>
                             <li>
