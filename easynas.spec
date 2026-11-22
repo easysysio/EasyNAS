@@ -106,17 +106,34 @@ EOF
 # baked into the image by KIWI (imageinclude), one channel per image, so an RPM
 # update never resets which channel the appliance updates from.
 
+# systemd holds the web interface's listening socket and hands it to the app
+# (fd 3), so while the app restarts -- every update restarts it -- new
+# connections wait in the socket's queue instead of being refused. The port
+# comes from /etc/easynas/easynas.conf through a drop-in that
+# /easynas/startup/web-port.sh writes; 1443 here is only the default.
+cat > %{buildroot}/usr/lib/systemd/system/easynas.socket << 'EOF'
+[Unit]
+Description=EasyNAS web interface socket
+
+[Socket]
+ListenStream=1443
+
+[Install]
+WantedBy=sockets.target
+EOF
+
 cat > %{buildroot}/usr/lib/systemd/system/easynas.service << 'EOF'
 [Unit]
 Description=EasyNAS application
-After=network.target
+After=network.target easynas.socket
+Requires=easynas.socket
 
 [Service]
 Type=simple
 User=easynas
-Environment=EASYNAS_PORT=1443
-EnvironmentFile=-/etc/easynas/easynas.conf
-ExecStart=/easynas/script/easy_nas daemon -m production -l https://*:${EASYNAS_PORT}?cert=/etc/easynas/easynas.cert&key=/etc/easynas/easynas.key
+ExecStart=/easynas/script/easy_nas daemon -m production -l https://*?fd=3&cert=/etc/easynas/easynas.cert&key=/etc/easynas/easynas.key
+Restart=on-failure
+RestartSec=2
 
 [Install]
 WantedBy=multi-user.target
@@ -241,6 +258,7 @@ EOF
 /etc/sudoers.d/easynas
 /etc/ImageVersion
 /usr/lib/systemd/system/easynas.service
+/usr/lib/systemd/system/easynas.socket
 /usr/lib/systemd/system/easynas-firstboot.service
 /usr/lib/systemd/system/getty@tty1.service.d/easynas-firstboot.conf
 /easynas/easy_n_a_s.yml
@@ -308,16 +326,27 @@ EOF
 
 
 %post
-systemctl enable easynas.service easynas-firstboot.service
+systemctl enable easynas.socket easynas.service easynas-firstboot.service
 
 # On a live system, seed the config layer (cert, port, cron) and restart now.
 # During an image build there is no running systemd, so this is skipped and the
 # enabled firstboot service seeds at the first real boot instead -- which keeps
 # the SSL cert out of the image so every appliance gets its own (conflict #3).
+# firstboot.sh also writes the socket's port drop-in (web-port.sh).
 if [ -d /run/systemd/system ]; then
     /easynas/startup/firstboot.sh
     systemctl daemon-reload
-    systemctl restart easynas.service
+    if systemctl -q is-active easynas.socket; then
+        # The socket stays open: connections wait for the new app instead of
+        # being refused.
+        systemctl restart easynas.service
+    else
+        # First update to socket activation: the old app holds the port
+        # itself, so it stops before systemd can open the socket (one last
+        # short gap).
+        systemctl stop easynas.service
+        systemctl start easynas.socket easynas.service
+    fi
 fi
 
 
@@ -841,6 +870,14 @@ Polish Language for EasyNAS
     "settingsmenu". The add-ons whose pages changed are bumped, and the core
     conflicts with their older releases so they update together.
     t/templates-post.t fails on any template that asks for a change by GET
+  - No more "connection refused" while the web interface restarts (every
+    update restarts it): systemd now holds the listening socket
+    (easynas.socket) and hands it to the app, so connections wait for the
+    new app instead of being refused. The port still comes from
+    /etc/easynas/easynas.conf; startup/web-port.sh copies it into the
+    socket's drop-in at boot and when Settings changes it. The service also
+    restarts itself if it crashes. The console menu's stop/start covers the
+    socket. The Settings page refuses a port that isn't a plain number
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

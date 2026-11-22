@@ -239,7 +239,7 @@ sub changesettings($self) {
  my $hostname=$self->param("hostname");
  my $conf_hosts=get_conf_hosts();
  my $rc;
- if ($port > 65535 || $port < 1025) {
+ unless (defined $port && $port =~ /^\d{4,5}$/ && $port >= 1025 && $port <= 65535) {
   $result="fail";
   $msg=$TEXT{'settings_bad_port'};
   return;
@@ -254,10 +254,13 @@ sub changesettings($self) {
  $rc=system("/usr/bin/sudo /bin/hostname $hostname > /dev/null");
  $rc=system("/bin/echo '############## EasyNAS hosts file ############' | /usr/bin/sudo /usr/bin/tee $conf_hosts > /dev/null");
  $rc=system("/bin/echo '127.0.0.1  localhost $hostname' | /usr/bin/sudo /usr/bin/tee -a $conf_hosts > /dev/null");
- # Persist the port to the config layer; systemd reads it via EnvironmentFile.
+ # Persist the port to the config layer. systemd holds the listening socket
+ # (easynas.socket), so web-port.sh copies the port into its drop-in and
+ # restarts the web interface: only the app on the same port (connections
+ # wait meanwhile), the socket too on a new one. In its own transient unit so
+ # it outlives this process, which it restarts.
  $rc=system("/bin/echo \"EASYNAS_PORT=$port\" | /usr/bin/sudo /usr/bin/tee /etc/easynas/easynas.conf > /dev/null");
- $rc=system("/usr/bin/sudo /usr/bin/systemctl daemon-reload > /dev/null");
- $rc=system("/usr/bin/sudo /usr/bin/systemctl restart easynas.service &");
+ $rc=system("/usr/bin/sudo","/usr/bin/systemd-run","--collect","--quiet","/easynas/startup/web-port.sh","--apply");
  $result="success";
  $msg=$TEXT{'settings_saved'};
  return;

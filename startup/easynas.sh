@@ -97,12 +97,14 @@ while [[ true ]] ; do
 	"2" )
             if [[ $ACTIVE =~ "running" ]]; then 
 	        echo "Stopping EasyNAS"
-		sudo /usr/bin/systemctl stop easynas.service 
+		# The socket too: while it is open, the next browser request would
+		# start the web interface again.
+		sudo /usr/bin/systemctl stop easynas.socket easynas.service
 	        echo "EasyNAS Stopped"
 	        read -p "Press Enter key to continue ..."
 	    else 
 		echo "Starting EasyNAS"
-		sudo /usr/bin/systemctl start easynas.service  
+		sudo /usr/bin/systemctl start easynas.socket easynas.service
 		echo "EasyNAS Started"
                 read -p "Press Enter key to continue ..."
 	    fi

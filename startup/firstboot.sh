@@ -58,6 +58,8 @@ fi
 if [ ! -f ${CONF_DIR}/easynas.conf ]; then
     echo "EASYNAS_PORT=1443" > ${CONF_DIR}/easynas.conf
 fi
+# systemd holds the listening socket (easynas.socket); give it that port.
+/easynas/startup/web-port.sh --boot
 
 # Cron schedule (conflict #2): seed the default update-check entry if missing.
 # Per-filesystem scrub and snapshot entries are appended/removed at runtime by

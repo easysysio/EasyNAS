@@ -243,6 +243,25 @@ my $L = 'EasyNAS::Controller::Login';
      ->status_is(302, 'another address signs in');
 }
 
+# ===================== port change =====================
+# systemd holds the socket: a port change goes through web-port.sh, which
+# copies the port into the socket's drop-in and restarts the right units.
+{
+  @SYS = ();
+  my $tp = Test::Mojo->new;
+  $tp->get_ok('/signin');
+  $tp->post_ok('/settings' => form => { action => 'changesettings', port => '8443', hostname => 'nas' });
+  my ($conf) = grep { ($_->[0] // '') =~ m{tee /etc/easynas/easynas.conf} } @SYS;
+  like $conf->[0], qr/^\/bin\/echo "EASYNAS_PORT=8443" \|/, 'port written to the conf';
+  ok((grep { "@$_" eq '/usr/bin/sudo /usr/bin/systemd-run --collect --quiet /easynas/startup/web-port.sh --apply' } @SYS),
+     'applied by web-port.sh, in its own unit');
+  ok(!(grep { "@$_" =~ /systemctl (restart|daemon-reload)/ } @SYS), 'no restart of its own');
+
+  @SYS = ();
+  $tp->post_ok('/settings' => form => { action => 'changesettings', port => '8443x; reboot', hostname => 'nas' });
+  is scalar @SYS, 0, 'a port that is not a number changes nothing';
+}
+
 # ===================== NAS accounts as administrators =====================
 {
   no warnings 'redefine';

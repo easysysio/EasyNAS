@@ -37,8 +37,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: File manager helper and template tests
-        run: prove -v t/files-helper.t t/templates-post.t
+      - name: File manager helper, template and port tests
+        run: prove -v t/files-helper.t t/templates-post.t t/web-port.t
       - name: Install Mojolicious
         run: sudo apt-get update && sudo apt-get install -y libmojolicious-perl
       - name: Settings, sign-in and file manager web tests
