@@ -245,9 +245,109 @@ SKIP: {
   ok(-d $vol && -f "$vol/a.txt", '...and nothing was');
 }
 
+# ---- read with a limit (text preview)
+{
+  my (undef, $rc, $raw) = h(['read', 'pool/vol/a.txt', 3]);
+  is($raw, 'alp', 'read stops at the limit');
+  (undef, undef, $raw) = h(['read', 'pool/vol/a.txt', 100]);
+  is($raw, "alpha\n", 'a limit past the end reads it all');
+}
+
+# ---- mkdirs (folder upload)
+{
+  my ($j) = h(['mkdirs', 'pool/vol', 'up/a/b']);
+  ok($j->{ok} && -d "$vol/up/a/b", 'nested folders created');
+  ($j) = h(['mkdirs', 'pool/vol', 'up/a/c']);
+  ok($j->{ok} && -d "$vol/up/a/c", 'existing levels are reused');
+  ($j) = h(['mkdirs', 'pool/vol', 'docs_link/x']);
+  is($j->{error}, 'notdir', 'a link is never followed');
+  ok(!-e "$vol/docs/x", '...nothing created through it');
+  ($j) = h(['mkdirs', 'pool/vol', 'a.txt/x']);
+  is($j->{error}, 'notdir', 'a file in the way');
+  ($j) = h(['mkdirs', 'pool/vol', 'up/../../x']);
+  is($j->{error}, 'badpath', 'no climbing out');
+  ($j) = h(['mkdirs', 'pool', 'x/y']);
+  is($j->{error}, 'protected', 'not above the inside of a volume');
+  ($j) = h(['mkdirs', 'pool/vol/escape_dir', 'x']);
+  is($j->{error}, 'outside', 'not through an escaping link');
+  ok(!-e "$out/x", '...nothing created outside');
+  ($j) = h(['mkdirs', 'pool/vol', 'x.easynas-part/y']);
+  is($j->{error}, 'badname', 'no part-file names');
+}
+
+# ---- zip (folder download)
+# The zips are read back with Python's zipfile, an independent reader that
+# checks every CRC and understands ZIP64.
+SKIP: {
+  my $py = `python3 -c 'print(1)' 2>/dev/null` // '';
+  skip 'python3 not available', 19 unless $py =~ /1/;
+  mkdir "$vol/z"; mkdir "$vol/z/sub"; mkdir "$vol/z/empty";
+  put_file("$vol/z/one.txt", "one\n");
+  put_file("$vol/z/sub/two.bin", join('', map { chr($_ % 256) } 0 .. 99_999));
+  put_file("$vol/z/\xd7\xa9.txt", "utf8 name\n");       # a Hebrew letter, as UTF-8 bytes
+  symlink("$vol/z/one.txt", "$vol/z/one_link");
+  symlink("$vol/z/sub", "$vol/z/sub_link");
+  symlink("$out/secret.txt", "$vol/z/out_link");
+
+  my $check = sub {
+    my ($zip) = @_;
+    my $prog = <<'PY';
+import zipfile, sys, json, hashlib
+z = zipfile.ZipFile(sys.argv[1])
+bad = z.testzip()
+out = {"bad": bad, "entries": {}}
+for i in z.infolist():
+    data = z.read(i)
+    out["entries"][i.filename] = {"size": i.file_size, "mode": i.external_attr >> 16,
+                                   "sha": hashlib.sha256(data).hexdigest(),
+                                   "text": data.decode("latin-1") if i.file_size < 400 else None}
+print(json.dumps(out))
+PY
+    my $res = `python3 -I -c '$prog' '$zip' 2>&1`;
+    return eval { JSON::PP->new->decode($res) } || { error => $res };
+  };
+  my $run = sub {
+    my ($args, $env) = @_;
+    my $zip = "$out/test.zip";
+    local $ENV{EASYNAS_ZIP64_AT} = $env if defined $env;
+    system("'$^X' '$helper' '$root' @{[ map { qq('$_') } @$args ]} > '$zip'");
+    return ($? >> 8, $check->($zip));
+  };
+
+  for my $case ([undef, 'plain'], [100, 'ZIP64 records']) {
+    my ($rc, $z) = $run->(['zip', 'pool/vol/z', 'pool/vol/a.txt'], $case->[0]);
+    is($rc, 0, "zip exits 0 ($case->[1])");
+    is($z->{bad}, undef, "every CRC checks out ($case->[1])") or diag explain $z;
+    my $e = $z->{entries} || {};
+    is($e->{'z/one.txt'}{text}, "one\n", "file content ($case->[1])");
+    is($e->{'z/sub/two.bin'}{size}, 100_000, "larger file size ($case->[1])");
+    is($e->{'a.txt'}{text}, "alpha\n", "a file named alongside a folder ($case->[1])");
+    ok(exists $e->{'z/empty/'}, "empty folder kept ($case->[1])");
+  }
+
+  my ($rc, $z) = $run->(['zip', 'pool/vol/z']);
+  my $e = $z->{entries};
+  is($e->{'z/one_link'}{text}, "one\n", 'a link to a file inside is followed');
+  ok(!exists $e->{'z/sub_link/'} && !exists $e->{'z/sub_link/two.bin'}, 'a link to a folder is not');
+  ok(!grep({ /out_link/ && !/not included/ } keys %$e), 'a link leading outside is not');
+  like($e->{'EasyNAS - not included.txt'}{text} // '', qr{z/sub_link.*link to a folder}, 'skipped link to a folder is listed');
+  like($e->{'EasyNAS - not included.txt'}{text} // '', qr{z/out_link.*outside}, 'skipped outside link is listed');
+  is(($e->{'z/one.txt'}{mode} // 0) & 0777, 0644, 'file mode kept');
+  ok(exists $e->{"z/\x{05e9}.txt"}, 'a non-ASCII name arrives as UTF-8');
+
+  my ($j) = h(['zipcheck', 'pool/vol/z', 'pool/vol/a.txt']);
+  ok($j->{ok}, 'zipcheck accepts files and folders');
+  ($j) = h(['zipcheck', 'pool/vol/nope']);
+  is($j->{error}, 'notfound', 'zipcheck: missing');
+  ($j) = h(['zipcheck', 'pool/vol/escape_dir']);
+  is($j->{error}, 'outside', 'zipcheck: a link leading outside');
+  ($j) = h(['zipcheck', '../x']);
+  is($j->{error}, 'badpath', 'zipcheck: climbing out');
+}
+
 # ---- the kernel has the last word on permissions
 SKIP: {
-  skip 'running as root: permissions are not enforced', 6 if $> == 0;
+  skip 'running as root: permissions are not enforced', 7 if $> == 0;
   mkdir "$vol/ro"; put_file("$vol/ro/keep.txt", "k"); chmod 0555, "$vol/ro";
   mkdir "$vol/hidden"; put_file("$vol/hidden/h.txt", "h"); chmod 0000, "$vol/hidden";
   my ($j) = h(['list', 'pool/vol/ro']);
@@ -261,6 +361,8 @@ SKIP: {
   ($j) = h(['list', 'pool/vol/hidden']);
   is($j->{error}, 'denied', 'a folder without access cannot be listed');
   is(names((h(['list', 'pool/vol']))[0])->{hidden}{readable}, 0, '...and is shown as unreadable');
+  ($j) = h(['zipcheck', 'pool/vol/hidden']);
+  is($j->{error}, 'denied', 'a folder without access cannot be zipped');
   chmod 0755, "$vol/ro", "$vol/hidden";
 }
 

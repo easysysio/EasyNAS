@@ -20,10 +20,27 @@
  #fm .fm-muted { color: #999; }
  #fm .fm-empty { padding: 30px; text-align: center; color: #999; }
  #fm .fm-drop { outline: 2px dashed #337ab7; outline-offset: -6px; background: #f5faff; }
- #fm .fm-up { margin-bottom: 6px; }
+ #fm .fm-up { margin-bottom: 10px; }
  #fm .fm-up .progress { margin: 2px 0 0; height: 8px; }
  #fm .fm-up small { color: #777; }
+ #fm .fm-up .fm-up-cur { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
  #fm .fm-count { line-height: 30px; color: #777; margin-left: 4px; }
+ /* The dialog. Plain CSS and script: the NAS-user frame loads no Bootstrap JS. */
+ .fm-modal { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 2000; background: rgba(0,0,0,.6);
+             display: flex; align-items: center; justify-content: center; padding: 16px; }
+ .fm-modal-box { background: #fff; border-radius: 4px; box-shadow: 0 5px 15px rgba(0,0,0,.5);
+                 max-width: 100%; max-height: 100%; display: flex; flex-direction: column; min-width: 300px; }
+ .fm-modal-box.fm-wide { width: 1100px; }
+ .fm-modal-head { padding: 10px 15px; border-bottom: 1px solid #e5e5e5; display: flex; align-items: center; }
+ .fm-modal-head span { flex: 1; font-weight: bold; word-break: break-all; margin-right: 10px; }
+ .fm-modal-head .close { float: none; }
+ .fm-modal-body { padding: 15px; overflow: auto; flex: 1; min-height: 0; }
+ .fm-modal-body img { display: block; margin: 0 auto; max-width: 100%; max-height: 72vh; }
+ .fm-modal-body pre { max-height: 70vh; overflow: auto; white-space: pre-wrap; word-break: break-word; margin: 0; }
+ .fm-modal-body .fm-note { color: #777; margin-top: 8px; }
+ .fm-modal-foot { padding: 10px 15px; border-top: 1px solid #e5e5e5; text-align: right; }
+ .fm-modal-foot .btn { margin-left: 5px; }
+ .fm-modal-foot label { float: left; font-weight: normal; margin-top: 6px; }
 </style>
 
 <div class="row" id="fm">
@@ -40,7 +57,11 @@
      </div>
      <div class="btn-group">
       <button type="button" class="btn btn-default btn-sm" id="fm-mkdir"><i class="fa fa-folder"></i> <%= $TEXT->{'files_new_folder'} %></button>
-      <button type="button" class="btn btn-default btn-sm" id="fm-upload"><i class="fa fa-upload"></i> <%= $TEXT->{'files_upload'} %></button>
+      <button type="button" class="btn btn-default btn-sm" id="fm-upload"><i class="fa fa-upload"></i> <%= $TEXT->{'files_upload_files'} %></button>
+      <button type="button" class="btn btn-default btn-sm" id="fm-upload-dir"><i class="fa fa-folder-open"></i> <%= $TEXT->{'files_upload_folder'} %></button>
+     </div>
+     <div class="btn-group">
+      <button type="button" class="btn btn-default btn-sm" id="fm-download"><i class="fa fa-download"></i> <%= $TEXT->{'files_download'} %></button>
      </div>
      <div class="btn-group">
       <button type="button" class="btn btn-default btn-sm" id="fm-copy"><i class="fa fa-copy"></i> <%= $TEXT->{'files_copy'} %></button>
@@ -76,6 +97,7 @@
     <div class="fm-empty" id="fm-empty" style="display:none"></div>
 
     <input type="file" id="fm-file" multiple style="display:none">
+    <input type="file" id="fm-dir" multiple webkitdirectory style="display:none">
    </div>
   </div>
  </div>
@@ -87,7 +109,21 @@
   var S     = <%== Mojo::JSON::to_json(\%strings) %>;
   var CSRF  = <%== Mojo::JSON::to_json($csrf) %>;
   var CHUNK = <%= $chunk_size %>;
+  var TEXT_MAX = <%= $preview_text_max %>;
   var URL_  = '/<%= $addon->{program} %>';
+
+  // What the preview shows: pictures by extension (the same list the server
+  // sends them by), and text -- common text extensions and the usual
+  // extension-less names. Anything else is downloaded when clicked.
+  var IMAGE = {};
+  <%== Mojo::JSON::to_json($image_ext) %>.forEach(function (x) { IMAGE[x] = 1; });
+  var TEXT = {};
+  ('txt text log md markdown rst csv tsv json jsonl xml yml yaml ini conf cfg cnf properties toml env ' +
+   'sh bash zsh fish ps1 bat cmd py pl pm rb php js mjs cjs ts tsx jsx css scss less html htm vue ' +
+   'java kt c h cc cpp hpp cs go rs swift lua r sql srt vtt sub ass nfo diff patch tex spec service ' +
+   'gitignore dockerignore editorconfig').split(' ').forEach(function (x) { TEXT[x] = 1; });
+  var TEXT_NAMES = { readme: 1, license: 1, copying: 1, authors: 1, changelog: 1, makefile: 1,
+                     dockerfile: 1, vagrantfile: 1, gemfile: 1, procfile: 1 };
 
   var cwd = [];            // current folder, as path components
   var entries = [];        // its listing
@@ -102,6 +138,7 @@
   function rel(parts) { return parts.join('/'); }
   function pathOf(name) { return rel(cwd.concat([name])); }
   function selected() { return Object.keys(sel); }
+  function byName(name) { for (var i = 0; i < entries.length; i++) if (entries[i].name === name) return entries[i]; return null; }
 
   // Everything that comes from the filesystem goes into the page as text
   // nodes, never as markup: a file may be named <img onerror=...>.
@@ -169,6 +206,7 @@
     opts.headers['X-CSRF-Token'] = CSRF;
     return fetch(URL_ + (q ? '?' + qs(q) : ''), opts).then(parse);
   }
+  function fileUrl(action, path) { return URL_ + '?' + qs({ action: action, path: path }); }
 
   function size(n) {
     if (n < 1024) return n + ' B';
@@ -180,6 +218,115 @@
     var d = new Date(sec * 1000);
     function p(x) { return (x < 10 ? '0' : '') + x; }
     return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  // ------------------------------------------------------------ dialog
+  // One dialog at a time. buttons: [{ label, cls, click }]; a click handler
+  // returning false keeps the dialog open. onKey gets keydown events.
+  var modal = null;
+  function closeModal() {
+    if (!modal) return;
+    document.removeEventListener('keydown', modal.key);
+    document.body.removeChild(modal.node);
+    var done = modal.onClose;
+    modal = null;
+    if (done) done();
+  }
+  function openModal(o) {
+    closeModal();
+    var body = el('div', { 'class': 'fm-modal-body' }, o.body ? [o.body] : []);
+    var foot = el('div', { 'class': 'fm-modal-foot' }, o.footLeft ? [o.footLeft] : []);
+    (o.buttons || []).forEach(function (b) {
+      foot.appendChild(el(b.href ? 'a' : 'button',
+        b.href ? { 'class': 'btn btn-sm ' + (b.cls || 'btn-default'), href: b.href, text: b.label }
+               : { type: 'button', 'class': 'btn btn-sm ' + (b.cls || 'btn-default'), text: b.label },
+        []));
+      var node = foot.lastChild;
+      if (b.disabled) node.setAttribute('disabled', 'disabled');
+      node.addEventListener('click', function (e) {
+        if (b.href) return;
+        if (b.click && b.click(e) === false) return;
+        closeModal();
+      });
+    });
+    var box = el('div', { 'class': 'fm-modal-box' + (o.wide ? ' fm-wide' : ''), role: 'dialog', 'aria-modal': 'true' }, [
+      el('div', { 'class': 'fm-modal-head' }, [
+        el('span', { text: o.title || '' }),
+        el('button', { type: 'button', 'class': 'close', 'aria-label': t('close'), text: '×', on: { click: closeModal } })
+      ]), body, foot
+    ]);
+    var node = el('div', { 'class': 'fm-modal' }, [box]);
+    node.addEventListener('click', function (e) { if (e.target === node) closeModal(); });
+    var key = function (e) {
+      if (e.key === 'Escape') { e.preventDefault(); closeModal(); return; }
+      if (o.onKey) o.onKey(e);
+    };
+    modal = { node: node, key: key, body: body, onClose: o.onClose };
+    document.addEventListener('keydown', key);
+    document.body.appendChild(node);
+    var first = foot.querySelector('.btn-primary') || foot.querySelector('.btn');
+    if (first) first.focus();
+    return modal;
+  }
+
+  // ------------------------------------------------------------ preview
+  function ext(name) { var m = /\.([^.\/]+)$/.exec(name); return m ? m[1].toLowerCase() : ''; }
+  function previewKind(e) {
+    if (!e || e.type !== 'file' || !e.readable || e.badname) return null;
+    var x = ext(e.name);
+    if (IMAGE[x]) return 'image';
+    if (TEXT[x] || (!x && TEXT_NAMES[e.name.toLowerCase()]) || TEXT_NAMES[e.name.toLowerCase().replace(/\.[^.]*$/, '')]) return 'text';
+    return null;
+  }
+
+  function preview(name) {
+    var list = entries.filter(function (e) { return previewKind(e); }).map(function (e) { return e.name; });
+    var i = list.indexOf(name);
+    if (i < 0) return;
+    var e = byName(name), kind = previewKind(e), path = pathOf(name);
+    function step(d) { if (list[i + d] !== undefined) preview(list[i + d]); }
+
+    var body = el('div', {});
+    var m = openModal({
+      title: name, wide: true, body: body,
+      buttons: [
+        { label: '‹ ' + t('prev'), disabled: i === 0, click: function () { step(-1); return false; } },
+        { label: t('next') + ' ›', disabled: i === list.length - 1, click: function () { step(1); return false; } },
+        { label: t('download'), href: fileUrl('download', path) },
+        { label: t('close'), cls: 'btn-primary' }
+      ],
+      onKey: function (ev) {
+        if (ev.key === 'ArrowLeft')  { ev.preventDefault(); step(-1); }
+        if (ev.key === 'ArrowRight') { ev.preventDefault(); step(1); }
+      }
+    });
+    function fail(text) { body.textContent = ''; body.appendChild(el('p', { 'class': 'fm-muted', text: text })); }
+
+    if (kind === 'image') {
+      var img = el('img', { alt: name, src: fileUrl('preview', path) });
+      img.addEventListener('error', function () { if (modal === m) fail(t('preview_failed')); });
+      body.appendChild(img);
+      return;
+    }
+    body.appendChild(el('p', { 'class': 'fm-muted', text: '…' }));
+    fetch(fileUrl('preview', path), { credentials: 'same-origin' }).then(function (r) {
+      if (!r.ok) return r.text().then(function (x) { throw new Error(x || t('preview_failed')); });
+      var total = parseInt(r.headers.get('X-File-Size') || '0', 10);
+      return r.arrayBuffer().then(function (buf) {
+        if (modal !== m) return;               // moved on meanwhile
+        var bytes = new Uint8Array(buf);
+        // A NUL byte early on: not text, whatever the name says.
+        for (var k = 0; k < Math.min(bytes.length, 8000); k++) {
+          if (bytes[k] === 0) { fail(t('preview_binary')); return; }
+        }
+        var text = new TextDecoder('utf-8').decode(bytes);
+        body.textContent = '';
+        body.appendChild(el('pre', { text: text }));
+        if (total > bytes.length) {
+          body.appendChild(el('p', { 'class': 'fm-note', text: t('preview_truncated').replace('%s', size(bytes.length)).replace('%s', size(total)) }));
+        }
+      });
+    }).catch(function (err) { if (modal === m) fail(err.message || t('preview_failed')); });
   }
 
   // ------------------------------------------------------------ rendering
@@ -201,6 +348,9 @@
   function icon(e) {
     if (!e.readable) return 'fa-lock fm-muted';
     if (e.type === 'dir') return 'fa-folder';
+    var k = previewKind(e);
+    if (k === 'image') return 'fa-file-image';
+    if (k === 'text') return 'fa-file-lines';
     if (e.type === 'file') return 'fa-file';
     return 'fa-question fm-muted';
   }
@@ -232,7 +382,15 @@
       } else if (e.type === 'dir' && e.readable) {
         label = el('a', { href: '#', text: e.name, on: { click: function (ev) { ev.preventDefault(); go(cwd.concat([e.name])); } } });
       } else if (e.type === 'file' && e.readable) {
-        label = el('a', { href: URL_ + '?' + qs({ action: 'download', path: pathOf(e.name) }), title: t('download'), text: e.name });
+        // A link to the download either way, so it can be opened or saved
+        // from the browser's menu; a plain click on a previewable file
+        // opens the preview instead.
+        var kind = previewKind(e);
+        label = el('a', { href: fileUrl('download', pathOf(e.name)), title: kind ? t('preview') : t('download'), text: e.name });
+        if (kind) label.addEventListener('click', function (ev) {
+          if (ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return;
+          ev.preventDefault(); preview(e.name);
+        });
       } else {
         label = el('span', { 'class': 'fm-muted', title: t('no_access'), text: e.name });
       }
@@ -255,12 +413,20 @@
     $('fm-all').checked = false;
   }
 
+  var canPickFolder = 'webkitdirectory' in document.createElement('input');
+
   function toolbar() {
-    var n = selected().length;
+    var names = selected(), n = names.length;
     var change = writable && !busy;
+    var fetchable = n > 0 && names.every(function (k) {
+      var e = byName(k);
+      return e && e.readable && (e.type === 'file' || e.type === 'dir');
+    });
     $('fm-up').disabled = !cwd.length;
     $('fm-mkdir').disabled = !change;
     $('fm-upload').disabled = !change;
+    $('fm-upload-dir').disabled = !change || !canPickFolder;
+    $('fm-download').disabled = !fetchable;
     $('fm-copy').disabled = !n || busy;
     $('fm-cut').disabled = !n || !change;
     $('fm-paste').disabled = !clip || !change;
@@ -296,6 +462,7 @@
     var h = location.hash.replace(/^#\/?/, '');
     cwd = h ? h.split('/').filter(Boolean).map(decodeURIComponent) : [];
     sel = {};
+    closeModal();
     load();
   }
   function go(parts) {
@@ -344,6 +511,31 @@
     act(post('delete', { item: names.map(pathOf) }));
   });
 
+  // One file downloads as itself; a folder, or several things, as one zip
+  // the server builds while it sends it. The zip request is an ordinary form
+  // POST, so the browser saves the answer like any download (with its own
+  // progress) and there is no limit on how many items it names.
+  $('fm-download').addEventListener('click', function () {
+    var names = selected();
+    if (!names.length) return;
+    var first = byName(names[0]);
+    if (names.length === 1 && first && first.type === 'file') { location.href = fileUrl('download', pathOf(names[0])); return; }
+    var items = names.map(pathOf), dir = rel(cwd);
+    // Asked first, so a refusal shows here instead of replacing the page.
+    post('zipcheck', { item: items }).then(function (res) {
+      if (!res.ok) { msg(errText(res.error)); return; }
+      var form = el('form', { method: 'post', action: URL_, style: 'display:none' }, [
+        el('input', { type: 'hidden', name: 'action', value: 'zip' }),
+        el('input', { type: 'hidden', name: 'csrf', value: CSRF }),
+        el('input', { type: 'hidden', name: 'path', value: dir })
+      ]);
+      items.forEach(function (p) { form.appendChild(el('input', { type: 'hidden', name: 'item', value: p })); });
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+    }).catch(function () {});
+  });
+
   function toClip(mode) {
     var names = selected();
     clip = { mode: mode, from: rel(cwd), names: names, items: names.map(pathOf) };
@@ -361,63 +553,122 @@
   });
 
   // ------------------------------------------------------------ upload
+  // Uploads are a list of { file, sub }: the file, and the folder below the
+  // current one it goes into ('' for here). Files picked or dropped on their
+  // own have no sub; a folder brings its whole tree, which is created first.
+  //
   // A file goes up in chunks, one request each, so its size is not bounded by
   // any request limit and nothing large is ever held in the server's memory.
   // The server appends them to a hidden part file and only gives the file its
   // name once it is complete.
-  function uploadOne(file, dir, row) {
-    var bar = row.querySelector('.progress-bar'), note = row.querySelector('small');
-    function progress(done) {
-      var pct = file.size ? Math.floor(done * 100 / file.size) : 100;
-      bar.style.width = pct + '%';
-      note.textContent = size(done) + ' / ' + size(file.size);
-    }
-    function send(offset, overwrite) {
-      var blob = file.slice(offset, offset + CHUNK);
-      return post('upload', { path: dir, name: file.name, offset: offset, total: file.size, overwrite: overwrite ? 1 : 0 }, blob)
-        .then(function (res) {
-          if (res.ok) {
-            progress(res.size);
-            return res.done ? true : send(res.size, overwrite);
-          }
-          if (res.error === 'exists' && !overwrite) {
-            if (confirm(t('overwrite').replace('%s', file.name))) return send(0, true);
-            note.textContent = t('skipped');
-            return false;
-          }
-          // The server has a different amount than we thought: carry on from there.
-          if (res.error === 'offset' && typeof res.have === 'number' && res.have < file.size) return send(res.have, overwrite);
-          throw new Error(errText(res.error));
-        });
-    }
-    progress(0);
-    return send(0, false);
+
+  // "X already exists here": replace or skip, optionally for every remaining
+  // conflict of this upload. Resolves to { replace, all }.
+  function askOverwrite(name, more) {
+    return new Promise(function (resolve) {
+      var all = el('input', { type: 'checkbox' });
+      var answered = false;
+      function answer(replace) { answered = true; resolve({ replace: replace, all: all.checked }); }
+      openModal({
+        title: t('upload'),
+        body: el('p', { text: t('overwrite').replace('%s', name) }),
+        footLeft: more ? el('label', {}, [all, ' ' + t('apply_all')]) : null,
+        buttons: [
+          { label: t('skip'), click: function () { answer(false); } },
+          { label: t('replace'), cls: 'btn-primary', click: function () { answer(true); } }
+        ],
+        onClose: function () { if (!answered) resolve({ replace: false, all: false }); }
+      });
+    });
   }
 
-  function upload(files) {
-    files = [].slice.call(files);
-    if (!files.length || !writable) return;
-    var dir = rel(cwd), box = $('fm-uploads'), failed = [];
+  function upload(items, dirs) {
+    if (!items.length && !(dirs && dirs.length)) return;
+    if (!writable) return;
+    var base = rel(cwd), box = $('fm-uploads'), failed = [];
+    var total = 0, sent = 0, done = 0, cancelled = false, policy = null;
+    items.forEach(function (it) { total += it.file.size; });
     busy = true; toolbar();
+
+    var bar = el('div', { 'class': 'progress-bar', style: 'width:0' });
+    var cur = el('div', { 'class': 'fm-up-cur' });
+    var note = el('small', {});
+    var stop = el('button', { type: 'button', 'class': 'btn btn-default btn-xs pull-right', text: t('cancel'),
+                              on: { click: function () { cancelled = true; stop.disabled = true; } } });
+    box.textContent = '';
+    box.appendChild(el('div', { 'class': 'fm-up' }, [stop, cur, note, el('div', { 'class': 'progress' }, [bar])]));
+    function progress(extra) {
+      var pct = total ? Math.floor((sent + extra) * 100 / total) : Math.floor(done * 100 / Math.max(items.length, 1));
+      bar.style.width = pct + '%';
+      note.textContent = t('upload_progress').replace('%d', done).replace('%d', items.length)
+                         .replace('%s', size(sent + extra)).replace('%s', size(total));
+    }
+
+    function dirOf(it) { return it.sub ? base + '/' + it.sub : base; }
+
+    function sendFile(it) {
+      var file = it.file;
+      cur.textContent = (it.sub ? it.sub + '/' : '') + file.name;
+      function send(offset, overwrite) {
+        if (cancelled) return Promise.resolve(false);
+        var blob = file.slice(offset, offset + CHUNK);
+        return post('upload', { path: dirOf(it), name: file.name, offset: offset, total: file.size, overwrite: overwrite ? 1 : 0 }, blob)
+          .then(function (res) {
+            if (res.ok) {
+              progress(res.size);
+              return res.done ? true : send(res.size, overwrite);
+            }
+            if (res.error === 'exists' && !overwrite) {
+              var decide = policy !== null ? Promise.resolve({ replace: policy })
+                         : askOverwrite(cur.textContent, done < items.length - 1);
+              return decide.then(function (d) {
+                if (d.all) policy = d.replace;
+                return d.replace ? send(0, true) : 'skipped';
+              });
+            }
+            // The server has a different amount than we thought: carry on from there.
+            if (res.error === 'offset' && typeof res.have === 'number' && res.have < file.size) return send(res.have, overwrite);
+            throw new Error(errText(res.error));
+          });
+      }
+      return send(0, false);
+    }
+
+    // The folders first, deepest ones only (each brings its parents).
+    var leaves = (dirs || []).filter(function (d) {
+      return !(dirs || []).some(function (o) { return o !== d && o.indexOf(d + '/') === 0; });
+    });
+    var badDir = {};
     var chain = Promise.resolve();
-    files.forEach(function (file) {
-      var row = el('div', { 'class': 'fm-up' }, [
-        el('span', { text: file.name + ' ' }), el('small', {}),
-        el('div', { 'class': 'progress' }, [el('div', { 'class': 'progress-bar', style: 'width:0' })])
-      ]);
-      box.appendChild(row);
+    leaves.forEach(function (d) {
       chain = chain.then(function () {
-        return uploadOne(file, dir, row).then(function () {
-          row.querySelector('.progress-bar').className = 'progress-bar progress-bar-success';
-        }, function (err) {
-          row.querySelector('.progress-bar').className = 'progress-bar progress-bar-danger';
-          row.querySelector('small').textContent = err.message;
-          failed.push(file.name + ' (' + err.message + ')');
+        if (cancelled) return;
+        cur.textContent = d + '/';
+        return post('mkdirs', { path: base, name: d }).then(function (res) {
+          if (!res.ok) { badDir[d] = errText(res.error); failed.push(d + '/ (' + errText(res.error) + ')'); }
         });
       });
     });
-    chain.then(function () {
+    progress(0);
+    items.forEach(function (it) {
+      chain = chain.then(function () {
+        if (cancelled) return;
+        // Its folder couldn't be made: so neither can the file.
+        for (var d in badDir) if (it.sub === d || it.sub.indexOf(d + '/') === 0) { done++; return; }
+        return sendFile(it).then(function (r) {
+          if (r === true) sent += it.file.size;
+          done++; progress(0);
+        }, function (err) {
+          failed.push((it.sub ? it.sub + '/' : '') + it.file.name + ' (' + err.message + ')');
+          done++; progress(0);
+        });
+      });
+    });
+    chain.catch(function () {}).then(function () {
       busy = false;
+      bar.className = 'progress-bar ' + (failed.length ? 'progress-bar-danger' : 'progress-bar-success');
+      cur.textContent = cancelled ? t('upload_cancelled') : '';
+      stop.style.display = 'none';
       load(true).then(function () {
         if (failed.length) msg(t('some_failed') + ' ' + failed.join(', '));
         else setTimeout(function () { box.textContent = ''; }, 2500);
@@ -425,27 +676,72 @@
     });
   }
 
-  $('fm-upload').addEventListener('click', function () { $('fm-file').click(); });
-  $('fm-file').addEventListener('change', function () { upload(this.files); this.value = ''; });
+  function plainFiles(list) { return [].slice.call(list).map(function (f) { return { file: f, sub: '' }; }); }
 
-  // Drop files onto the listing to upload them here.
+  // A picked folder: every file carries its path from the folder picked down
+  // ("Photos/2024/a.jpg"). Empty folders are not reported by the browser.
+  function pickedFolder(list) {
+    var items = [], dirs = {};
+    [].forEach.call(list, function (f) {
+      var p = (f.webkitRelativePath || f.name).split('/');
+      p.pop();
+      var sub = p.join('/');
+      items.push({ file: f, sub: sub });
+      if (sub) dirs[sub] = 1;
+    });
+    return { items: items, dirs: Object.keys(dirs) };
+  }
+
+  // Dropped items: files, and folders walked to the bottom (empty ones too).
+  function droppedTree(dt) {
+    var items = [], dirs = [];
+    var entries_ = [].map.call(dt.items || [], function (i) { return i.webkitGetAsEntry ? i.webkitGetAsEntry() : null; });
+    if (!entries_.length || entries_.some(function (e) { return !e; })) {
+      return Promise.resolve({ items: plainFiles(dt.files), dirs: [] });
+    }
+    function walk(entry, sub) {
+      if (entry.isFile) {
+        return new Promise(function (ok) {
+          entry.file(function (f) { items.push({ file: f, sub: sub }); ok(); }, function () { ok(); });
+        });
+      }
+      var here = sub ? sub + '/' + entry.name : entry.name;
+      dirs.push(here);
+      var reader = entry.createReader(), all = [];
+      return new Promise(function (ok) {
+        // readEntries hands them out in batches until it returns none.
+        (function more() {
+          reader.readEntries(function (batch) {
+            if (!batch.length) { ok(all); return; }
+            all = all.concat([].slice.call(batch));
+            more();
+          }, function () { ok(all); });
+        })();
+      }).then(function (kids) {
+        return kids.reduce(function (p, k) { return p.then(function () { return walk(k, here); }); }, Promise.resolve());
+      });
+    }
+    return entries_.reduce(function (p, e) { return p.then(function () { return walk(e, ''); }); }, Promise.resolve())
+      .then(function () { return { items: items, dirs: dirs }; });
+  }
+
+  $('fm-upload').addEventListener('click', function () { $('fm-file').click(); });
+  $('fm-upload-dir').addEventListener('click', function () { $('fm-dir').click(); });
+  $('fm-file').addEventListener('change', function () { upload(plainFiles(this.files), []); this.value = ''; });
+  $('fm-dir').addEventListener('change', function () { var r = pickedFolder(this.files); upload(r.items, r.dirs); this.value = ''; });
+
+  // Drop files or folders onto the listing to upload them here.
   var panel = $('fm-panel'), depth = 0;
   function hasFiles(e) { return e.dataTransfer && [].indexOf.call(e.dataTransfer.types || [], 'Files') >= 0; }
-  panel.addEventListener('dragenter', function (e) { if (!hasFiles(e)) return; e.preventDefault(); depth++; if (writable) panel.classList.add('fm-drop'); });
+  panel.addEventListener('dragenter', function (e) { if (!hasFiles(e)) return; e.preventDefault(); depth++; if (writable && !busy) panel.classList.add('fm-drop'); });
   panel.addEventListener('dragover', function (e) { if (hasFiles(e)) e.preventDefault(); });
   panel.addEventListener('dragleave', function (e) { if (!hasFiles(e)) return; if (--depth <= 0) { depth = 0; panel.classList.remove('fm-drop'); } });
   panel.addEventListener('drop', function (e) {
     if (!hasFiles(e)) return;
     e.preventDefault(); depth = 0; panel.classList.remove('fm-drop');
+    if (busy) return;
     if (!writable) { msg(protectedDir ? t('protected_note') : t('read_only_note')); return; }
-    // A dropped folder arrives as an unreadable pseudo-file; leave those out.
-    var files = [], items = e.dataTransfer.items || [];
-    [].forEach.call(e.dataTransfer.files, function (f, i) {
-      var entry = items[i] && items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
-      if (entry && entry.isDirectory) { msg(t('no_folder_upload')); return; }
-      files.push(f);
-    });
-    upload(files);
+    droppedTree(e.dataTransfer).then(function (r) { upload(r.items, r.dirs); });
   });
 
   fromHash();

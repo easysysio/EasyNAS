@@ -33,6 +33,23 @@ my $helper = '/easynas/lib/EasyNAS/files-helper.pl';
 # limit (16 MiB by default); each chunk is one POST.
 my $chunk_size = 8 * 1024 * 1024;
 
+# A text preview shows at most this much of the start of a file.
+my $preview_text_max = 256 * 1024;
+
+# Pictures the preview shows, by extension, with the type they are sent as.
+# Anything else previews as text (the page decides what it offers to show).
+my %image_type = (
+  jpg => 'image/jpeg', jpeg => 'image/jpeg', png => 'image/png', gif => 'image/gif',
+  webp => 'image/webp', bmp => 'image/bmp', avif => 'image/avif', ico => 'image/x-icon',
+  svg => 'image/svg+xml',
+);
+
+# Sent with every file this page hands out. A file is content from whoever
+# wrote it to the volume, so the browser must never run it as part of the
+# appliance's pages: an SVG or HTML file opened from here gets a sandbox with
+# no scripts and no origin.
+my $csp = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox";
+
 # The command that runs the helper as the account in $runas (see runas).
 # The service may sudo to root only, so for a NAS user it goes through root and
 # setpriv drops to the account before anything else runs: real and effective
@@ -117,8 +134,9 @@ sub view ($self) {
 
   if ($self->req->method eq 'POST') {
     # Every change arrives as a POST carrying the session's token in a header,
-    # which a page on another site can neither read nor set.
-    my $sent = $self->req->headers->header('X-CSRF-Token') // '';
+    # which a page on another site can neither read nor set. (A zip download
+    # is a plain form POST, so it may carry the token as a field instead.)
+    my $sent = $self->req->headers->header('X-CSRF-Token') // $self->param('csrf') // '';
     return $self->render(json => { ok => 0, error => 'csrf' }, status => 403)
       unless $sent ne '' && secure_compare($sent, csrf($self));
 
@@ -128,6 +146,11 @@ sub view ($self) {
       my $name = $self->param('name') // '';
       return run_op($self, $runas, ['mkdir', $path, $name], log => "created folder $path/$name");
     }
+    if ($action eq 'mkdirs') {               # the folders of a folder upload
+      return run_op($self, $runas, ['mkdirs', $path, $self->param('name') // '']);
+    }
+    if ($action eq 'zipcheck' && @items) { return run_op($self, $runas, ['zipcheck', @items]); }
+    if ($action eq 'zip' && @items) { return zip($self, $runas, $path, @items); }
     if ($action eq 'rename') {
       my $name = $self->param('name') // '';
       return run_op($self, $runas, ['rename', $path, $name], log => "renamed $path to $name");
@@ -148,6 +171,7 @@ sub view ($self) {
     return run_op($self, $runas, ['list', $self->param('path') // '']);
   }
   if ($action eq 'download') { return download($self, $runas); }
+  if ($action eq 'preview')  { return preview($self, $runas); }
 
   # The page itself. The administrator gets it inside the normal layout; a NAS
   # user gets a bare frame with nothing but the file manager (see the template).
@@ -157,7 +181,9 @@ sub view ($self) {
                is_admin   => ($role eq 'admin' ? 1 : 0),
                username   => ($self->session('user') // ''),
                csrf       => csrf($self),
-               chunk_size => $chunk_size);
+               chunk_size => $chunk_size,
+               preview_text_max => $preview_text_max,
+               image_ext  => [sort keys %image_type]);
   $self->render(template => 'easynas/files');
 }
 
@@ -183,56 +209,119 @@ sub upload ($self, $runas) {
                 ($last ? (log => "uploaded $path/$name") : ()));
 }
 
-# Stream a file to the browser. The helper's `stat` answers first (does it
-# exist, may this account read it, how big is it); then `read` is started and
-# its output relayed, pausing the pipe whenever the browser falls behind.
-sub download ($self, $runas) {
-  my $path = $self->param('path') // '';
-  my @base = helper_cmd($runas);
-  my $arg  = encode('UTF-8', $path);
-  $self->render_later;
+# Stream a helper's output to the browser: run @$cmd, relay what it prints,
+# pausing the pipe whenever the browser falls behind. Headers are set by the
+# caller beforehand; with no Content-Length the response is chunked.
+sub stream_out ($self, $cmd) {
+  my $pid = open(my $fh, '-|', @$cmd);
+  return $self->render(text => 'Download failed', status => 500) unless $pid;
+  my $h = $self->res->headers;
+  $h->header('X-Content-Type-Options' => 'nosniff');
+  $h->header('Content-Security-Policy' => $csp);
+  $h->cache_control('private, no-store');
+  $self->inactivity_timeout(0);
 
-  Mojo::IOLoop->subprocess->run_p(sub { capture([@base, 'stat', $arg]) })->then(sub ($out) {
+  my $stream = Mojo::IOLoop::Stream->new($fh)->timeout(0);
+  my $reap; $reap = sub ($tries) {
+    # The helper runs as another account, so it can't be signalled from
+    # here; closing the pipe ends it. Collect it without ever blocking.
+    return if waitpid($pid, WNOHANG) != 0 || $tries <= 0;
+    Mojo::IOLoop->timer(1 => sub { $reap->($tries - 1) });
+  };
+  $stream->on(read => sub ($s, $bytes) {
+    $s->stop;                                            # until this chunk is sent
+    $self->write($bytes => sub { $s->start });
+  });
+  $stream->on(close => sub { $reap->(30); $self->finish; });
+  $stream->on(error => sub { $self->finish; });
+  $self->on(finish => sub { $stream->close; });          # browser went away
+  $stream->start;
+  return;
+}
+
+# The name a file is sent under, for Content-Disposition.
+sub disposition ($kind, $name) {
+  return "$kind; filename*=UTF-8''" . url_escape(encode('UTF-8', $name));
+}
+
+# Run a checking op (stat, zipcheck) and continue with $then->($result) if it
+# passed; otherwise answer with the reason as text.
+sub checked ($self, $cmd, $then) {
+  $self->render_later;
+  Mojo::IOLoop->subprocess->run_p(sub { capture($cmd) })->then(sub ($out) {
     my $st = eval { decode_json($out) };
     if (ref $st ne 'HASH' || !$st->{ok}) {
       my $err = (ref $st eq 'HASH' && $st->{error}) || 'failed';
       return $self->render(text => ($TEXT{"files_err_$err"} || 'Download failed'),
                            status => ($err eq 'denied' ? 403 : 404));
     }
-
-    my $pid = open(my $fh, '-|', @base, 'read', $arg);
-    return $self->render(text => 'Download failed', status => 500) unless $pid;
-
-    my ($name) = $path =~ m{([^/]+)/*$};
-    $name //= 'download';
-    my $h = $self->res->headers;
-    $h->content_type('application/octet-stream');
-    $h->content_length($st->{size});
-    # Always an attachment, never rendered in the page's origin.
-    $h->content_disposition("attachment; filename*=UTF-8''" . url_escape(encode('UTF-8', $name)));
-    $h->header('X-Content-Type-Options' => 'nosniff');
-    $self->inactivity_timeout(0);
-
-    my $stream = Mojo::IOLoop::Stream->new($fh)->timeout(0);
-    my $reap; $reap = sub ($tries) {
-      # The helper runs as another account, so it can't be signalled from
-      # here; closing the pipe ends it. Collect it without ever blocking.
-      return if waitpid($pid, WNOHANG) != 0 || $tries <= 0;
-      Mojo::IOLoop->timer(1 => sub { $reap->($tries - 1) });
-    };
-    $stream->on(read => sub ($s, $bytes) {
-      $s->stop;                                            # until this chunk is sent
-      $self->write($bytes => sub { $s->start });
-    });
-    $stream->on(close => sub { $reap->(30); $self->finish; });
-    $stream->on(error => sub { $self->finish; });
-    $self->on(finish => sub { $stream->close; });          # browser went away
-    $stream->start;
-    write_log($addon->{name}, "INFO", ($self->session('user') // '?') . ": downloaded $path");
+    $then->($st);
   })->catch(sub ($err) {
     $self->render(text => 'Download failed', status => 500);
   });
   return;
+}
+
+# Download one file. The helper's `stat` answers first (does it exist, may
+# this account read it, how big is it); then `read` streams it.
+sub download ($self, $runas) {
+  my $path = $self->param('path') // '';
+  my @base = helper_cmd($runas);
+  my $arg  = encode('UTF-8', $path);
+  return checked($self, [@base, 'stat', $arg], sub ($st) {
+    my ($name) = $path =~ m{([^/]+)/*$};
+    my $h = $self->res->headers;
+    $h->content_type('application/octet-stream');
+    $h->content_length($st->{size});
+    # Always an attachment, never rendered in the page's origin.
+    $h->content_disposition(disposition('attachment', $name // 'download'));
+    stream_out($self, [@base, 'read', $arg]);
+    write_log($addon->{name}, "INFO", ($self->session('user') // '?') . ": downloaded $path");
+  });
+}
+
+# Download files and folders as one zip, made on the fly by the helper. It
+# is checked first, so a bad request gets an answer instead of a broken zip.
+sub zip ($self, $runas, $dir, @items) {
+  my @base = helper_cmd($runas);
+  my @args = map { encode('UTF-8', $_) } @items;
+  return checked($self, [@base, 'zipcheck', @args], sub ($st) {
+    # One item: its name. Several: the folder they are in.
+    my ($name) = (@items == 1 ? $items[0] : $dir) =~ m{([^/]+)/*$};
+    my $h = $self->res->headers;
+    $h->content_type('application/zip');
+    $h->content_disposition(disposition('attachment', ($name // 'files') . '.zip'));
+    stream_out($self, [@base, 'zip', @args]);
+    write_log($addon->{name}, "INFO", ($self->session('user') // '?') . ": downloaded "
+              . join(', ', @items) . " as a zip");
+  });
+}
+
+# A file for the preview: a picture whole, shown inline; anything else as the
+# start of its bytes ($preview_text_max), which the page decodes and shows as
+# text. X-File-Size says how big the whole file is.
+sub preview ($self, $runas) {
+  my $path = $self->param('path') // '';
+  my @base = helper_cmd($runas);
+  my $arg  = encode('UTF-8', $path);
+  my ($ext) = $path =~ /\.([A-Za-z0-9]+)$/;
+  my $type  = $image_type{lc($ext // '')};
+  return checked($self, [@base, 'stat', $arg], sub ($st) {
+    my ($name) = $path =~ m{([^/]+)/*$};
+    my $h = $self->res->headers;
+    $h->header('X-File-Size' => $st->{size});
+    if ($type) {
+      $h->content_type($type);
+      $h->content_length($st->{size});
+      $h->content_disposition(disposition('inline', $name // 'image'));
+      return stream_out($self, [@base, 'read', $arg]);
+    }
+    my $len = $st->{size} < $preview_text_max ? $st->{size} : $preview_text_max;
+    $h->content_type('application/octet-stream');
+    $h->content_length($len);
+    $h->content_disposition(disposition('attachment', $name // 'preview'));
+    stream_out($self, [@base, 'read', $arg, $len]);
+  });
 }
 
 1;

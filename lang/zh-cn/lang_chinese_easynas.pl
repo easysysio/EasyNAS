@@ -664,6 +664,7 @@ $TEXT{'about_easynas'} = "EasyNAS 核心：Web 界面、存储管理和更新系
 $TEXT{'about_samba'} = "兼容 Windows 的文件共享（SMB/CIFS）：向 Windows、macOS 和 Linux 客户端共享卷。";
 $TEXT{'about_nfs'} = "面向 Linux/UNIX 客户端的 NFS 导出：通过网络文件系统共享卷。";
 $TEXT{'about_afp'} = "Apple 文件协议（netatalk）：向较旧的 macOS 客户端和时间机器备份共享卷。";
+$TEXT{'about_files'} = "Web 文件管理器：在浏览器中浏览卷，上传和下载文件及整个文件夹，预览图片和文本，复制、移动、重命名和删除。NAS 用户使用自己的账户登录，并以该账户的权限操作。";
 $TEXT{'about_ftp'} = "FTP 文件传输（pure-ftpd）：用户使用 EasyNAS 账户登录并访问卷。";
 $TEXT{'about_ssh'} = "对设备的安全 Shell 访问，包括 SFTP 文件传输。";
 $TEXT{'about_rsyncd'} = "rsync 守护进程：将卷作为 rsync 模块，用于快速远程同步和备份。";

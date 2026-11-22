@@ -378,20 +378,23 @@ TFTP addon for EasyNAS
 
 ##### File Manager ####
 # setpriv (util-linux) drops to the signed-in NAS account; cp/mv/rm (coreutils)
-# do the recursive work with GNU options.
+# do the recursive work with GNU options; Compress::Raw::Zlib gives the zip
+# download its CRCs.
 %package        fs-files
 Version:        %{version}
-Release:        1
+Release:        2
 Summary:        File Manager addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
 Requires:       util-linux
 Requires:       coreutils
+Requires:       perl(Compress::Raw::Zlib)
 
 %description fs-files
-Web file manager addon for EasyNAS: browse the volumes, download, upload,
-copy, move, rename and delete from the browser. NAS users sign in with their
-own account and act with its permissions.
+Web file manager addon for EasyNAS: browse the volumes, upload and download
+files and whole folders (as a zip), preview pictures and text, copy, move,
+rename and delete from the browser. NAS users sign in with their own account
+and act with its permissions.
 
 %files fs-files
 /easynas/addons/files.easynas
@@ -400,6 +403,10 @@ own account and act with its permissions.
 /easynas/templates/easynas/files.html.ep
 /easynas/templates/easynas/files_user.html.ep
 /easynas/lang/en-en/lang_english_files.pl
+/easynas/lang/de-de/lang_german_files.pl
+/easynas/lang/pt-br/lang_brazilian_portuguese_files.pl
+/easynas/lang/zh-cn/lang_chinese_files.pl
+/easynas/lang/pl-pl/lang_polish_files.pl
 
 
 ##### FTP ####
@@ -659,7 +666,7 @@ iSCSI addon for EasyNAS
 ##### German Language ####
 %package        lang-german
 Version:        %{version}
-Release:        4
+Release:        5
 Summary:        German Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -675,7 +682,7 @@ German Language for EasyNAS
 ##### Portuguese Language ####
 %package        lang-portuguese
 Version:        %{version}
-Release:        4
+Release:        5
 Summary:        Portuguese Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -691,7 +698,7 @@ Portuguese Language for EasyNAS
 ##### Chinese Language ####
 %package        lang-chinese
 Version:        %{version}
-Release:        4
+Release:        5
 Summary:        Simplified Chinese Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -707,7 +714,7 @@ Simplified Chinese Language for EasyNAS
 ##### Polish Language ####
 %package        lang-polish
 Version:        %{version}
-Release:        4
+Release:        5
 Summary:        Polish Language for EasyNAS
 Group:          easynas/lang
 Requires:       easynas >= %{version}
@@ -797,6 +804,18 @@ Polish Language for EasyNAS
     one is removed, so an unreachable repo leaves the channel unchanged
   - Sign-in throttling: five wrong passwords in a row lock the client address
     out for a minute, doubling per further failure up to 15 minutes; logged
+  - File Manager: upload whole folders (folder picker or drag and drop, the
+    tree is recreated) with one overall progress bar, a Cancel button and a
+    replace/skip choice that can apply to every conflict; download folders
+    and multiple selections as a zip streamed while it is made (stored,
+    ZIP64 past 4 GB; what the account can't read is listed in a note inside);
+    preview pictures and text files (first 256 KB) with previous/next; every
+    file is served with a sandboxing Content-Security-Policy so an SVG or
+    HTML file can never run in the appliance's pages; German, Polish,
+    Portuguese and Chinese translations
+  - Translations: language strings are decoded from UTF-8 once loaded; they
+    were sent to the browser encoded twice, so every non-ASCII letter on a
+    translated page showed as garbage
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

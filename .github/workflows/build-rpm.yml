@@ -41,8 +41,8 @@ jobs:
         run: prove -v t/files-helper.t
       - name: Install Mojolicious
         run: sudo apt-get update && sudo apt-get install -y libmojolicious-perl
-      - name: Settings and sign-in tests
-        run: prove -v t/web.t
+      - name: Settings, sign-in and file manager web tests
+        run: prove -v t/web.t t/files-web.t
 
   build:
     needs: test

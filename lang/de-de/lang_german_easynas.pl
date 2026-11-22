@@ -664,6 +664,7 @@ $TEXT{'about_easynas'} = "Der EasyNAS-Kern: Weboberfläche, Speicherverwaltung u
 $TEXT{'about_samba'} = "Windows-kompatible Dateifreigabe (SMB/CIFS): Volumes für Windows-, macOS- und Linux-Clients freigeben.";
 $TEXT{'about_nfs'} = "NFS-Exporte für Linux/UNIX-Clients: Volumes über das Netzwerkdateisystem freigeben.";
 $TEXT{'about_afp'} = "Apple Filing Protocol (netatalk): Volumes für ältere macOS-Clients und Time-Machine-Backups freigeben.";
+$TEXT{'about_files'} = "Web-Dateimanager: die Volumes im Browser durchsuchen, Dateien und ganze Ordner hoch- und herunterladen, Bilder und Texte ansehen, kopieren, verschieben, umbenennen und löschen. NAS-Benutzer melden sich mit ihrem eigenen Konto an und arbeiten mit dessen Berechtigungen.";
 $TEXT{'about_ftp'} = "FTP-Dateiübertragung (pure-ftpd): Benutzer melden sich mit ihren EasyNAS-Konten an und erreichen die Volumes.";
 $TEXT{'about_ssh'} = "Sicherer Shell-Zugriff auf die Appliance, einschließlich SFTP-Dateiübertragung.";
 $TEXT{'about_rsyncd'} = "rsync-Daemon: Volumes als rsync-Module für schnelle Fernsynchronisation und Backups bereitstellen.";

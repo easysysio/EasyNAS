@@ -46,6 +46,14 @@ download, upload, copy, move, rename and delete, with no client to set up.
   under **Storage**. Files and folders inside a volume are fair game.
 - Uploads are sent in pieces, so there is no size limit, and a file only
   appears under its name once it has arrived completely.
+- **Upload folder** (or drag a folder onto the list) sends a whole folder tree.
+  If files already exist you choose to replace or skip them, once for all of
+  them if you like.
+- **Download** on a folder, or on several selected items, gets one zip, built
+  while it downloads, so there is no waiting and no size limit. Anything the
+  account can't read is left out and listed in a note inside the zip.
+- Click a picture or a text file to preview it; the arrow keys step through
+  the others in the folder. Long text files show their first 256 KB.
 
 !!! note "NAS accounts and the web interface"
     Installing this add-on is what lets NAS accounts sign in to the web

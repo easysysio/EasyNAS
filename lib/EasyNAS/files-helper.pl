@@ -18,15 +18,18 @@
 # Ops (paths relative to <root>; "" is <root> itself):
 #   list   <dir>                      directory listing
 #   stat   <path>                     one entry (used before a download)
-#   read   <path>                     file contents on stdout
+#   read   <path> [<max bytes>]       file contents on stdout (or their start)
+#   zipcheck <path>...                can these be downloaded as a zip?
+#   zip    <path>...                  a zip of files and folders on stdout
 #   mkdir  <dir> <name>
+#   mkdirs <dir> <relpath>            create nested folders (folder upload)
 #   rename <path> <newname>
 #   delete <path>...
 #   move   <destdir> <path>...
 #   copy   <destdir> <path>...
 #   put    <dir> <name> <offset> <total> <overwrite>   upload chunk on stdin
 #
-# Every op but `read` prints one line of JSON: {"ok":1,...} or
+# Every op but `read` and `zip` prints one line of JSON: {"ok":1,...} or
 # {"ok":0,"error":"<code>","detail":"..."} and exits 0 / 1.
 #
 # This file is part of EasyNAS (c) created by Yariv Hakim
@@ -38,6 +41,8 @@ use Encode ();
 use Errno qw(EACCES EPERM ENOENT EEXIST ENOTEMPTY ENOSPC EDQUOT ENOTDIR EISDIR EROFS);
 use Fcntl qw(:mode O_WRONLY O_CREAT O_TRUNC O_RDONLY);
 use JSON::PP ();
+use Compress::Raw::Zlib ();
+use File::Temp ();
 
 # Entries may be changed only from this depth down: <pool>/<volume>/<entry>.
 my $MIN_DEPTH = 2;
@@ -241,12 +246,17 @@ if ($op eq 'stat' || $op eq 'read') {
     exit 0;
   }
 
+  # An optional byte limit: a text preview needs only the start of a file.
+  my $left = (defined $ARGV[1] && $ARGV[1] =~ /^\d+$/) ? $ARGV[1] : undef;
   sysopen(my $in, $real, O_RDONLY) or fail(errcode(), $!);
   binmode(STDOUT);
   $| = 1;
-  while (1) {
-    my $n = sysread($in, my $buf, 1 << 20);
+  while (!defined $left || $left > 0) {
+    my $want = 1 << 20;
+    $want = $left if defined $left && $left < $want;
+    my $n = sysread($in, my $buf, $want);
     last unless $n;                       # 0 = EOF, undef = read error
+    $left -= $n if defined $left;
     my $off = 0;
     while ($off < $n) {
       my $w = syswrite(STDOUT, $buf, $n - $off, $off);
@@ -257,6 +267,202 @@ if ($op eq 'stat' || $op eq 'read') {
   exit 0;
 }
 
+# ---------------------------------------------------------------- zip
+# Download files and folders as one zip, streamed: nothing is staged on disk
+# and nothing large is held in memory, so a folder of any size can be fetched.
+# Entries are stored, not compressed -- a NAS holds mostly photos, video and
+# archives that don't compress, and storing costs no CPU -- and written with
+# ZIP64 records where sizes or offsets pass 4 GB.
+#
+# Like every op it runs as the signed-in account, so what it can't read is
+# left out; so are links to folders (they could loop, or lead out of the
+# root), other filesystems below a folder (snapshots, nested subvolumes) and
+# anything that is neither a file nor a folder. What was left out is listed in
+# a text file added at the end of the zip.
+
+# The items to zip, checked: each exists and is inside the root. Returns a
+# list of [dir, name, full].
+sub zip_items {
+  fail('badpath') unless @ARGV;
+  my @items;
+  foreach my $rel (@ARGV) {
+    my ($dir, $name, $full) = entry($rel, 0);
+    my @l = lstat($full) or fail('notfound');
+    my $real = realpath($full);
+    fail('outside')  unless defined $real && inside($real);
+    fail('denied')   unless -r $real && (!-d $real || -x $real);
+    fail('notfound') unless -f $real || -d $real;
+    push @items, [$dir, $name, $full];
+  }
+  return @items;
+}
+
+if ($op eq 'zipcheck') {
+  zip_items();
+  out({ ok => 1 });
+  exit 0;
+}
+
+if ($op eq 'zip') {
+  my @items = zip_items();
+  binmode(STDOUT);
+
+  my $pos  = 0;           # bytes written so far: the next entry's offset
+  my $obuf = '';
+  my (@cd, @skipped);
+  my $Z64  = 0xFFFFFFFF;    # "see the ZIP64 record" placeholder
+  # Sizes and offsets from this value up go into ZIP64 records. Only the
+  # tests lower it, to exercise those records without 4 GB of data.
+  my $LIM  = ($ENV{EASYNAS_ZIP64_AT} // '') =~ /^\d+$/ ? $ENV{EASYNAS_ZIP64_AT} : $Z64;
+
+  my $flush = sub {
+    my $off = 0;
+    while ($off < length $obuf) {
+      my $w = syswrite(STDOUT, $obuf, length($obuf) - $off, $off);
+      exit 1 unless defined $w;              # the browser went away
+      $off += $w;
+    }
+    $obuf = '';
+  };
+  my $emit = sub { $obuf .= $_[0]; $pos += length $_[0]; $flush->() if length $obuf >= (1 << 20); };
+
+  # MS-DOS date and time, local time, as zip wants them.
+  my $dostime = sub {
+    my @t = localtime(shift);
+    my $y = $t[5] + 1900; $y = 1980 if $y < 1980;
+    return (($t[2] << 11) | ($t[1] << 5) | int($t[0] / 2),
+            (($y - 1980) << 9) | (($t[4] + 1) << 5) | $t[3]);
+  };
+
+  # One entry. $path is the name inside the zip (bytes), $full what to read
+  # (undef for a folder), @st its stat.
+  my $add = sub {
+    my ($path, $full, @st) = @_;
+    my $isdir = !defined $full;
+    $path .= '/' if $isdir;
+    my $utf8  = defined eval { my $c = $path; Encode::decode('UTF-8', $c, Encode::FB_CROAK) };
+    my ($time, $date) = $dostime->($st[9]);
+    my $offset = $pos;
+
+    my ($fh, $size, $crc) = (undef, 0, 0);
+    if (!$isdir) {
+      if (!sysopen($fh, $full, O_RDONLY)) { push @skipped, [$path, "$!"]; return; }
+      $size = $st[7];
+    }
+    # A file that may pass 4 GB gets ZIP64 sizes from its local header on.
+    my $big   = !$isdir && $size >= $LIM;
+    my $flags = ($isdir ? 0 : 0x08) | ($utf8 ? 0x800 : 0);
+    my $need  = $big ? 45 : 20;
+    my $lextra = $big ? pack('vvQ<Q<', 1, 16, 0, 0) : '';
+    $emit->(pack('VvvvvvVVVvv', 0x04034b50, $need, $flags, 0, $time, $date, 0,
+                 ($big ? ($Z64, $Z64) : (0, 0)), length $path, length $lextra) . $path . $lextra);
+
+    if (!$isdir) {
+      # Read no more than the size taken at the start, so the entry stays
+      # consistent with a file that grows while it is being zipped.
+      my ($done, $left) = (0, $size);
+      while ($left > 0) {
+        my $n = sysread($fh, my $buf, $left < (1 << 20) ? $left : (1 << 20));
+        if (!defined $n) { push @skipped, [$path, "read error after $done bytes: $!"]; last; }
+        last if $n == 0;                   # shrank meanwhile
+        $crc = Compress::Raw::Zlib::crc32($buf, $crc);
+        $emit->($buf);
+        $done += $n; $left -= $n;
+      }
+      close $fh;
+      $size = $done;
+      $emit->($big ? pack('VVQ<Q<', 0x08074b50, $crc, $size, $size)
+                   : pack('VVVV',   0x08074b50, $crc, $size, $size));
+    }
+    my $mode = ($st[2] & 07777) | ($isdir ? 0040000 : 0100000);
+    push @cd, { path => $path, flags => $flags, need => $need, time => $time, date => $date,
+                crc => $crc, size => $size, offset => $offset,
+                attr => (($mode << 16) | ($isdir ? 0x10 : 0)) };
+  };
+
+  # A folder and everything below it, depth first. $dev: the filesystem the
+  # walk started on; other ones below are not entered.
+  my $walk;
+  $walk = sub {
+    my ($path, $full, $dev) = @_;
+    my @st = stat($full);
+    $add->($path, undef, @st);
+    my $dh;
+    if (!opendir($dh, $full)) { push @skipped, ["$path/", "$!"]; return; }
+    my @names = sort grep { $_ ne '.' && $_ ne '..' && !/\Q$PART\E$/ } readdir($dh);
+    closedir $dh;
+    foreach my $n (@names) {
+      my ($p, $f) = ("$path/$n", "$full/$n");
+      my @l = lstat($f) or next;
+      if (S_ISLNK($l[2])) {
+        my $real = realpath($f);
+        if (defined $real && inside($real) && -f $real) {
+          my @s = stat($real);
+          $add->($p, $real, @s);
+        } else {
+          push @skipped, [$p, (defined $real && inside($real) && -d $real) ? 'link to a folder' : 'link leading outside the volumes'];
+        }
+      }
+      elsif (S_ISDIR($l[2])) {
+        if ($l[0] != $dev)          { push @skipped, ["$p/", 'another filesystem (snapshot or volume)']; }
+        elsif (!-r $f || !-x $f)    { push @skipped, ["$p/", 'permission denied']; }
+        else                        { $walk->($p, $f, $dev); }
+      }
+      elsif (S_ISREG($l[2])) {
+        if (-r $f) { $add->($p, $f, @l); }
+        else       { push @skipped, [$p, 'permission denied']; }
+      }
+      else { push @skipped, [$p, 'not a file or folder']; }
+    }
+  };
+
+  foreach my $it (@items) {
+    my ($dir, $name, $full) = @$it;
+    my $real = realpath($full);              # a selected link is followed
+    my @st = stat($real);
+    if (-d $real) { $walk->($name, $real, $st[0]); }
+    else          { $add->($name, $real, @st); }
+  }
+
+  if (@skipped) {
+    my $note = "These were not included in the download:\n\n"
+             . join('', map { "$_->[0]  ($_->[1])\n" } @skipped);
+    my $tmp = File::Temp->new;
+    print $tmp $note; close $tmp;
+    my @st = stat("$tmp");
+    $st[2] = 0100644; $st[9] = time;
+    $add->('EasyNAS - not included.txt', "$tmp", @st);
+  }
+
+  # Central directory, then its end record(s).
+  my $cd_start = $pos;
+  foreach my $e (@cd) {
+    my @z64;
+    push @z64, $e->{size}, $e->{size} if $e->{size} >= $LIM;
+    push @z64, $e->{offset}            if $e->{offset} >= $LIM;
+    my $extra = @z64 ? pack('vv', 1, 8 * @z64) . pack('Q<' x @z64, @z64) : '';
+    my $need  = @z64 ? 45 : $e->{need};
+    my $sz    = $e->{size} >= $LIM ? $Z64 : $e->{size};
+    $emit->(pack('VvvvvvvVVVvvvvvVV', 0x02014b50, (3 << 8) | 45, $need, $e->{flags}, 0,
+                 $e->{time}, $e->{date}, $e->{crc}, $sz, $sz, length $e->{path}, length $extra,
+                 0, 0, 0, $e->{attr}, ($e->{offset} >= $LIM ? $Z64 : $e->{offset}))
+            . $e->{path} . $extra);
+  }
+  my ($cd_size, $count) = ($pos - $cd_start, scalar @cd);
+  my $z64_end = $count >= 0xFFFF || $cd_size >= $LIM || $cd_start >= $LIM;
+  if ($z64_end) {
+    my $z64_at = $pos;
+    $emit->(pack('VQ<vvVVQ<Q<Q<Q<', 0x06064b50, 44, (3 << 8) | 45, 45, 0, 0,
+                 $count, $count, $cd_size, $cd_start));
+    $emit->(pack('VVQ<V', 0x07064b50, 0, $z64_at, 1));
+  }
+  $emit->(pack('VvvvvVVv', 0x06054b50, 0, 0,
+               ($z64_end ? 0xFFFF : $count) x 2,
+               ($z64_end ? $Z64 : $cd_size), ($z64_end ? $Z64 : $cd_start), 0));
+  $flush->();
+  exit 0;
+}
+
 # ---------------------------------------------------------------- mkdir
 if ($op eq 'mkdir') {
   my $dir  = target_dir($ARGV[0]);
@@ -264,6 +470,31 @@ if ($op eq 'mkdir') {
   fail('badname') unless good_name($name);
   set_umask($dir);
   mkdir("$dir/$name") or fail(errcode(), $!);
+  out({ ok => 1 });
+  exit 0;
+}
+
+# ---------------------------------------------------------------- mkdirs
+# The folders a folder upload needs: <relpath> below <dir>, each level created
+# if missing. A level that already exists must be a real folder -- a link is
+# never followed here -- so the files that follow land where the listing says.
+if ($op eq 'mkdirs') {
+  my $dir = target_dir($ARGV[0]);
+  my @parts = comps($ARGV[1]);
+  fail('badpath') unless @parts;
+  foreach my $p (@parts) { fail('badname') unless good_name($p); }
+  set_umask($dir);
+  my $at = $dir;
+  foreach my $p (@parts) {
+    my $next = "$at/$p";
+    my @l = lstat($next);
+    if (@l) {
+      fail('notdir', $p) unless S_ISDIR($l[2]) && !S_ISLNK($l[2]);
+    } else {
+      mkdir($next) or fail(errcode(), $!);
+    }
+    $at = $next;
+  }
   out({ ok => 1 });
   exit 0;
 }

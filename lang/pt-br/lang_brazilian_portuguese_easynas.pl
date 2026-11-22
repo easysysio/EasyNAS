@@ -664,6 +664,7 @@ $TEXT{'about_easynas'} = "O núcleo do EasyNAS: interface web, gerenciamento de 
 $TEXT{'about_samba'} = "Compartilhamento de arquivos compatível com Windows (SMB/CIFS): compartilhe volumes com clientes Windows, macOS e Linux.";
 $TEXT{'about_nfs'} = "Exportações NFS para clientes Linux/UNIX: compartilhe volumes pelo sistema de arquivos de rede.";
 $TEXT{'about_afp'} = "Apple Filing Protocol (netatalk): compartilhe volumes com clientes macOS antigos e backups do Time Machine.";
+$TEXT{'about_files'} = "Gerenciador de arquivos web: navegue pelos volumes no navegador, envie e baixe arquivos e pastas inteiras, visualize imagens e textos, copie, mova, renomeie e exclua. Usuários do NAS entram com a própria conta e agem com as permissões dela.";
 $TEXT{'about_ftp'} = "Transferência de arquivos FTP (pure-ftpd): os usuários entram com suas contas EasyNAS e acessam os volumes.";
 $TEXT{'about_ssh'} = "Acesso shell seguro ao dispositivo, incluindo transferência de arquivos SFTP.";
 $TEXT{'about_rsyncd'} = "Daemon rsync: exponha volumes como módulos rsync para sincronização remota rápida e backups.";

@@ -664,6 +664,7 @@ $TEXT{'about_easynas'} = "Rdzeń EasyNAS: interfejs WWW, zarządzanie pamięcią
 $TEXT{'about_samba'} = "Udostępnianie plików zgodne z Windows (SMB/CIFS): wolumeny dla klientów Windows, macOS i Linux.";
 $TEXT{'about_nfs'} = "Eksporty NFS dla klientów Linux/UNIX: udostępnianie wolumenów przez sieciowy system plików.";
 $TEXT{'about_afp'} = "Apple Filing Protocol (netatalk): wolumeny dla starszych klientów macOS i kopii Time Machine.";
+$TEXT{'about_files'} = "Menedżer plików WWW: przeglądanie wolumenów w przeglądarce, wysyłanie i pobieranie plików oraz całych folderów, podgląd obrazów i tekstu, kopiowanie, przenoszenie, zmiana nazw i usuwanie. Użytkownicy NAS logują się własnym kontem i działają z jego uprawnieniami.";
 $TEXT{'about_ftp'} = "Transfer plików FTP (pure-ftpd): użytkownicy logują się kontami EasyNAS i mają dostęp do wolumenów.";
 $TEXT{'about_ssh'} = "Bezpieczny dostęp powłoki do urządzenia, w tym transfer plików SFTP.";
 $TEXT{'about_rsyncd'} = "Demon rsync: wolumeny jako moduły rsync do szybkiej zdalnej synchronizacji i kopii zapasowych.";
