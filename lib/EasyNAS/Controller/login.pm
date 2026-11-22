@@ -11,6 +11,20 @@ my %TEXT=get_lang_text('login');
 # the config layer -- NOT a local system account. See docs/identity-design.md.
 my $admin_conf = "/etc/easynas/admin.conf";
 
+# Sign-in throttling, per client address. The $FREE_TRIES-th wrong password in
+# a row locks the address out for a minute, and each further one doubles that,
+# up to $MAX_LOCK. An address left quiet for $WINDOW (counted from the end of
+# any lockout) starts afresh, and a successful sign-in clears it. That leaves
+# a guesser a handful of tries per quarter hour instead of thousands a minute,
+# while a user who mistypes a few times is never stopped. Per address rather than per
+# account, so nobody can lock the administrator out by failing as "admin".
+# Kept in memory: the app is a single process, and a restart forgetting the
+# counts costs a guesser more time than it saves.
+my %throttle;                   # address -> { fails, last, until }
+my $FREE_TRIES = 5;
+my $WINDOW     = 15 * 60;
+my $MAX_LOCK   = 15 * 60;
+
 sub view ($self) {
    
     if ($self->session('is_auth')) {
@@ -46,6 +60,16 @@ sub view ($self) {
 sub login ($self) {
   my $user = $self->param('user') // '';
   my $pass = $self->param('pass') // '';
+  my $ip   = $self->tx->remote_address // '?';
+
+  # Locked out: refuse without looking at the password, so a guess made
+  # during the lockout tells nothing even when it is right.
+  if (my $left = locked_for($ip)) {
+    $result="failed";
+    my $min = int(($left + 59) / 60);
+    $msg = sprintf($TEXT{'login_locked'} // "Too many failed sign-in attempts. Try again in %d minute(s).", $min);
+    return;
+  }
 
   # admin.conf holds one line, "<user>:<$6$ crypt hash>". Absent until the
   # first-boot console prompt seeds it.
@@ -63,6 +87,7 @@ sub login ($self) {
     $result="success";
     $self->session(is_auth => 1);
     $self->session(user => $user);
+    clear_failures($ip);
     $self->session(role => 'admin');
     $self->redirect_to('/');
   }
@@ -73,6 +98,7 @@ sub login ($self) {
     $result="success";
     $self->session(is_auth => 1);
     $self->session(user => $user);
+    clear_failures($ip);
     $self->session(role => 'user');
     write_log("login","INFO","NAS user $user signed in");
     $self->redirect_to($home);
@@ -80,9 +106,39 @@ sub login ($self) {
   else {
     $result="failed";
     $msg="Bad Username or Password";
+    note_failure($ip, $user);
   }
   return;
 }
+
+# Seconds $ip is still locked out for; 0 when it may try.
+sub locked_for ($ip, $now = time) {
+  my $t = $throttle{$ip} or return 0;
+  my $left = ($t->{until} // 0) - $now;
+  return $left > 0 ? $left : 0;
+}
+
+# Count a wrong password from $ip, and lock it out once it is past its free
+# tries. $user is only for the log line.
+sub note_failure ($ip, $user, $now = time) {
+  if (keys %throttle > 10000) {          # bound the memory a scan could use
+    delete @throttle{ grep { $now - ($throttle{$_}{until} // $throttle{$_}{last}) > $WINDOW
+                                && $now - $throttle{$_}{last} > $WINDOW } keys %throttle };
+  }
+  my $t = $throttle{$ip};
+  my $quiet_since = $t ? (($t->{until} // 0) > $t->{last} ? $t->{until} : $t->{last}) : 0;
+  $t = $throttle{$ip} = { fails => 0 } if !$t || $now - $quiet_since > $WINDOW;
+  $t->{fails}++;
+  $t->{last} = $now;
+  return if $t->{fails} < $FREE_TRIES;
+  my $lock = 60 * 2 ** ($t->{fails} - $FREE_TRIES);
+  $lock = $MAX_LOCK if $lock > $MAX_LOCK;
+  $t->{until} = $now + $lock;
+  (my $who = substr($user // '', 0, 32)) =~ s/[^A-Za-z0-9_.\@-]/?/g;
+  write_log("login", "WARNING", "$t->{fails} failed sign-ins from $ip (last as \"$who\"); locked out for $lock seconds");
+}
+
+sub clear_failures ($ip) { delete $throttle{$ip}; }
 
 # The page a NAS user lands on: the first enabled addon that declares
 # <access>user</access>. Empty when there is none, and then no NAS account can

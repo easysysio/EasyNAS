@@ -1,6 +1,7 @@
 package EasyNAS::Controller::Settings;
 use lib '/easynas/lib/EasyNAS/Controller';
 use Mojo::Base 'Mojolicious::Controller', -signatures;
+use Mojo::DOM;
 use easynas;
 
 
@@ -8,6 +9,15 @@ my $msg;
 my $result;
 my $addon = get_addon_info("settings");
 my %TEXT=get_lang_text($addon->{'name'});
+
+# The two EasyNAS update channels. Exactly one is configured at a time, under
+# these aliases: firmware.pm, addons.pm, check_update.pl and addon-worker.sh
+# all pick the active channel by looking for the EasyNAS_Beta alias, and the
+# image (KIWI) bakes in the same ones.
+my %CHANNEL = (
+  stable  => { alias => 'EasyNAS',      url => 'https://repo.easysys.io/easynas/stable/RPMS/' },
+  testing => { alias => 'EasyNAS_Beta', url => 'https://repo.easysys.io/easynas/testing/RPMS/' },
+);
 
 sub view ($self) {
   if (!($self->session('is_auth'))) {
@@ -34,6 +44,13 @@ sub view ($self) {
    upload_crt($self);
   }
 
+######### setchannel #########
+  # POST only: the session cookie is SameSite=Lax, so another site can make a
+  # browser GET this page signed in, but not POST to it.
+  if (defined $action && $action eq "setchannel" && $self->req->method eq "POST") {
+   setchannel($self);
+  }
+
 ##### menu ######
   my $hostname=`/bin/hostname`;
   # Current date/time to seed the Date/Time tab inputs.
@@ -52,7 +69,11 @@ sub view ($self) {
   my $snapshots="";
   my $sc=`/usr/bin/sudo /usr/bin/snapper -c root get-config 2>/dev/null`;
   if ($sc =~ /^NUMBER_LIMIT\s*\|\s*(\S+)/m) { $snapshots=$1; }
+  my @repos=repo_list();
   $self->stash(hostname => $hostname,
+	       repos => \@repos,
+	       channel => active_channel(@repos),
+	       channels => \%CHANNEL,
 	       port => $port,
 	       snapshots => $snapshots,
 	       today => $today,
@@ -62,6 +83,96 @@ sub view ($self) {
 	       msg => $msg);
   $self->render(template => 'easynas/settings');
 
+}
+
+######## repositories ########
+# Every configured zypper repository, as { alias, name, url, enabled }, from
+# zypper's XML so nothing depends on its column layout or language.
+sub repo_list {
+ return parse_repos(scalar `/usr/bin/sudo /usr/bin/zypper --quiet --xmlout repos 2>/dev/null`);
+}
+
+sub parse_repos {
+ my ($xml)=@_;
+ my @repos;
+ Mojo::DOM->new->xml(1)->parse($xml // '')->find('repo')->each(sub {
+  my $r=shift;
+  push @repos, { alias   => $r->attr('alias') // '',
+                 name    => $r->attr('name')  // $r->attr('alias') // '',
+                 url     => $r->at('url') ? $r->at('url')->text : '',
+                 enabled => ($r->attr('enabled') // '') eq '1' ? 1 : 0 };
+ });
+ return @repos;
+}
+
+# "testing" when the testing channel's repo is enabled, else "stable" (the
+# same rule the update code uses).
+sub active_channel {
+ my @repos=@_;
+ foreach my $r (@repos) {
+  return 'testing' if $r->{enabled} && $r->{alias} eq $CHANNEL{testing}{alias};
+ }
+ return 'stable';
+}
+
+######## setchannel ########
+# Switch the appliance between the stable and testing channels. The new
+# channel's repo is added and refreshed FIRST and the old one removed only once
+# that worked, so an unreachable repo leaves the appliance on its old channel
+# instead of on none. Installed packages are not touched: moving from testing
+# to stable keeps the (newer) testing versions until stable catches up.
+sub setchannel($self) {
+ my $want=$self->param("channel") // '';
+ unless (exists $CHANNEL{$want}) {
+  $result="fail";
+  $msg=$TEXT{'settings_channel_bad'} || "Unknown update channel.";
+  return;
+ }
+ my $have=active_channel(repo_list());
+ if ($want eq $have) {
+  $result="success";
+  $msg=$TEXT{'settings_channel_same'} || "The appliance is already on this channel.";
+  return;
+ }
+ if (get_update_state() eq "updating") {
+  $result="fail";
+  $msg=$TEXT{'settings_channel_busy'} || "An update is running; change the channel when it has finished.";
+  return;
+ }
+ my $new=$CHANNEL{$want};
+ my $old=$CHANNEL{$have};
+ my $rc;
+
+ # A stale repo under the new alias (e.g. disabled by hand) would make addrepo
+ # fail; clear it first. Fails harmlessly when there is none.
+ system("/usr/bin/sudo","/usr/bin/zypper","--quiet","removerepo",$new->{alias});
+ $rc=system("/usr/bin/sudo","/usr/bin/zypper","--quiet","addrepo","--refresh",$new->{url},$new->{alias});
+ if ($rc != 0) {
+  $result="fail";
+  # zypper exits 7 when another zypper (an add-on install, an update) holds
+  # its lock.
+  $msg=(($rc >> 8) == 7)
+     ? ($TEXT{'settings_channel_locked'} || "The package manager is busy (an add-on install or update is running). Try again when it has finished.")
+     : ($TEXT{'settings_channel_failed'} || "Could not change the update channel.");
+  return;
+ }
+ $rc=system("/usr/bin/sudo","/usr/bin/zypper","--quiet","--non-interactive","--gpg-auto-import-keys","refresh",$new->{alias});
+ if ($rc != 0) {
+  system("/usr/bin/sudo","/usr/bin/zypper","--quiet","removerepo",$new->{alias});
+  $result="fail";
+  $msg=$TEXT{'settings_channel_unreachable'} || "The channel's repository could not be reached; the update channel was not changed.";
+  return;
+ }
+ system("/usr/bin/sudo","/usr/bin/zypper","--quiet","removerepo",$old->{alias});
+
+ # Rebuild the add-on catalog, the pending-update list and the core-image
+ # manifest for the new channel. Several network round trips, so in its own
+ # transient unit rather than holding up this page.
+ system("/usr/bin/sudo","/usr/bin/systemd-run","--collect","--quiet","/easynas/startup/check_update.pl");
+ write_log("settings","INFO","update channel changed from $have to $want");
+ $result="success";
+ $msg=$TEXT{'settings_channel_changed'} || "Update channel changed. Checking it for updates in the background.";
+ return;
 }
 
 ######## upload_crt ########

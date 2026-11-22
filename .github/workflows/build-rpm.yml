@@ -39,6 +39,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: File manager helper tests
         run: prove -v t/files-helper.t
+      - name: Install Mojolicious
+        run: sudo apt-get update && sudo apt-get install -y libmojolicious-perl
+      - name: Settings and sign-in tests
+        run: prove -v t/web.t
 
   build:
     needs: test

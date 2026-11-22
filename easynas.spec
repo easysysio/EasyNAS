@@ -791,6 +791,12 @@ Polish Language for EasyNAS
     and remove folders. NAS users can sign in to it with their own account and
     are confined to it; every operation runs as the signed-in Linux account,
     so ownership and permission bits decide what each person may do
+  - Settings: the Repository tab (an empty placeholder until now) switches the
+    update channel between Stable and Testing and lists the configured
+    repositories; the new channel's repo is added and refreshed before the old
+    one is removed, so an unreachable repo leaves the channel unchanged
+  - Sign-in throttling: five wrong passwords in a row lock the client address
+    out for a minute, doubling per further failure up to 15 minutes; logged
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv
