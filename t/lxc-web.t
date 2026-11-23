@@ -110,8 +110,9 @@ is $SYS[-1][-1], 0, 'autostart off unless ticked';
 $t->post_ok('/lxc' => form => { action => 'delete', name => 'db' })->content_like(qr/Container deleted/);
 $t->post_ok('/lxc' => form => { action => 'autostart', name => 'db', on => 1 });
 $t->post_ok('/lxc' => form => { action => 'start', name => 'db' });
-is_deeply $helper->(), [['delete', 'db'], ['autostart', 'db', 1], ['net']], 'helper calls';
-ok((grep { $_->[1] eq '/usr/bin/lxc-start' && "@$_" =~ /-n db -d/ } @SYS), 'started');
+is_deeply $helper->(), [['delete', 'db'], ['autostart', 'db', 1], ['start', 'db']], 'helper calls';
+@RC = (256);
+$t->post_ok('/lxc' => form => { action => 'start', name => 'db' })->content_like(qr/reason is in \/var\/log\/easynas\/lxc\.log/, 'a failed start says where to look');
 @RC = (256);
 $t->post_ok('/lxc' => form => { action => 'delete', name => 'db' })->content_like(qr/That did not work/, 'a failure is reported');
 

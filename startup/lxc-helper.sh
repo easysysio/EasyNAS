@@ -9,6 +9,14 @@
 #       openSUSE's lxc points every new container at lxcbr0 but ships the
 #       bridge switched off (USE_LXC_BRIDGE="false" in /etc/default/lxc), so
 #       without this no container can start.
+#   lxc-helper.sh apparmor
+#       Load LXC's AppArmor profiles. The kernel has AppArmor on, so lxc-start
+#       insists on the lxc-container-default-cgns profile, and these containers
+#       are privileged, so running them unconfined is not an option. Only
+#       LXC's own profiles are loaded; lxc.service does this at boot through a
+#       drop-in.
+#   lxc-helper.sh start <name>
+#       Start a container, with the reason in lxc.log if it won't.
 #   lxc-helper.sh create <name> <dist> <release> <arch> <nat|lan> <0|1>
 #       Download an image from images.linuxcontainers.org and make a container
 #       of it. Slow, so lxc.pm runs it in its own transient unit; progress is
@@ -35,6 +43,8 @@ FSTAB=${EASYNAS_FSTAB:-/etc/fstab}
 MARKER="# easynas-lxc-storage"
 DROPIN=${EASYNAS_LXC_DROPIN:-/etc/systemd/system/lxc.service.d/easynas-storage.conf}
 NETCONF=${EASYNAS_LXC_NETCONF:-/etc/default/lxc-net}
+AA_SYS=${EASYNAS_AA_SYS:-/sys/kernel/security/apparmor}
+AA_PROFILES=${EASYNAS_AA_PROFILES:-/etc/apparmor.d/lxc-containers}
 TERM_UNIT=easynas-lxc-terminal
 
 log() { echo "$(date '+%F %T') [lxc] $*" >> "$LOG"; }
@@ -58,6 +68,15 @@ net_up() {
     ip link show lxcbr0 >/dev/null 2>&1
 }
 
+# LXC's container profile, loaded if the kernel has AppArmor and it isn't yet.
+aa_loaded() { grep -qs '^lxc-container-default-cgns ' "$AA_SYS/profiles"; }
+aa_up() {
+    [ -d "$AA_SYS" ] || return 0
+    aa_loaded && return 0
+    apparmor_parser -r "$AA_PROFILES" >> "$LOG" 2>&1
+    aa_loaded
+}
+
 cmd="${1:-}"
 [ $# -gt 0 ] && shift
 mkdir -p "$STATE" "$(dirname "$LOG")"
@@ -66,6 +85,24 @@ case "$cmd" in
 
 net)
     net_up || die "the lxcbr0 bridge did not come up (see: journalctl -u lxc-net)"
+    aa_up || die "could not load LXC's AppArmor profiles"
+    # Now, not only from the next boot: it stops containers cleanly at shutdown.
+    systemctl start lxc.service || log "lxc.service did not start"
+    ;;
+
+apparmor)
+    aa_up || die "could not load LXC's AppArmor profiles"
+    ;;
+
+start)
+    name="${1:-}"; need_name "$name"
+    exists "$name" || die "no container $name"
+    aa_up || die "could not load LXC's AppArmor profiles"
+    if grep -Eqs '^[[:space:]]*lxc\.net\.[0-9]+\.link[[:space:]]*=[[:space:]]*lxcbr0' "$LXCPATH/$name/config"; then
+        net_up || die "the lxcbr0 bridge did not come up (see: journalctl -u lxc-net)"
+    fi
+    lxc-start -n "$name" -d -o "$LOG" -l ERROR || die "starting $name failed"
+    log "started $name"
     ;;
 
 create)
@@ -185,7 +222,7 @@ terminal)
     ;;
 
 *)
-    echo "usage: lxc-helper.sh net|create|delete|autostart|storage|terminal ..." >&2
+    echo "usage: lxc-helper.sh net|apparmor|start|create|delete|autostart|storage|terminal ..." >&2
     exit 2
     ;;
 esac

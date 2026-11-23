@@ -104,13 +104,12 @@ sub view ($self) {
 
   ##### start / stop #####
   if ($post && $action eq "start" && $named) {
-    # A container made before the bridge was switched on still needs it.
-    helper("net");
-    if (system("/usr/bin/sudo","/usr/bin/lxc-start","-n",$name,"-d") == 0) {
+    # The helper first makes sure of what it needs (AppArmor profile, bridge).
+    if (helper("start", $name)) {
       write_log("lxc","INFO","Container $name started");
     } else {
       $result = "fail";
-      $msg = $T->('lxc_start_failed', "The container didn't start. See /var/log/easynas/lxc.log and lxc-start -n NAME -F on the console.");
+      $msg = $T->('lxc_start_failed', "The container didn't start. The reason is in /var/log/easynas/lxc.log.");
     }
   }
   if ($post && $action eq "stop" && $named) {

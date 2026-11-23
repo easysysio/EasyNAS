@@ -12,7 +12,7 @@ use File::Basename qw(dirname);
 
 my $helper = abs_path(dirname(__FILE__) . '/../startup/lxc-helper.sh');
 my $d = tempdir(CLEANUP => 1);
-mkdir "$d/$_" for qw(bin lxc state mnt mnt/pool mnt/pool/data);
+mkdir "$d/$_" for qw(bin lxc state aa mnt mnt/pool mnt/pool/data);
 sub put { my ($f, $s) = @_; open my $fh, '>', $f or die "$f: $!"; print $fh $s; close $fh }
 sub slurp { my ($f) = @_; open my $fh, '<', $f or return undef; local $/; my $s = <$fh>; close $fh; $s }
 
@@ -32,6 +32,18 @@ echo "lxc-create \$*" >> $d/calls
 while [ \$# -gt 0 ]; do case "\$1" in -n) n=\$2; shift 2;; -f) /bin/cp "\$2" $d/created.conf; shift 2;; --) break;; *) shift;; esac; done
 mkdir -p $d/lxc/\$n && echo "lxc.uts.name = \$n" > $d/lxc/\$n/config
 SH
+put("$d/bin/apparmor_parser", <<"SH");
+#!/bin/sh
+echo "apparmor_parser \$*" >> $d/calls
+[ -e $d/fail-aa ] && exit 1
+echo 'lxc-container-default-cgns (enforce)' >> $d/aa/profiles
+SH
+put("$d/bin/lxc-start", <<"SH");
+#!/bin/sh
+echo "lxc-start \$*" >> $d/calls
+[ -e $d/fail-start ] && exit 1
+exit 0
+SH
 put("$d/bin/lxc-info", "#!/bin/sh\n[ -e $d/running ] && echo RUNNING || echo STOPPED\n");
 put("$d/bin/cp", "#!/bin/sh\necho \"cp \$*\" >> $d/calls\nexit 0\n");
 chmod 0755, glob("$d/bin/*");
@@ -49,6 +61,8 @@ $ENV{EASYNAS_LXC_LOG} = "$d/lxc.log";
 $ENV{EASYNAS_FSTAB} = "$d/fstab";
 $ENV{EASYNAS_LXC_DROPIN} = "$d/dropin/easynas-storage.conf";
 $ENV{EASYNAS_LXC_NETCONF} = "$d/lxc-net";
+$ENV{EASYNAS_AA_SYS} = "$d/aa";
+$ENV{EASYNAS_AA_PROFILES} = "$d/lxc-containers";
 put("$d/fstab", "/dev/sda1 /mnt/pool btrfs defaults 0 0\n");
 
 sub run { unlink "$d/calls"; system('/bin/sh', $helper, @_); my $rc = $? >> 8; return ($rc, slurp("$d/calls") // '') }
@@ -61,6 +75,7 @@ put("$d/bridge", '');
 is $rc, 0, 'net: ok once it is up';
 is slurp("$d/lxc-net"), qq{USE_LXC_BRIDGE="true"\n}, 'bridge switched on';
 like $calls, qr/systemctl enable lxc-net\.service lxc\.service/, 'bridge and autostart enabled';
+like $calls, qr/apparmor_parser -r \Q$d\E\/lxc-containers\n(?:.*\n)*systemctl start lxc\.service/, 'profiles loaded, then lxc.service started';
 ($rc) = run('net');
 is slurp("$d/lxc-net"), qq{USE_LXC_BRIDGE="true"\n}, 'written once';
 
@@ -146,6 +161,47 @@ like $calls, qr{systemd-run --collect --quiet --unit=easynas-lxc-terminal -p Run
      'ttyd attached to the container, with the credential';
 ($rc) = run(qw(terminal web nothex));
 is $rc, 1, 'terminal: bad token';
+
+# ---- AppArmor and start
+unlink "$d/aa/profiles", "$d/running";
+put("$d/lxc/web/config", "lxc.uts.name = web\nlxc.net.0.type = macvlan\nlxc.net.0.link = enp3s0\n");
+put("$d/fail-aa", '');
+($rc, $calls) = run(qw(start web));
+is $rc, 1, 'start: refused when the profile cannot be loaded';
+unlike $calls, qr/lxc-start/, '...before lxc-start';
+($rc) = run('apparmor');
+is $rc, 1, 'apparmor: reports the failure';
+unlink "$d/fail-aa";
+($rc, $calls) = run('apparmor');
+is $rc, 0, 'apparmor: loads the profiles';
+like $calls, qr/apparmor_parser -r/;
+($rc, $calls) = run('apparmor');
+is $calls, '', 'apparmor: already loaded, nothing to do';
+rename "$d/aa", "$d/aa-off";
+($rc, $calls) = run('apparmor');
+is $rc, 0, 'apparmor: a kernel without it needs nothing';
+is $calls, '';
+rename "$d/aa-off", "$d/aa";
+
+unlink "$d/bridge";
+($rc, $calls) = run(qw(start web));
+is $rc, 0, 'start: a LAN container needs no bridge';
+like $calls, qr/lxc-start -n web -d -o \Q$d\E\/lxc\.log -l ERROR/, 'errors go to lxc.log';
+unlike $calls, qr/lxc-net/, '...and the bridge is left alone';
+put("$d/lxc/web/config", "lxc.net.0.type = veth\nlxc.net.0.link = lxcbr0\n");
+($rc, $calls) = run(qw(start web));
+is $rc, 1, 'start: a private container needs the bridge up';
+unlike $calls, qr/lxc-start/;
+put("$d/bridge", '');
+put("$d/fail-start", '');
+($rc) = run(qw(start web));
+is $rc, 1, 'start: a failed lxc-start is reported';
+like slurp("$d/lxc.log"), qr/starting web failed/, '...and logged';
+unlink "$d/fail-start";
+($rc) = run(qw(start nosuch));
+is $rc, 1, 'start: no such container';
+($rc) = run('start', '../x');
+is $rc, 1, 'start: bad name';
 
 ($rc) = run('bogus');
 is $rc, 2, 'unknown command';

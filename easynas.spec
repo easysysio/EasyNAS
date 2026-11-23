@@ -34,7 +34,7 @@ Requires:       dmidecode
 Obsoletes:      easynas-mm-plex < 1.99-5
 # The NAS-user frame, templates/layouts/user.html.ep (needed by fs-files).
 Provides:       easynas(user-layout)
-Provides:       easynas(lxc-helper)
+Provides:       easynas(lxc-helper) = 2
 # The core only lets GETs show things (POST for changes, see lib/EasyNAS.pm);
 # these add-on releases are the first whose pages make their changes by POST,
 # so older ones are updated along with the core.
@@ -103,6 +103,13 @@ cat > %{buildroot}/etc/easynas/addons/easynas.addons << 'EOF'
 </solvable-list>
 </search-result>
 </stream>
+EOF
+
+# srv-lxc: load LXC's AppArmor profiles before lxc.service autostarts containers.
+mkdir -p %{buildroot}/usr/lib/systemd/system/lxc.service.d
+cat > %{buildroot}/usr/lib/systemd/system/lxc.service.d/easynas-apparmor.conf << 'EOF'
+[Service]
+ExecStartPre=-/easynas/startup/lxc-helper.sh apparmor
 EOF
 
 # The channel repo (EasyNAS or EasyNAS_Beta) is NOT shipped by this RPM. It is
@@ -366,11 +373,11 @@ fi
 #### lxc ####
 %package        srv-lxc
 Version:        %{version}
-Release:        8
+Release:        9
 Summary:        Virtualization addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
-Requires:       easynas(lxc-helper)
+Requires:       easynas(lxc-helper) >= 2
 Requires:       lxc
 Requires:       ttyd
 # lxc-create's download template
@@ -380,14 +387,19 @@ Requires:       xz
 # lxc-net: the lxcbr0 bridge's DHCP and its NAT rules
 Requires:       dnsmasq
 Requires:       nftables
+# The kernel has AppArmor on, so lxc-start needs its container profile loaded
+Requires:       apparmor-parser
+Requires:       apparmor-abstractions
 
 %description srv-lxc
 Virtualization addon for EasyNAS
 
 %post srv-lxc
 # Switch on the lxcbr0 bridge new containers connect to (openSUSE ships it
-# off) and autostart at boot. Only on a live system.
+# off), load LXC's AppArmor profiles and start lxc.service, which also starts
+# the containers marked for boot. Only on a live system.
 if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload
     /easynas/startup/lxc-helper.sh net >/dev/null 2>&1 || :
 fi
 
@@ -398,6 +410,8 @@ fi
 /easynas/templates/easynas/lxc.html.ep
 /easynas/templates/easynas/lxc_create.html.ep
 /easynas/templates/easynas/lxc_storage.html.ep
+%dir /usr/lib/systemd/system/lxc.service.d
+/usr/lib/systemd/system/lxc.service.d/easynas-apparmor.conf
 
 
 #### mariadb ####
@@ -921,6 +935,12 @@ Polish Language for EasyNAS
     work is in startup/lxc-helper.sh (core, easynas(lxc-helper)). Requires
     wget/tar/xz (download template) and dnsmasq/nftables (bridge); no longer
     libwebsockets-devel
+  - LXC (srv-lxc 9): containers failed to start with "Failed to change AppArmor
+    profile to lxc-container-default-cgns": the kernel has AppArmor on, but
+    nothing installed the parser or loaded LXC's profiles. srv-lxc now requires
+    apparmor-parser and -abstractions and loads only LXC's profiles, before
+    every start and at boot (lxc.service drop-in). lxc.service is started on
+    install, and a failed start's reason now goes to /var/log/easynas/lxc.log
   - MariaDB storage: the fstab bind line now says x-systemd.requires-mounts-for
     (was requires-mount-for, which systemd ignores, so the bind could beat its
     volume at boot); %post corrects existing lines
