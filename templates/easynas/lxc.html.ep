@@ -60,7 +60,7 @@
            <i class="fa <%= $auto ? 'fa-toggle-on text-success' : 'fa-toggle-off text-muted' %> fa-2x"></i></a></td>
       <td>
 %   if ($running) {
-       <a data-post href="?action=terminal&name=<%= $name %>" target="_blank" rel="noopener noreferrer" title="<%= ($TEXT->{'lxc_terminal'} || 'Terminal') %>"><i class="fa fa-terminal fa-2x">&nbsp;</i></a>
+       <a href="?action=terminalmenu&name=<%= $name %>" target="_blank" rel="noopener" title="<%= ($TEXT->{'lxc_terminal'} || 'Terminal') %>"><i class="fa fa-terminal fa-2x">&nbsp;</i></a>
        <a data-post href="?action=stop&name=<%= $name %>" title="<%= ($TEXT->{'lxc_stop'} || 'Stop') %>"><i class="fa fa-stop fa-2x">&nbsp;</i></a>
 %   } else {
        <a data-post href="?action=start&name=<%= $name %>" title="<%= ($TEXT->{'lxc_start'} || 'Start') %>"><i class="fa fa-play fa-2x">&nbsp;</i></a>

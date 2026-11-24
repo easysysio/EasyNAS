@@ -18,7 +18,7 @@ sub slurp { my ($f) = @_; open my $fh, '<', $f or return undef; local $/; my $s 
 
 # Every fake logs "<tool> <args>" to calls; lxc-create copies the -f config it
 # was given and makes the container, unless told to fail.
-for my $tool (qw(systemctl lxc-destroy lxc-ls umount mount mountpoint systemd-run ss sleep)) {
+for my $tool (qw(systemctl lxc-destroy lxc-ls lxc-attach umount mount mountpoint systemd-run ss sleep)) {
   put("$d/bin/$tool", "#!/bin/sh\necho \"$tool \$*\" >> $d/calls\n" .
       ($tool eq 'mountpoint' ? "[ -e $d/mounted ]\n" : $tool eq 'lxc-ls' ? "cat $d/lxc-ls 2>/dev/null\n" : $tool eq 'ss' ? "echo LISTEN\n" : "exit 0\n"));
 }
@@ -164,17 +164,17 @@ for my $bad ('/etc', '/mnt/../etc', 'relative') {
   is $rc, 1, "storage refuses $bad";
 }
 
-# ---- terminal
-($rc) = run(qw(terminal web 0123456789abcdef0123456789abcdef));
-is $rc, 1, 'terminal: refused when not running';
+# ---- attach (the web terminal)
+($rc, $calls) = run(qw(attach web));
+is $rc, 1, 'attach: refused when not running';
+unlike $calls, qr/lxc-attach/;
 put("$d/running", '');
-($rc, $calls) = run(qw(terminal web 0123456789abcdef0123456789abcdef));
-is $rc, 0, 'terminal: starts';
-like $calls, qr/systemctl stop easynas-lxc-terminal/, 'an old one is stopped first';
-like $calls, qr{systemd-run --collect --quiet --unit=easynas-lxc-terminal -p RuntimeMaxSec=8h /usr/bin/ttyd -p 8080 -o -W -c easynas:0123456789abcdef0123456789abcdef /usr/bin/lxc-attach -n web},
-     'ttyd attached to the container, with the credential';
-($rc) = run(qw(terminal web nothex));
-is $rc, 1, 'terminal: bad token';
+($rc, $calls) = run(qw(attach web));
+is $rc, 0, 'attach: ok';
+like $calls, qr/^lxc-attach -n web$/m, 'a shell in the container (exec, so it gets the terminal)';
+($rc, $calls) = run(qw(attach ../x));
+is $rc, 1, 'attach: a bad name is refused';
+unlike $calls, qr/lxc-attach/;
 
 # ---- AppArmor and start
 unlink "$d/aa/profiles", "$d/running";

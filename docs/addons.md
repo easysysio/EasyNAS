@@ -56,20 +56,22 @@ After installing a language pack, select the language in **Admin → Settings**.
 **Services → Virtualization** runs Linux containers: a whole Linux system
 (Debian, Ubuntu, Alpine, openSUSE and more) sharing the NAS's kernel.
 
-1. **Keep them on a volume first.** Click *Keep them on a volume* (or
-   *Change*) and pick one. Containers left on the system disk are lost at the
-   next firmware update.
-2. **Create new System**: name it, pick an image (downloaded from
+1. **Create new System**: name it, pick an image (downloaded from
    images.linuxcontainers.org for your machine), and pick the network:
     - **Private**: an address on a network inside the NAS (10.0.3.x). It
       reaches the internet; other devices can't reach it.
     - **Your network**: its own address from your router. Other devices can
       reach it, but the NAS itself can't.
+2. The first time, also pick the **volume** containers are kept on (create
+   one on the Volumes page if there is none). Every container goes there, so
+   they survive firmware updates, which wipe the system disk; *Change* on the
+   containers page moves them all to another volume (stop them first).
 3. Downloading takes a few minutes; the list shows it as *Creating...* and
    updates by itself.
 
-Then start it, open a **terminal** into it (a new tab on port 8080, for that
-one session), turn **Start at boot** on, or delete it. Problems are logged in
-`/var/log/easynas/lxc.log`.
+Then start it, open a **terminal** into it (a root shell in a new tab, over
+the web interface's own connection; the browser loads the terminal from
+cdn.jsdelivr.net), turn **Start at boot** on, or delete it. Problems are
+logged in `/var/log/easynas/lxc.log`.
 
 <!-- TODO: keep this list generated/synced with the repository -->

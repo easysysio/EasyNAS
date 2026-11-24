@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+ <title><%= $name %> - <%= ($TEXT->{'lxc_terminal'} || 'Terminal') %></title>
+ %# xterm.js, pinned. The page is the admin's own browser's, so the appliance
+ %# itself needs no internet for it.
+ <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
+ <style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #term { position: absolute; top: 0; left: 0; right: 0; bottom: 26px; padding: 4px; }
+  #status { position: absolute; left: 0; right: 0; bottom: 0; height: 26px; box-sizing: border-box;
+            padding: 5px 10px; background: #222; color: #ccc; font: 13px/16px sans-serif; }
+  #status.bad { color: #f88; }
+ </style>
+</head>
+<body>
+<div id="term"></div>
+<div id="status"><%= ($TEXT->{'lxc_terminal_connecting'} || 'Connecting...') %></div>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+<script>
+(function () {
+  var NAME = <%== Mojo::JSON::to_json($name) %>;
+  var T = <%== Mojo::JSON::to_json({
+    connected => ($TEXT->{'lxc_terminal_connected'} || 'Connected to'),
+    closed    => ($TEXT->{'lxc_terminal_closed'} || 'The session ended. Reload the page to open a new one.'),
+    noxterm   => ($TEXT->{'lxc_terminal_noxterm'} || "Couldn't load the terminal from cdn.jsdelivr.net. This browser needs internet access for it."),
+  }) %>;
+  var status = document.getElementById('status');
+  function say(text, bad) { status.textContent = text; status.className = bad ? 'bad' : ''; }
+  if (typeof Terminal === 'undefined' || typeof FitAddon === 'undefined') { say(T.noxterm, true); return; }
+
+  var term = new Terminal({ cursorBlink: true, fontSize: 14, scrollback: 5000 });
+  var fit = new FitAddon.FitAddon();
+  term.loadAddon(fit);
+  term.open(document.getElementById('term'));
+  fit.fit();
+
+  var ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host +
+                         '/lxc/ws?name=' + encodeURIComponent(NAME));
+  ws.binaryType = 'arraybuffer';
+  function send(m) { if (ws.readyState === 1) ws.send(JSON.stringify(m)); }
+  var ping;
+  ws.onopen = function () {
+    say(T.connected + ' ' + NAME);
+    send({ t: 'r', c: term.cols, r: term.rows });
+    ping = setInterval(function () { send({ t: 'p' }); }, 30000);
+    term.focus();
+  };
+  ws.onmessage = function (e) { term.write(typeof e.data === 'string' ? e.data : new Uint8Array(e.data)); };
+  ws.onclose = function () { clearInterval(ping); say(T.closed, true); };
+  term.onData(function (d) { send({ t: 'i', d: d }); });
+  term.onResize(function (s) { send({ t: 'r', c: s.cols, r: s.rows }); });
+  window.addEventListener('resize', function () { fit.fit(); });
+})();
+</script>
+</body>
+</html>

@@ -35,7 +35,7 @@ Requires:       dmidecode
 Obsoletes:      easynas-mm-plex < 1.99-5
 # The NAS-user frame, templates/layouts/user.html.ep (needed by fs-files).
 Provides:       easynas(user-layout)
-Provides:       easynas(lxc-helper) = 3
+Provides:       easynas(lxc-helper) = 4
 # The core only lets GETs show things (POST for changes, see lib/EasyNAS.pm);
 # these add-on releases are the first whose pages make their changes by POST,
 # so older ones are updated along with the core.
@@ -377,13 +377,14 @@ fi
 #### lxc ####
 %package        srv-lxc
 Version:        %{version}
-Release:        10
+Release:        11
 Summary:        Virtualization addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
-Requires:       easynas(lxc-helper) >= 3
+Requires:       easynas(lxc-helper) >= 4
 Requires:       lxc
-Requires:       ttyd
+# the web terminal's pseudo-terminal
+Requires:       perl(IO::Pty)
 # lxc-create's download template
 Requires:       wget
 Requires:       tar
@@ -981,6 +982,13 @@ Polish Language for EasyNAS
     storage page moves them to another volume, with no way back to the system
     disk. lxc-helper.sh refuses to create a container before a volume is set
     or while it isn't mounted (easynas(lxc-helper) 3)
+  - LXC (srv-lxc 11): the terminal works. It was ttyd on port 8080, which on
+    Tumbleweed (ttyd 1.7.7, libwebsockets 5.1) closes right after it starts
+    listening. It is now part of the page: a new tab runs xterm.js and talks
+    to the web interface over a WebSocket on its own address, port and
+    sign-in (only from the appliance's own pages), which runs lxc-attach on a
+    pseudo-terminal (lxc-helper.sh attach; easynas(lxc-helper) 4). No more
+    port 8080 or ttyd; requires perl(IO::Pty)
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

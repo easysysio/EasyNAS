@@ -31,9 +31,10 @@
 #       (fstab, after the volume) so they survive a firmware update, which
 #       wipes the system disk. Existing containers are copied, never moved.
 #       There is no way back to the system disk; only to another volume.
-#   lxc-helper.sh terminal <name> <token>
-#       A one-shot ttyd on port 8080 attached to the container, guarded by the
-#       credential easynas:<token>.
+#   lxc-helper.sh attach <name>
+#       A root shell in a running container, on the caller's terminal: the
+#       web terminal (lxc.pm) runs it on a pseudo-terminal it relays to the
+#       browser over the web interface's own WebSocket.
 #
 # This file is part of EasyNAS (c) created by Yariv Hakim
 #========================================================================
@@ -48,7 +49,6 @@ DROPIN=${EASYNAS_LXC_DROPIN:-/etc/systemd/system/lxc.service.d/easynas-storage.c
 NETCONF=${EASYNAS_LXC_NETCONF:-/etc/default/lxc-net}
 AA_SYS=${EASYNAS_AA_SYS:-/sys/kernel/security/apparmor}
 AA_PROFILES=${EASYNAS_AA_PROFILES:-/etc/apparmor.d/lxc-containers}
-TERM_UNIT=easynas-lxc-terminal
 
 log() { echo "$(date '+%F %T') [lxc] $*" >> "$LOG"; }
 die() { log "$*"; echo "$*" >&2; exit 1; }
@@ -205,26 +205,15 @@ storage)
     log "storage: $dir"
     ;;
 
-terminal)
-    name="${1:-}"; token="${2:-}"; need_name "$name"
-    echo "$token" | grep -Eq '^[0-9a-f]{32}$' || die "bad token"
-    running "$name" || die "$name is not running"
-    # One terminal at a time: a ttyd nobody connected to would hold the port.
-    systemctl stop "$TERM_UNIT" 2>/dev/null
-    systemctl reset-failed "$TERM_UNIT" 2>/dev/null
-    systemd-run --collect --quiet --unit="$TERM_UNIT" -p RuntimeMaxSec=8h \
-        /usr/bin/ttyd -p 8080 -o -W -c "easynas:$token" /usr/bin/lxc-attach -n "$name" \
-        || die "ttyd did not start"
-    # Hand the browser over only once ttyd listens, or it is refused.
-    for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-        ss -ltn 'sport = :8080' 2>/dev/null | grep -q LISTEN && exit 0
-        sleep 0.25
-    done
-    die "ttyd is not listening on port 8080"
+attach)
+    name="${1:-}"; need_name "$name"
+    running "$name" || die "$name is not running. Start it, then open the terminal again."
+    log "terminal opened to $name"
+    exec lxc-attach -n "$name"
     ;;
 
 *)
-    echo "usage: lxc-helper.sh net|apparmor|start|create|delete|autostart|storage|terminal ..." >&2
+    echo "usage: lxc-helper.sh net|apparmor|start|create|delete|autostart|storage|attach ..." >&2
     exit 2
     ;;
 esac

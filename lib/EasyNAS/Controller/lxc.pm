@@ -2,6 +2,10 @@ package EasyNAS::Controller::Lxc;
 use Mojo::Base 'Mojolicious::Controller', -signatures;
 use lib '/easynas/lib/EasyNAS/Controller';
 use easynas;
+use Mojo::IOLoop::Stream;
+use Mojo::JSON qw(from_json);
+use Mojo::Util qw(encode);
+use POSIX ();
 
 my $addon = get_addon_info("lxc");
 my %TEXT = get_lang_text($addon->{'name'});
@@ -11,6 +15,10 @@ my $HELPER = "/easynas/startup/lxc-helper.sh";
 
 # A container name as lxc-* accepts it, kept strict: it reaches root commands.
 my $NAME_RE = qr/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
+# How the terminal runs "lxc-helper.sh attach <name>" on a pseudo-terminal:
+# ($fh of its master side, $pid). Replaced in t/lxc-web.t.
+our $SPAWN = \&spawn_pty;
 
 # The images on offer: the "default" variant of every system image for this
 # machine on images.linuxcontainers.org (what lxc-create's download template
@@ -192,27 +200,14 @@ sub view ($self) {
     }
   }
 
-  ##### web terminal into a container #####
-  # A one-shot ttyd attached to the container (not a host shell) on port 8080,
-  # guarded by a fresh random credential handed only to the admin who clicked,
-  # at the appliance's own address from the Host header.
-  if ($post && $action eq "terminal" && $named) {
-    my @c = (0..9,'a'..'f');
-    my $token = join('', map { $c[int rand @c] } 1..32);
-    my $host = $self->req->headers->host // "";
-    $host =~ s/:\d+$//;
-    if ($host =~ /^[A-Za-z0-9.-]+$|^\[[0-9A-Fa-f:.]+\]$/ && helper("terminal", $name, $token)) {
-      # Not redirect_to: Mojo::URL leaves the user:password part out of the
-      # URL it writes, and without it ttyd only asks for a login nobody knows.
-      $self->res->headers->location("http://easynas:$token\@$host:8080/");
-      $self->rendered(302);
-      return;
-    }
-    $result = "fail"; $msg = $T->('lxc_terminal_failed', 'The terminal did not start. Is the container running?');
-  }
-
   ##### pages #####
   $self->stash(addon => $addon, TEXT => \%TEXT, result => $result, msg => $msg);
+  # The terminal: a page of its own (it opens in a new tab) that talks to ws()
+  # below over this same address, port and sign-in.
+  if ($action eq "terminalmenu" && $named) {
+    $self->render(template => 'easynas/lxc_terminal', name => $name);
+    return;
+  }
   if ($action eq "createlxcmenu") {
     my %img = images();
     my %vol = vol_info();
@@ -228,6 +223,104 @@ sub view ($self) {
   my %systems = systems_list();
   $self->render(template => 'easynas/lxc', systems => \%systems, storage_vol => storage_vol(),
                 busy => (grep { $_->[1] eq 'CREATING' } values %systems) ? 1 : 0);
+}
+
+########## the terminal ##########
+# A shell in a container, in the browser: the page (lxc_terminal.html.ep)
+# runs xterm.js and opens a WebSocket here (/lxc/ws?name=..., admin only, the
+# same sign-in as every page); this end runs lxc-attach on a pseudo-terminal
+# and passes the bytes both ways. The client sends JSON: {"t":"i","d":text}
+# typed, {"t":"r","c":cols,"r":rows} resized, {"t":"p"} keep-alive. Output
+# goes back as binary frames. Closing the tab hangs the shell up.
+#
+# (It used to be ttyd on port 8080, but Tumbleweed's ttyd 1.7.7 with
+# libwebsockets 5 closes right after it starts listening.)
+sub ws ($self) {
+  my $name = $self->param('name') // '';
+  # Only from this appliance's own pages: a page elsewhere can open a
+  # WebSocket here too, and the browser would send the session cookie along.
+  my $origin = $self->req->headers->origin // '';
+  my $host   = $self->req->headers->host // '';
+  if ($name !~ $NAME_RE || $host eq '' || $origin !~ m{^https?://\Q$host\E$}i) {
+    write_log("lxc","WARNING","refused a terminal connection".($name =~ $NAME_RE ? " to $name" : "")." from origin \"".
+              substr($origin =~ s/[^A-Za-z0-9:\/._\[\]-]/?/gr, 0, 80)."\"");
+    return $self->render(text => 'Forbidden', status => 403);
+  }
+  my ($fh, $pid) = $SPAWN->($name);
+  return $self->render(text => 'The terminal did not start.', status => 500) unless $fh;
+  write_log("lxc","INFO","Terminal opened to container $name");
+
+  # The page pings every 30 seconds, so a connection quiet for longer is gone.
+  $self->inactivity_timeout(120);
+  my $stream = Mojo::IOLoop::Stream->new($fh);
+  $stream->timeout(0);
+  my $sid = Mojo::IOLoop->stream($stream);
+  my $done;
+  my $end = sub {
+    return if $done++;
+    Mojo::IOLoop->remove($sid);
+    close $fh;                            # the master: the shell gets SIGHUP
+    reap($pid);
+    write_log("lxc","INFO","Terminal to container $name closed");
+  };
+  $stream->on(read  => sub ($s, $bytes) { $self->send({binary => $bytes}) });
+  $stream->on(error => sub { $self->finish; $end->() });   # EIO: the shell exited
+  $stream->on(close => sub { $self->finish; $end->() });
+  $self->on(message => sub ($c, $msg) {
+    my $m = eval { from_json($msg) };
+    return unless ref $m eq 'HASH' && defined $m->{t};
+    if ($m->{t} eq 'i' && defined $m->{d} && !ref $m->{d}) { $stream->write(encode('UTF-8', $m->{d})) }
+    elsif ($m->{t} eq 'r') { resize($fh, $m->{r}, $m->{c}) }
+  });
+  $self->on(finish => sub { $end->() });
+}
+
+# The terminal size the shell sees (TIOCSWINSZ on the master; the shell is
+# sent SIGWINCH).
+sub resize ($fh, $rows, $cols) {
+  return unless defined $rows && defined $cols && "$rows$cols" =~ /^\d+$/;
+  return unless $rows > 0 && $rows < 1000 && $cols > 0 && $cols < 1000 && -t $fh;
+  my $req = eval { require IO::Tty; IO::Tty::Constant::TIOCSWINSZ() } // return;
+  ioctl($fh, $req, pack('S4', $rows, $cols, 0, 0));
+}
+
+# Collect the attach process once it has exited (closing the master hangs it
+# up); one that ignores the hangup is killed.
+sub reap ($pid) {
+  return unless $pid && $pid > 0;
+  return if waitpid($pid, POSIX::WNOHANG()) != 0;
+  my $tries = 0;
+  my $tid; $tid = Mojo::IOLoop->recurring(0.5 => sub ($loop) {
+    my $r = waitpid($pid, POSIX::WNOHANG());
+    kill 'KILL', $pid if $r == 0 && ++$tries == 10;
+    $loop->remove($tid) if $r != 0 || $tries > 20;
+  });
+}
+
+# Run the helper's "attach" on a new pseudo-terminal: its own session, with
+# the terminal's slave side as its controlling terminal and stdio.
+sub spawn_pty ($name) {
+  my $pty = eval { require IO::Pty; IO::Pty->new };
+  if (!$pty) { write_log("lxc","ERROR","terminal: no pseudo-terminal (perl IO::Pty): ".($@ || $!)); return; }
+  my $pid = fork;
+  if (!defined $pid) { write_log("lxc","ERROR","terminal: fork failed: $!"); return; }
+  if (!$pid) {
+    eval {
+      $pty->make_slave_controlling_terminal;
+      my $slave = $pty->slave;
+      close $pty;
+      open(STDIN,  '<&', $slave) or die;
+      open(STDOUT, '>&', $slave) or die;
+      open(STDERR, '>&', $slave) or die;
+      close $slave;
+      $ENV{TERM} = 'xterm-256color';
+      exec('/usr/bin/sudo', $HELPER, 'attach', $name);
+    };
+    POSIX::_exit(127);
+  }
+  $pty->close_slave;
+  $pty->blocking(0);
+  return ($pty, $pid);
 }
 
 1;

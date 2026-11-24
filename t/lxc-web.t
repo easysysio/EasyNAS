@@ -35,7 +35,9 @@ put_file($stub->child('layouts', 'default.html.ep'), '<%= content %>');
 unshift @INC, "$stub";
 
 our (@SYS, @RC, %PIPE);
+our @EXEC;   # set: exec runs this instead (the pseudo-terminal test)
 BEGIN {
+  *CORE::GLOBAL::exec     = sub { CORE::exec { $EXEC[0] } @EXEC if @EXEC; CORE::exec { $_[0] } @_ };
   *CORE::GLOBAL::system   = sub { push @SYS, [@_]; my $rc = shift(@RC) // 0; $? = $rc; return $rc };
   *CORE::GLOBAL::readpipe = sub { my ($cmd) = @_; for (sort keys %PIPE) { return wantarray ? (map {"$_\n"} split /\n/, $PIPE{$_}) : $PIPE{$_} if index($cmd, $_) >= 0 } return wantarray ? () : '' };
 }
@@ -62,6 +64,7 @@ $PIPE{'lxc-ls'} = join "\n",
 
 app->renderer->paths(["$stub", "$root/templates"]);
 any '/lxc' => sub ($c) { EasyNAS::Controller::Lxc::view($c) };
+websocket '/lxc/ws' => sub ($c) { EasyNAS::Controller::Lxc::ws($c) };
 my $t = Test::Mojo->new;
 my $helper = sub { [map { [@$_[2..$#$_]] } grep { ($_->[1] // '') eq '/easynas/startup/lxc-helper.sh' } @SYS] };
 
@@ -71,7 +74,8 @@ $t->get_ok('/lxc')->status_is(200)
   ->content_like(qr{<td>db</td>\s*<td>STOPPED</td>\s*<td>-</td>}, 'stopped')
   ->element_exists('a[data-post][href="?action=autostart&name=web&on=0"] i.fa-toggle-on', 'web starts at boot: the toggle turns it off')
   ->element_exists('a[data-post][href="?action=autostart&name=db&on=1"] i.fa-toggle-off', 'db does not')
-  ->element_exists('a[data-post][href="?action=terminal&name=web"]')
+  ->element_exists('a[href="?action=terminalmenu&name=web"][target="_blank"]:not([data-post])', 'the terminal opens in a tab of its own')
+  ->element_exists_not('a[href*="action=terminalmenu&name=db"]', '...for a running container only')
   ->element_exists('a[data-post][href="?action=start&name=db"]')
   ->element_exists('a[data-post][href="?action=delete&name=db"]')
   ->content_like(qr/system disk, which a firmware update wipes/, 'warns: kept on the system disk');
@@ -163,19 +167,84 @@ $t->post_ok('/lxc' => form => { action => 'setstorage', radio_sel => 'internal' 
 is_deeply $helper->(), [['storage', '/mnt/pool/media']], 'storage targets';
 
 # ---- terminal
-@SYS = ();
-$t->post_ok('/lxc' => form => { action => 'terminal', name => 'web' })->status_is(302)
-  ->header_like(Location => qr{^http://easynas:[0-9a-f]{32}\@(127\.0\.0\.1|localhost):8080/$}, 'to ttyd, with the credential');
-my ($call) = @{$helper->()};
-is_deeply [@$call[0, 1]], ['terminal', 'web'];
-like $t->tx->res->headers->location, qr/\Q$call->[2]\E/, 'the same credential ttyd got';
-@RC = (256);
-$t->post_ok('/lxc' => form => { action => 'terminal', name => 'db' })->status_is(200)->content_like(qr/terminal did not start/);
+# The page: xterm.js, connecting back to /lxc/ws for this container.
+$t->get_ok('/lxc?action=terminalmenu&name=web')->status_is(200)
+  ->element_exists('#term')
+  ->element_exists('script[src^="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/"]', 'xterm.js, pinned')
+  ->content_like(qr{var NAME = "web";})
+  ->content_like(qr{'/lxc/ws\?name=' \+ encodeURIComponent\(NAME\)});
+$t->get_ok('/lxc?action=terminalmenu&name=x%22%3Bboom')->content_unlike(qr/boom/, 'only a container name gets that far');
+
+# The connection: the attach process is a socket pair here.
+use Socket qw(AF_UNIX SOCK_STREAM PF_UNSPEC);
+my ($ours, $theirs, @spawned);
+$EasyNAS::Controller::Lxc::SPAWN = sub ($name) {
+  push @spawned, $name;
+  socketpair($ours, $theirs, AF_UNIX, SOCK_STREAM, PF_UNSPEC) or die $!;
+  $ours->blocking(0);
+  return ($ours, 0);
+};
+my $origin = $t->ua->server->url->path('')->to_string =~ s{/$}{}r;
+my $settle = sub { Mojo::IOLoop->timer(0.2 => sub { Mojo::IOLoop->stop }); Mojo::IOLoop->start };
+
+# (A handshake the server turns down, sent as the plain request it is.)
+my %upgrade = (Upgrade => 'websocket', Connection => 'Upgrade', 'Sec-WebSocket-Version' => 13,
+               'Sec-WebSocket-Key' => 'dGhlIHNhbXBsZSBub25jZQ==');
+is $t->ua->get('/lxc/ws?name=web' => {%upgrade, Origin => 'https://evil.example'})->res->code, 403, 'a page from another site: refused';
+is $t->ua->get('/lxc/ws?name=web' => {%upgrade})->res->code, 403, 'no origin: refused';
+is $t->ua->get('/lxc/ws?name=../x' => {%upgrade, Origin => $origin})->res->code, 403, 'not a container name: refused';
+is_deeply \@spawned, [], 'none of those started anything';
+
+$t->websocket_ok('/lxc/ws?name=web' => {Origin => $origin}, 'from its own page: connected');
+is_deeply \@spawned, ['web'], 'a shell in that container';
+syswrite($theirs, "root\@web:~# ");
+$t->message_ok->message_is({binary => "root\@web:~# "}, 'what the shell prints reaches the browser');
+$t->send_ok({json => {t => 'r', c => 120, r => 40}})->send_ok({json => {t => 'p'}})
+  ->send_ok({json => {t => 'i', d => "ls \x{e9}\r"}})->send_ok('not json')->send_ok({json => {t => 'i', d => {}}});
+$settle->();
+sysread($theirs, my $typed, 1000);
+is $typed, "ls \xc3\xa9\r", 'what is typed reaches the shell (UTF-8); a resize, a ping and junk are not typed';
+close $theirs;
+$t->finished_ok(1005, 'the shell ended: the connection closes');
+ok((grep { $_->[2] eq 'Terminal to container web closed' } @easynas::LOG), 'logged');
+
+$t->websocket_ok('/lxc/ws?name=web' => {Origin => $origin});
+$t->finish_ok;
+$settle->();
+is sysread($theirs, my $eof, 10), 0, 'the tab closed: the shell is hung up';
+
+# The real pseudo-terminal, with a shell standing in for lxc-attach.
+SKIP: {
+  skip 'needs IO::Pty', 6 unless eval { require IO::Pty; 1 };
+  local $EasyNAS::Controller::Lxc::SPAWN = \&EasyNAS::Controller::Lxc::spawn_pty;
+  local @EXEC = ('/bin/sh', '-c', 'echo "argv:$0 $*"; read x; stty size; echo "term:$TERM got:$x"; read y',
+                 '/usr/bin/sudo', '/easynas/startup/lxc-helper.sh', 'attach', 'web');
+  $t->websocket_ok('/lxc/ws?name=web' => {Origin => $origin});
+  my $out = '';
+  my $until = sub ($re) {
+    while ($out !~ $re) {
+      my ($got, $late);
+      $t->tx->once(message => sub { $got = $_[1] });
+      my $tid = Mojo::IOLoop->timer(5 => sub { $late = 1 });
+      Mojo::IOLoop->one_tick until defined $got || $late;
+      Mojo::IOLoop->remove($tid);
+      last unless defined $got;
+      $out .= $got;
+    }
+    return $out =~ $re;
+  };
+  ok $until->(qr{argv:/usr/bin/sudo /easynas/startup/lxc-helper\.sh attach web}), 'runs the helper\'s attach on it, through sudo';
+  $t->send_ok({json => {t => 'r', c => 132, r => 43}})->send_ok({json => {t => 'i', d => "hello\r"}});
+  ok $until->(qr{43 132\s+term:xterm-256color got:hello}), 'a real terminal: its size follows the page, typing reaches it';
+  $t->send_ok({json => {t => 'i', d => "\r"}});
+  $t->finished_ok(1005, 'the shell exits: the connection closes');
+}
 
 # ---- a GET changes nothing (the router also refuses it before the page runs)
 @SYS = ();
 $t->get_ok('/lxc?action=delete&name=web')->status_is(200);
 $t->get_ok('/lxc?action=create&name=box&image=debian:trixie');
+$t->get_ok('/lxc?action=terminal&name=web');
 is_deeply [grep { $_->[1] ne '/usr/bin/curl' } @SYS], [], 'GETs ran nothing';
 
 done_testing;

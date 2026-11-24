@@ -121,6 +121,9 @@ sub startup ($self) {
     }
     else {
       $admin->any([qw(GET POST)] => "/$program")->to("$program#view");
+      # A page's live connection (the LXC terminal), for the ones that have
+      # one (a ws action); admin only, like the page.
+      $admin->websocket("/$program/ws")->to("$program#ws");
     }
   }
 }
