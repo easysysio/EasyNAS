@@ -131,6 +131,11 @@
                             <li class="divider"></li>
 			    <li>
                                     <div>
+                                        <a href="/wizard"><i class="fa fa-magic fa-fw"></i> <%= ($TEXT->{'wizard'} || 'Setup wizard') %></a>
+                                    </div>
+                            </li>
+			    <li>
+                                    <div>
                                         <a href="/addons"><i class="fa fa-cloud-download fa-fw"></i> Update</a>
                                     </div>
                             </li>

@@ -35,7 +35,8 @@ our @EXPORT    = qw( get_mount_dir get_conf_cron get_addons_file get_update_file
                      disk_info health_info networks_info cpu_info memory_info
                      write_share_marker remove_share_marker rediscover_shares
                      get_update_state raid_status
-                     set_current_lang get_admin_group is_nas_admin);
+                     set_current_lang get_admin_group is_nas_admin
+                     setup_needed setup_done);
 
 ############# Declarations #####################
 my $authentication_enable = 1;
@@ -308,6 +309,28 @@ sub is_nas_admin
  my @g = getgrnam($admin_group);
  return 0 unless @g;
  return (grep { $_ eq $user } split(' ', $g[3] // '')) ? 1 : 0;
+}
+
+############# setup_needed ###############
+# 1 while the appliance looks new: the setup wizard (wizard.pm) hasn't been
+# finished or dismissed, and there is no data filesystem yet. The admin's
+# sign-in lands on the wizard then. An appliance set up before the wizard
+# existed has a filesystem, so it never sees it unasked.
+my $wizard_done = "$conf_dir/wizard.done";
+sub setup_needed
+{
+ return 0 if -e $wizard_done;
+ my %fs = fs_info();
+ return (grep { $_ ne 'ROOT' && $_ ne 'BOOT' } keys %fs) ? 0 : 1;
+}
+
+# Mark the wizard finished (or dismissed): sign-in goes to the dashboard.
+sub setup_done
+{
+ open(my $fh, '>', $wizard_done) or return 0;
+ print $fh time(), "\n";
+ close $fh;
+ return 1;
 }
 
 ############# get_conf_cron ###############

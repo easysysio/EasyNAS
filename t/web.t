@@ -25,7 +25,7 @@ package easynas;
 use Exporter 'import';
 our \@EXPORT = qw(get_addon_info get_lang_text write_log get_update_state
                  get_conf_hosts get_addons is_nas_admin get_admin_group
-                 users_info groups_info get_group_default get_mount_dir);
+                 users_info groups_info get_group_default get_mount_dir setup_needed);
 our \@LOG;
 our \$UPDATE_STATE = '';
 sub get_addon_info { return { name => \$_[0], program => \$_[0] } }
@@ -43,6 +43,8 @@ sub users_info  { (alice => [1000, 'alice', 'Alice', 'users staff', is_nas_admin
 sub groups_info { (users => [100, 'users'], staff => [1000, 'staff']) }
 sub get_group_default { 'users' }
 sub get_mount_dir { '/mnt' }
+our \$SETUP = 0;
+sub setup_needed { \$SETUP }
 1;
 EOF
 $stub->child('layouts')->make_path;
@@ -242,7 +244,10 @@ my $L = 'EasyNAS::Controller::Login';
   local *Mojo::Transaction::remote_address = sub { my $tx = shift; @_ ? $tx->$orig(@_) : '192.0.2.9' };
   my $tl = Test::Mojo->new;
   $tl->post_ok('/login' => form => { action => 'login', user => 'admin', pass => 'secret' })
-     ->status_is(302, 'another address signs in');
+     ->status_is(302, 'another address signs in')->header_is(Location => '/');
+  local $easynas::SETUP = 1;
+  Test::Mojo->new->post_ok('/login' => form => { action => 'login', user => 'admin', pass => 'secret' })
+     ->status_is(302)->header_is(Location => '/wizard', 'a new appliance: the admin starts with the setup wizard');
 }
 
 # ===================== port change =====================
@@ -282,6 +287,11 @@ my $L = 'EasyNAS::Controller::Login';
      ->status_is(302)->header_is(Location => '/', 'an administrator lands on the dashboard');
   $tl->get_ok('/whoami')->json_is('/role' => 'admin')->json_is('/nas_admin' => 1)->json_is('/user' => 'alice');
   ok((grep { $_->[2] eq 'NAS user alice signed in as an administrator' } @easynas::LOG), 'logged');
+  {
+    local $easynas::SETUP = 1;
+    Test::Mojo->new->post_ok('/login' => form => { action => 'login', user => 'alice', pass => 'pw' })
+      ->status_is(302)->header_is(Location => '/wizard', '...or on the setup wizard while the appliance is new');
+  }
 
   $tl = Test::Mojo->new;
   $tl->post_ok('/login' => form => { action => 'login', user => 'alice', pass => 'nope' })

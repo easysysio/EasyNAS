@@ -4,8 +4,10 @@ use Mojo::Base 'Mojolicious::Controller', -signatures;
 use easynas;
 
 
-my $msg;
-my $result;
+# The outcome of the last action, also read by the setup wizard (wizard.pm),
+# which runs the same create functions.
+our $msg;
+our $result;
 my $addon = get_addon_info("samba");
 my $service = ($addon->{service});
 my %TEXT=get_lang_text($addon->{'name'});
@@ -79,6 +81,42 @@ sub apply_share {
  }
 }
 
+# Start Samba now and at boot (smb, and nmb for network browsing).
+sub samba_start {
+  `/usr/bin/sudo /usr/bin/systemctl start $service`;
+  `/usr/bin/sudo /usr/bin/systemctl enable $service`;
+  `/usr/bin/sudo /usr/bin/systemctl start nmb.service`;
+  `/usr/bin/sudo /usr/bin/systemctl enable nmb.service`;
+  write_log($addon->{"name"},"INFO","Samba Service started");
+}
+
+# Add the share in the form ("name" on volume "vol", "fs/volume"). Sets
+# $result/$msg. Also used by the setup wizard.
+sub add_share ($self) {
+  my $share=$self->param("name");
+  my $vol=$self->param("vol") // "";
+  my $config=$addon->{config};
+  # The name goes into smb.conf, a grep pattern and sed ranges.
+  if (!defined($share) || $share eq "") {
+   $result="fail";
+   $msg=$TEXT{'samba_missing_name'};
+  }
+  elsif ($share !~ /^[A-Za-z0-9._-]{1,64}$/ || $vol !~ m{^[A-Za-z0-9_-]+/[A-Za-z0-9._-]+$} || $vol =~ /\.\./) {
+   $result="fail";
+   $msg=$TEXT{'samba_bad_name'} || "A share name has letters, digits, '.', '_' and '-'; pick a volume from the list.";
+  }
+  elsif (`/usr/bin/sudo /usr/bin/grep "#### $share ####" $config 2>/dev/null`) {
+   $result="fail";
+   $msg=$TEXT{'samba_share_exists'};
+  }
+  else {
+   apply_share($self,$config,get_mount_dir(),$service);
+   write_log($addon->{"name"},"INFO","Samba share $share was added");
+   $result="success";
+   $msg=$TEXT{'samba_share_added'} || "Share added.";
+  }
+}
+
 sub view ($self) {
   if (!($self->session('is_auth'))) {
         $self->redirect_to('login');
@@ -94,11 +132,7 @@ sub view ($self) {
 
 ##### sambaon #####
  if (defined($action) && $action eq "sambaon") {
-  `/usr/bin/sudo /usr/bin/systemctl start $service`;
-  `/usr/bin/sudo /usr/bin/systemctl enable $service`;
-  `/usr/bin/sudo /usr/bin/systemctl start nmb.service`;
-  `/usr/bin/sudo /usr/bin/systemctl enable nmb.service`;
-  write_log($addon->{"name"},"INFO","Samba Service started");
+  samba_start();
  }
 
 #### sambaoff #####
@@ -146,19 +180,7 @@ sub view ($self) {
 
 ##### add share #####
  if (defined($action) && $action eq "add") {
-  my $share=$self->param("name");
-  if (!defined($share) || $share eq "") {
-   $result="fail";
-   $msg=$TEXT{'samba_missing_name'};
-  }
-  elsif (`/usr/bin/sudo /usr/bin/grep "#### $share ####" $config 2>/dev/null`) {
-   $result="fail";
-   $msg=$TEXT{'samba_share_exists'};
-  }
-  else {
-   apply_share($self,$config,$mount_dir,$service);
-   write_log($addon->{"name"},"INFO","Samba share was added");
-  }
+  add_share($self);
  }
 
 ##### change share (edit an existing share in place) #####

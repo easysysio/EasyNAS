@@ -1,0 +1,8 @@
+<addon>
+ <name>wizard</name>
+ <description>wizard</description>
+ <version>1.0.0</version>
+ <icon>fa-magic</icon>
+ <author>Yariv Hakim</author>
+ <program>wizard</program>
+</addon>

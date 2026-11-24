@@ -86,7 +86,8 @@ sub login ($self) {
     $self->session(user => $user);
     clear_failures($ip);
     $self->session(role => 'admin');
-    $self->redirect_to('/');
+    # A new appliance: start with the setup wizard.
+    $self->redirect_to(setup_needed() ? '/wizard' : '/');
   }
   # Not the administrator: a NAS account may sign in when it was made an
   # administrator on the Users page -- then it gets the same session as admin,
@@ -102,7 +103,7 @@ sub login ($self) {
     if (is_nas_admin($user)) {
       $self->session(role => 'admin', nas_admin => 1);
       write_log("login","INFO","NAS user $user signed in as an administrator");
-      $self->redirect_to('/');
+      $self->redirect_to(setup_needed() ? '/wizard' : '/');
     }
     else {
       $self->session(role => 'user');

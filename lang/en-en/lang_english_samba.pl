@@ -48,6 +48,8 @@ $TEXT{'samba_reset'} = "Reset";
 $TEXT{'samba_not_installed'} = "Samba not installed";
 $TEXT{'samba_missing_name'} = "Share name was not entered"; 
 $TEXT{'samba_share_exists'} = "Share name allready exists"; 
+$TEXT{'samba_bad_name'} = "A share name has letters, digits, '.', '_' and '-'; pick a volume from the list.";
+$TEXT{'samba_share_added'} = "Share added.";
 $TEXT{'samba_help'} = "
 The SAMBA service allows you to share volumes with windows systems.<br>
 The NMB service will allow to share the system name with windows computers.<br><br>

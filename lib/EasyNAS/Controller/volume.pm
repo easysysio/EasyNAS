@@ -4,8 +4,10 @@ use Mojo::Base 'Mojolicious::Controller', -signatures;
 use easynas;
 
 
-my $msg;
-my $result;
+# The outcome of the last action, also read by the setup wizard (wizard.pm),
+# which runs the same create functions.
+our $msg;
+our $result;
 my $addon = get_addon_info("volume");
 my %TEXT=get_lang_text($addon->{'name'});
 my $mount_dir=get_mount_dir();
@@ -177,22 +179,38 @@ sub createvol($self) {
  my $fs=$self->param("fs");
  my $user=$self->param("user");
  my $group=$self->param("group");
- my $user_perm=$self->param("user_perm");
- my $group_perm=$self->param("group_perm");
- my $others_perm=$self->param("others_perm");
+ my $user_perm=$self->param("user_perm") // "";
+ my $group_perm=$self->param("group_perm") // "";
+ my $others_perm=$self->param("others_perm") // "";
  my $rc;
  my $permission=0;
- if ($vol eq '')
+ if (!defined $vol || $vol eq '')
  { 
    $result="fail";
    $msg=$TEXT{'vol_no_vol_name'};
    return;
  }
 
- if ($fs eq '') 
+ if (!defined $fs || $fs eq '') 
  {
   $result="fail";
   $msg=$TEXT{'vol_no_fs_selected'};
+  return;
+ }
+ # The names become a path for root commands: keep them to safe shapes, and
+ # the owner to accounts that exist.
+ if ($vol !~ /^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$/ || $fs !~ /^[A-Za-z0-9_-]{1,64}$/)
+ {
+  $result="fail";
+  $msg=$TEXT{'vol_bad_name'} || "A volume name has letters, digits, '.', '_' and '-', and starts with a letter, digit or '_'.";
+  return;
+ }
+ $user  = "root" if (!defined $user  || $user  eq "");
+ $group = "root" if (!defined $group || $group eq "");
+ if (!getpwnam($user) || !getgrnam($group))
+ {
+  $result="fail";
+  $msg=$TEXT{'vol_bad_owner'} || "The owner must be an existing user and group.";
   return;
  }
  if ($user_perm eq "read")
@@ -220,16 +238,18 @@ sub createvol($self) {
   $permission = $permission+7;
  } 
 
- $rc = system("/usr/bin/sudo /sbin/btrfs subvolume create $mount_dir/$fs/$vol > /dev/null");
- if($rc ne 0)
+ my $path="$mount_dir/$fs/$vol";
+ $rc = system("/usr/bin/sudo","/sbin/btrfs","subvolume","create",$path);
+ if($rc != 0)
  {
    $result="fail";
-   $msg=$TEXT{'vol_created'};
+   $msg=$TEXT{'vol_not_created'} || "The volume was not created. Is the filesystem mounted, and is the name free?";
  }
  else 
  {
-   $rc = system("/usr/bin/sudo /usr/bin/chown $user:$group $mount_dir/$fs/$vol > /dev/null");
-   $rc = system("/usr/bin/sudo /bin/chmod $permission $mount_dir/$fs/$vol > /dev/null");  
+   system("/usr/bin/sudo","/usr/bin/chown","$user:$group",$path);
+   system("/usr/bin/sudo","/bin/chmod",sprintf("%03d",$permission),$path);
+   write_log("volume","INFO","volume $fs/$vol created");
    $result="success";
    $msg=$TEXT{'vol_created'};
 
@@ -243,9 +263,9 @@ sub savevol($self) {
  my $fs=$self->param("fs");
  my $user=$self->param("user");
  my $group=$self->param("group");
- my $user_perm=$self->param("user_perm");
- my $group_perm=$self->param("group_perm");
- my $others_perm=$self->param("others_perm");
+ my $user_perm=$self->param("user_perm") // "";
+ my $group_perm=$self->param("group_perm") // "";
+ my $others_perm=$self->param("others_perm") // "";
  my $rc;
  my $permission=0;
  if ($user_perm eq "read")
@@ -286,9 +306,9 @@ sub createsnapshot($self) {
  my $snapshot=$self->param("name");
  my $user=$self->param("user");
  my $group=$self->param("group");
- my $user_perm=$self->param("user_perm");
- my $group_perm=$self->param("group_perm");
- my $others_perm=$self->param("others_perm");
+ my $user_perm=$self->param("user_perm") // "";
+ my $group_perm=$self->param("group_perm") // "";
+ my $others_perm=$self->param("others_perm") // "";
  my $rc;
  my $permission=0;
  if ($snapshot eq '')

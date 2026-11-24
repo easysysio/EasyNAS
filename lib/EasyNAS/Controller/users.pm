@@ -4,8 +4,10 @@ use Mojo::Base 'Mojolicious::Controller', -signatures;
 use easynas;
 
 
-my $msg;
-my $result;
+# The outcome of the last action, also read by the setup wizard (wizard.pm),
+# which runs the same create functions.
+our $msg;
+our $result;
 my $addon = get_addon_info("users");
 my %TEXT=get_lang_text($addon->{'name'});
 

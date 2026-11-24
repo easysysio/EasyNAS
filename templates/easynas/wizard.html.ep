@@ -1,0 +1,243 @@
+% layout 'default';
+% my @names = map { $TEXT->{"wizard_step_$_"} } qw(user fs vol share done);
+% my $volname = ($w_vol =~ m{/([^/]+)$})[0] // '';
+
+%if ($result eq "fail"){
+<div class="alert alert-danger alert-dismissible">
+ <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+ <%= $msg %>
+</div>
+%}
+%if ($result eq "success"){
+<div class="alert alert-success alert-dismissible">
+ <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+ <%= $msg %>
+</div>
+%}
+
+<div class="row">
+ <div class="col-lg-10">
+  <div class="panel panel-default">
+   <div class="panel-heading">
+    <label><i class="fa fa-magic fa-fw"></i> <%= $TEXT->{'wizard_title'} %></label>
+   </div>
+   <div class="panel-body">
+    <ul class="nav nav-pills" id="wizard-steps" style="margin-bottom:20px">
+    % for my $i (1 .. 5) {
+     <li class="<%= $i == $step ? 'active' : '' %>"><a href="/wizard?step=<%= $i %>">
+      % if ($i < $step) {
+      <i class="fa fa-check fa-fw"></i>
+      % }
+      <%= $i %>. <%= $names[$i-1] %></a></li>
+    % }
+    </ul>
+
+% if ($step == 1) {
+    <p><%= $TEXT->{'wizard_user_intro'} %></p>
+    % if ($w_user ne '') {
+    <p class="text-success" id="wizard-chosen"><i class="fa fa-check fa-fw"></i> <%= sprintf($TEXT->{'wizard_user_chosen'}, $w_user) %></p>
+    % }
+    <form role="form" method="post" action="/wizard" id="wizard-user-new">
+     <input type="hidden" name="action" value="user">
+     <input type="hidden" name="mode" value="new">
+     <div class="form-group">
+      <label><%= $TEXT->{'users_name'} %></label>
+      <input class="form-control" name="user_name" autocomplete="off" required>
+     </div>
+     <div class="form-group">
+      <label><%= $TEXT->{'users_password'} %></label>
+      <input type="password" class="form-control" name="password1" autocomplete="new-password" required>
+     </div>
+     <div class="form-group">
+      <label><%= $TEXT->{'users_password_retype'} %></label>
+      <input type="password" class="form-control" name="password2" autocomplete="new-password" required>
+     </div>
+     <p class="help-block"><%= $TEXT->{'wizard_user_help'} %></p>
+     <button type="submit" class="btn btn-primary"><%= $TEXT->{'wizard_user_create'} %></button>
+    </form>
+    % if (@$users) {
+    <hr>
+    <form role="form" method="post" action="/wizard" class="form-inline" id="wizard-user-existing">
+     <input type="hidden" name="action" value="user">
+     <input type="hidden" name="mode" value="existing">
+     <label><%= $TEXT->{'wizard_or_existing_user'} %></label>
+     <select class="form-control" name="existing">
+     % for my $u (@$users) {
+      <option value="<%= $u %>" <%= $u eq $w_user ? 'selected' : '' %>><%= $u %></option>
+     % }
+     </select>
+     <button type="submit" class="btn btn-default"><%= $TEXT->{'wizard_use_this'} %></button>
+    </form>
+    % }
+% }
+
+% if ($step == 2) {
+    <p><%= $TEXT->{'wizard_fs_intro'} %></p>
+    % if ($w_fs ne '') {
+    <p class="text-success" id="wizard-chosen"><i class="fa fa-check fa-fw"></i> <%= sprintf($TEXT->{'wizard_fs_chosen'}, $w_fs) %></p>
+    % }
+    % if (@$disks) {
+    <form role="form" method="post" action="/wizard" id="wizard-fs-new">
+     <input type="hidden" name="action" value="fs">
+     <input type="hidden" name="mode" value="new">
+     <div class="form-group">
+      <label><%= $TEXT->{'wizard_fs_disks'} %></label>
+      % for my $d (@$disks) {
+      <div class="checkbox"><label><input type="checkbox" name="disks" value="<%= $d->[0] %>">
+       <b><%= $d->[0] %></b> &nbsp; <%= $d->[2] // '' %> &nbsp; <span class="text-muted"><%= $d->[4] // '' %></span></label></div>
+      % }
+      <p class="help-block"><%= $TEXT->{'wizard_fs_raid_help'} %></p>
+     </div>
+     <div class="form-group">
+      <label><%= $TEXT->{'wizard_fs_name'} %></label>
+      <input class="form-control" name="fs_name" value="<%= (grep { $_ eq 'data' } @$filesystems) ? '' : 'data' %>" required>
+     </div>
+     <div class="checkbox">
+      <label class="text-danger"><input type="checkbox" name="erase" value="1" required> <b><%= $TEXT->{'wizard_fs_erase'} %></b></label>
+     </div>
+     <button type="submit" class="btn btn-danger"><%= $TEXT->{'wizard_fs_create'} %></button>
+    </form>
+    % } else {
+    <div class="alert alert-info" id="wizard-no-disks"><%= $TEXT->{'wizard_no_disks'} %></div>
+    % }
+    % if (@$filesystems) {
+    <hr>
+    <form role="form" method="post" action="/wizard" class="form-inline" id="wizard-fs-existing">
+     <input type="hidden" name="action" value="fs">
+     <input type="hidden" name="mode" value="existing">
+     <label><%= $TEXT->{'wizard_or_existing_fs'} %></label>
+     <select class="form-control" name="existing">
+     % for my $f (@$filesystems) {
+      <option value="<%= $f %>" <%= $f eq $w_fs ? 'selected' : '' %>><%= $f %></option>
+     % }
+     </select>
+     <button type="submit" class="btn btn-default"><%= $TEXT->{'wizard_use_this'} %></button>
+    </form>
+    % }
+% }
+
+% if ($step == 3) {
+    <p><%= $TEXT->{'wizard_vol_intro'} %></p>
+    % if ($w_vol ne '') {
+    <p class="text-success" id="wizard-chosen"><i class="fa fa-check fa-fw"></i> <%= sprintf($TEXT->{'wizard_vol_chosen'}, $w_vol) %></p>
+    % }
+    % if (@$filesystems) {
+    <form role="form" method="post" action="/wizard" id="wizard-vol-new">
+     <input type="hidden" name="action" value="vol">
+     <input type="hidden" name="mode" value="new">
+     <div class="form-group">
+      <label><%= $TEXT->{'wizard_vol_name'} %></label>
+      <input class="form-control" name="vol_name" value="share" required>
+     </div>
+     <div class="form-group">
+      <label><%= $TEXT->{'wizard_vol_fs'} %></label>
+      <select class="form-control" name="fs">
+      % for my $f (@$filesystems) {
+       <option value="<%= $f %>" <%= $f eq $w_fs ? 'selected' : '' %>><%= $f %></option>
+      % }
+      </select>
+     </div>
+     <div class="form-group">
+      <label><%= $TEXT->{'wizard_vol_access'} %></label>
+      <div class="radio"><label><input type="radio" name="access" value="all" checked> <%= $TEXT->{'wizard_vol_all'} %></label></div>
+      % if ($w_user ne '') {
+      <div class="radio"><label><input type="radio" name="access" value="only"> <%= sprintf($TEXT->{'wizard_vol_only'}, $w_user) %></label></div>
+      % }
+     </div>
+     <button type="submit" class="btn btn-primary"><%= $TEXT->{'wizard_vol_create'} %></button>
+    </form>
+    % } else {
+    <div class="alert alert-info" id="wizard-no-fs"><%= $TEXT->{'wizard_no_fs'} %></div>
+    % }
+    % if (@$volumes) {
+    <hr>
+    <form role="form" method="post" action="/wizard" class="form-inline" id="wizard-vol-existing">
+     <input type="hidden" name="action" value="vol">
+     <input type="hidden" name="mode" value="existing">
+     <label><%= $TEXT->{'wizard_or_existing_vol'} %></label>
+     <select class="form-control" name="existing">
+     % for my $v (@$volumes) {
+      <option value="<%= $v %>" <%= $v eq $w_vol ? 'selected' : '' %>><%= $v %></option>
+     % }
+     </select>
+     <button type="submit" class="btn btn-default"><%= $TEXT->{'wizard_use_this'} %></button>
+    </form>
+    % }
+% }
+
+% if ($step == 4) {
+    <p><%= $TEXT->{'wizard_share_intro'} %></p>
+    % if (!$samba) {
+    <div class="alert alert-warning" id="wizard-no-samba"><%= $TEXT->{'wizard_samba_missing'} %>
+     <a href="/addons"><%= $TEXT->{'wizard_open_addons'} %></a></div>
+    % } elsif (!@$volumes) {
+    <div class="alert alert-info" id="wizard-no-vol"><%= $TEXT->{'wizard_no_vol'} %></div>
+    % } else {
+    <form role="form" method="post" action="/wizard" id="wizard-share-new">
+     <input type="hidden" name="action" value="share">
+     <div class="form-group">
+      <label><%= $TEXT->{'wizard_share_name'} %></label>
+      <input class="form-control" name="share_name" value="<%= $volname ne '' ? $volname : 'share' %>" required>
+     </div>
+     <div class="form-group">
+      <label><%= $TEXT->{'wizard_share_vol'} %></label>
+      <select class="form-control" name="vol">
+      % for my $v (@$volumes) {
+       <option value="<%= $v %>" <%= $v eq $w_vol ? 'selected' : '' %>><%= $v %></option>
+      % }
+      </select>
+     </div>
+     <p class="help-block"><%= $TEXT->{'wizard_share_help'} %></p>
+     <button type="submit" class="btn btn-primary"><%= $TEXT->{'wizard_share_create'} %></button>
+    </form>
+    % }
+% }
+
+% if ($step == 5) {
+    <p><%= $TEXT->{'wizard_done_intro'} %></p>
+    <table class="table table-condensed" id="wizard-summary">
+     % my $none = $TEXT->{'wizard_skipped'};
+     <tr><th><%= $names[0] %></th><td><%= $w_user  ne '' ? $w_user  : $none %></td></tr>
+     <tr><th><%= $names[1] %></th><td><%= $w_fs    ne '' ? $w_fs    : $none %></td></tr>
+     <tr><th><%= $names[2] %></th><td><%= $w_vol   ne '' ? $w_vol   : $none %></td></tr>
+     <tr><th><%= $names[3] %></th><td><%= $w_share ne '' ? $w_share : $none %></td></tr>
+    </table>
+    % if ($w_share ne '') {
+    % my $h = $host ne '' ? $host : 'easynas';
+    <div class="well" id="wizard-connect">
+     <p><b><%= $TEXT->{'wizard_connect'} %></b></p>
+     <p><i class="fa fa-windows fa-fw"></i> Windows: <code>\\<%= $h %>\<%= $w_share %></code></p>
+     <p><i class="fa fa-apple fa-fw"></i> macOS: <code>smb://<%= $h %>/<%= $w_share %></code></p>
+     <p><i class="fa fa-linux fa-fw"></i> Linux: <code>smb://<%= $h %>/<%= $w_share %></code></p>
+     % if ($w_user ne '') {
+     <p class="help-block"><%= sprintf($TEXT->{'wizard_connect_as'}, $w_user) %></p>
+     % }
+    </div>
+    % }
+    <form method="post" action="/wizard" style="display:inline">
+     <input type="hidden" name="action" value="finish">
+     <button type="submit" class="btn btn-success"><i class="fa fa-check fa-fw"></i> <%= $TEXT->{'wizard_finish'} %></button>
+    </form>
+% }
+   </div>
+   <div class="panel-footer">
+    % if ($step > 1) {
+    <form method="post" action="/wizard" style="display:inline">
+     <input type="hidden" name="action" value="back"><input type="hidden" name="from" value="<%= $step %>">
+     <button type="submit" class="btn btn-default"><i class="fa fa-arrow-left fa-fw"></i> <%= $TEXT->{'wizard_back'} %></button>
+    </form>
+    % }
+    % if ($step < 5) {
+    <form method="post" action="/wizard" style="display:inline">
+     <input type="hidden" name="action" value="skip"><input type="hidden" name="from" value="<%= $step %>">
+     <button type="submit" class="btn btn-default"><%= $TEXT->{'wizard_skip'} %> <i class="fa fa-arrow-right fa-fw"></i></button>
+    </form>
+    % }
+    <form method="post" action="/wizard" style="display:inline" class="pull-right">
+     <input type="hidden" name="action" value="dismiss">
+     <button type="submit" class="btn btn-link"><%= $TEXT->{'wizard_exit'} %></button>
+    </form>
+   </div>
+  </div>
+ </div>
+</div>

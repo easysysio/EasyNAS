@@ -291,6 +291,7 @@ EOF
 /easynas/addons/power.easynas
 /easynas/addons/logs.easynas
 /easynas/addons/settings.easynas
+/easynas/addons/wizard.easynas
 /easynas/lib/EasyNAS.pm
 /easynas/lib/EasyNAS/Controller/disk.pm
 /easynas/lib/EasyNAS/Controller/easynas.pm
@@ -307,6 +308,7 @@ EOF
 /easynas/lib/EasyNAS/Controller/settings.pm
 /easynas/lib/EasyNAS/Controller/power.pm
 /easynas/lib/EasyNAS/Controller/language.pm
+/easynas/lib/EasyNAS/Controller/wizard.pm
 /easynas/templates/layouts
 /easynas/templates/easynas/disk*
 /easynas/templates/easynas/filesystem*
@@ -321,6 +323,7 @@ EOF
 /easynas/templates/easynas/network*
 /easynas/templates/easynas/login*
 /easynas/templates/easynas/power*
+/easynas/templates/easynas/wizard.html.ep
 /easynas/startup
 /easynas/lang/en-en/iso.txt
 /easynas/lang/en-en/lang_english_easynas.pl
@@ -542,7 +545,7 @@ NFS addon for EasyNAS
 ##### SAMBA ####
 %package        fs-samba
 Version:        %{version}
-Release:        5
+Release:        6
 Summary:        SAMBA addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -958,6 +961,20 @@ Polish Language for EasyNAS
     every add-on, one at a time through its queue. /firmware now leads to
     Add-ons, as does the menu's Update entry, and the update banner on every
     page reads its progress from Add-ons
+  - Setup wizard: a new appliance's first sign-in opens a wizard that sets up
+    a share in four steps -- a user, a filesystem on the free disks (one disk
+    as is, two or more mirrored, after confirming they may be erased), a
+    volume on it (for all users or only that user), and a Samba share of it
+    -- then shows how to connect from Windows, macOS and Linux. Each step can
+    take something that exists or be skipped. It runs the same checks and
+    commands as the Users, Filesystem, Volume and Samba pages. It opens only
+    until it's finished or closed, and never on an appliance that already has
+    a data filesystem; the top-right menu's Setup wizard entry reopens it
+  - Volume: creating one checks the name and the owner, runs its commands
+    without a shell, and says so when it fails (it reported "created" either
+    way)
+  - Samba (fs-samba 6): a new share's name is checked, and adding one says so.
+    Adding a share is a function the setup wizard runs too
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv
