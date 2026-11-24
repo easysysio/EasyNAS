@@ -415,6 +415,7 @@ fi
 /easynas/templates/easynas/lxc.html.ep
 /easynas/templates/easynas/lxc_create.html.ep
 /easynas/templates/easynas/lxc_storage.html.ep
+/easynas/templates/easynas/lxc_terminal.html.ep
 %dir /usr/lib/systemd/system/lxc.service.d
 /usr/lib/systemd/system/lxc.service.d/easynas-apparmor.conf
 
