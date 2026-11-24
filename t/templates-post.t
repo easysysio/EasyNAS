@@ -71,6 +71,7 @@ is_deeply \@reloads,   [], 'no page reloads itself (that would repeat a POST)';
 open(my $l, '<', "$root/templates/layouts/default.html.ep") or die $!;
 my $layout = do { local $/; <$l> };
 close $l;
-like $layout, qr/closest\('a\[data-post\]'\)/, 'layout turns data-post links into POST forms';
+like $layout, qr/matches\('a\[data-post\]'\)/, 'layout turns data-post links into POST forms';
+like $layout, qr/composedPath\(\)/, '...found on the click\'s path, even after an onclick changed the link';
 
 done_testing;

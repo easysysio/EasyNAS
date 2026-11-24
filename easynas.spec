@@ -941,6 +941,10 @@ Polish Language for EasyNAS
     apparmor-parser and -abstractions and loads only LXC's profiles, before
     every start and at boot (lxc.service drop-in). lxc.service is started on
     install, and a failed start's reason now goes to /var/log/easynas/lxc.log
+  - Buttons that make a change (data-post links) did nothing when the click
+    landed on their icon after an onclick had replaced the button's contents
+    (the Add-ons Update/Install buttons): the link is now found on the click's
+    original path, so the POST is sent
   - MariaDB storage: the fstab bind line now says x-systemd.requires-mounts-for
     (was requires-mount-for, which systemd ignores, so the bind could beat its
     volume at boot); %post corrects existing lines

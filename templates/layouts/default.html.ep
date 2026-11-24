@@ -345,8 +345,15 @@
         // the many "?action=..." links keep working. An onclick that cancels
         // the click (a confirm() answered No) still cancels it. Opened in a new
         // tab, such a link is a plain GET, which the router refuses.
+        //
+        // The link is looked up on the path the click took when it happened,
+        // not from e.target now: an onclick may already have replaced the
+        // link's contents (the Add-ons buttons swap in a spinner), and a
+        // clicked icon taken out of the page no longer has the link above it.
         document.addEventListener('click', function (e) {
-          var a = e.target.closest ? e.target.closest('a[data-post]') : null;
+          var path = e.composedPath ? e.composedPath() : [e.target], a = null;
+          for (var n = 0; n < path.length && !a; n++)
+            if (path[n].matches && path[n].matches('a[data-post]')) a = path[n];
           if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
           e.preventDefault();
           var u = new URL(a.getAttribute('href'), location.href);
