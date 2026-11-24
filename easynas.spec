@@ -17,6 +17,7 @@ Source0:        %{name}-%{version}.tar.gz
 Requires:       perl
 Requires:       perl-Mojolicious
 Requires:       perl-XML-LibXML
+Requires:       perl-Number-Bytes-Human
 Requires:       perl-IO-Socket-SSL
 Requires:       btrfsprogs
 Requires:       cron
@@ -945,6 +946,11 @@ Polish Language for EasyNAS
     landed on their icon after an onclick had replaced the button's contents
     (the Add-ons Update/Install buttons): the link is now found on the click's
     original path, so the POST is sent
+  - Require perl-Number-Bytes-Human: easynas.pm uses it, but nothing pulled it
+    in, so on a fresh install the web interface died at startup ("Can't locate
+    Number/Bytes/Human.pm") while upgraded appliances still had it.
+    t/perl-requires.t now fails when the code uses a non-core module that no
+    Requires: names
   - MariaDB storage: the fstab bind line now says x-systemd.requires-mounts-for
     (was requires-mount-for, which systemd ignores, so the bind could beat its
     volume at boot); %post corrects existing lines
