@@ -74,7 +74,7 @@ Get started
 <div class="es-wrap es-strip-inner">
 <span class="es-strip-label">Runs on</span>
 <div class="es-strip-items">
-<span>PCs and servers with UEFI</span>
+<span>PCs and servers (UEFI or legacy BIOS)</span>
 <span>Raspberry Pi 3 rev 1.2+, 4, 400, 5</span>
 <span>ARM64 boards with UEFI firmware</span>
 <span>KVM · Proxmox · QEMU</span>
@@ -243,7 +243,7 @@ Get started
 <div class="es-panel es-panel--deb"><div class="es-term-body es-mono"><span class="t-c"># 1 — write the install ISO to a USB stick</span>
 <span class="t-p">$</span> sudo dd if=EasyNAS.x86_64-&lt;version&gt;.install.iso \
     of=/dev/sdX bs=4M status=progress
-<span class="t-c"># 2 — boot the stick in UEFI mode, pick "Install EasyNAS"</span>
+<span class="t-c"># 2 — boot the stick (UEFI or legacy BIOS), pick "Install EasyNAS"</span>
 <span class="t-c">#     the system disk is erased; data disks are untouched</span>
 <span class="t-ok">→</span> https://&lt;ip-address&gt;:1443</div></div>
 <div class="es-panel es-panel--rpm"><div class="es-term-body es-mono"><span class="t-c"># 1 — flash the raw image to the SD card, USB or NVMe disk</span>
@@ -270,7 +270,7 @@ Get started
 <div class="es-card en-platform">
 <div class="es-icon es-icon--sm"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M8 20h8M12 16v4"></path></svg></div>
 <div class="en-platform-title">x86_64 PC</div>
-<div class="en-platform-text">Install ISO, UEFI firmware required (roughly 2012 or newer).</div>
+<div class="en-platform-text">Install ISO, boots on UEFI and legacy-BIOS machines.</div>
 </div>
 <div class="es-card en-platform">
 <div class="es-icon es-icon--sm"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"></rect><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"></path></svg></div>

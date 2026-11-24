@@ -7,7 +7,7 @@ mechanics differ.
 
 | Platform | Image | Notes |
 |---|---|---|
-| **x86_64 PC / server** | Install ISO | Requires **UEFI** firmware (roughly 2012 or newer). Legacy-BIOS-only machines are not supported. |
+| **x86_64 PC / server** | Install ISO | Boots on **UEFI** and on **legacy-BIOS** machines, older PCs included. (Install ISOs before 1.99.98 are UEFI only.) |
 | **Raspberry Pi** | Raw SD/USB image | 64-bit models: **Pi 3 rev 1.2+, Pi 4, Pi 400, Pi 5**. Flash and boot — firmware is included in the image. |
 | **Generic ARM64 boards** | Raw disk image (UEFI) | Boards that provide their own UEFI firmware, e.g. **RK3588** family (FriendlyElec CM3588, Orange Pi 5 series) with the EDK2 firmware on SPI flash. |
 | **Virtual machine** | qcow2 disk image | KVM / Proxmox / QEMU with UEFI (OVMF). Import and boot — no installer pass. |

@@ -19,7 +19,7 @@ Get the image for your platform from the [downloads page](https://repo.easysys.i
 === "x86_64 PC"
 
     1. Write the ISO to a USB stick (e.g. with [balenaEtcher](https://etcher.balena.io/) or `dd`).
-    2. Boot the target machine from the stick (UEFI mode).
+    2. Boot the target machine from the stick, in UEFI or legacy BIOS mode.
     3. Choose **Install EasyNAS** — this **erases the system disk** and performs a full,
        unattended installation.
     4. Remove the stick when the machine reboots.
