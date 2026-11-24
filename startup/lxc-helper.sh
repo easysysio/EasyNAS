@@ -21,13 +21,16 @@
 #       Download an image from images.linuxcontainers.org and make a container
 #       of it. Slow, so lxc.pm runs it in its own transient unit; progress is
 #       /run/easynas-lxc/<name> ("creating", then gone, or "failed").
+#       Only onto a volume: refused until "storage" has put /var/lib/lxc on
+#       one and while that volume isn't mounted.
 #   lxc-helper.sh delete <name>
 #   lxc-helper.sh autostart <name> <0|1>
-#   lxc-helper.sh storage <volume-path>|internal
+#   lxc-helper.sh storage <volume-path>
 #       Keep containers on an EasyNAS volume, the way mariadb-storage.sh keeps
 #       the database there: <volume>/lxc is bind-mounted onto /var/lib/lxc
 #       (fstab, after the volume) so they survive a firmware update, which
 #       wipes the system disk. Existing containers are copied, never moved.
+#       There is no way back to the system disk; only to another volume.
 #   lxc-helper.sh terminal <name> <token>
 #       A one-shot ttyd on port 8080 attached to the container, guarded by the
 #       credential easynas:<token>.
@@ -113,6 +116,15 @@ create)
     case "$net"  in nat|lan) ;; *) die "bad network" ;; esac
     case "$auto" in 0|1) ;; *) die "bad autostart" ;; esac
     exists "$name" && die "container $name already exists"
+    # Never onto the system disk: not before a volume is set, and not while
+    # it is missing (the bare mountpoint is the system disk).
+    if ! grep -qs "$MARKER" "$FSTAB"; then
+        echo failed > "$STATE/$name"; die "containers have no volume yet (lxc-helper.sh storage <volume>)"
+    fi
+    if ! mountpoint -q "$LXCPATH"; then
+        mount "$LXCPATH" >> "$LOG" 2>&1
+        mountpoint -q "$LXCPATH" || { echo failed > "$STATE/$name"; die "the containers' volume is not mounted on $LXCPATH"; }
+    fi
     echo creating > "$STATE/$name"
 
     conf=$(mktemp) || die "mktemp failed"
@@ -161,7 +173,7 @@ autostart)
 
 storage)
     target="${1:-}"
-    case "$target" in internal|/mnt/*) ;; *) die "bad storage target" ;; esac
+    case "$target" in /mnt/*) ;; *) die "bad storage target (a volume, /mnt/<filesystem>/<volume>)" ;; esac
     echo "$target" | grep -q '\.\.' && die "bad storage target"
     for c in $(lxc-ls -1 2>/dev/null); do
         running "$c" && die "stop the running containers first ($c is running)"
@@ -176,16 +188,6 @@ storage)
     rm -f "$DROPIN"
     livedir="$LXCPATH"
     [ -n "$cur_src" ] && [ -d "$cur_src" ] && livedir="$cur_src"
-
-    if [ "$target" = "internal" ]; then
-        if [ "$livedir" != "$LXCPATH" ]; then
-            log "copying containers from $livedir back to $LXCPATH"
-            cp -a "$livedir/." "$LXCPATH/" || die "copy back failed"
-        fi
-        systemctl daemon-reload
-        log "storage: internal"
-        exit 0
-    fi
 
     dir="$target/lxc"
     mkdir -p "$dir" && chmod 755 "$dir"

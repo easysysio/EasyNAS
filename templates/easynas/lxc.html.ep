@@ -16,12 +16,14 @@
 <div class="row">
  <div class="col-lg-12">
   <p class="text-muted"><%= $TEXT->{'about_lxc'} %></p>
-% if ($storage_vol eq "") {
+% if ($storage_vol eq "" && grep { $_->[1] ne 'CREATING' && $_->[1] ne 'FAILED' } values %$systems) {
   <div class="alert alert-warning">
    <i class="fa fa-exclamation-triangle"></i>
    <%= ($TEXT->{'lxc_internal_warning'} || 'Containers are kept on the system disk, which a firmware update wipes.') %>
    <a href="?action=storagemenu" class="alert-link"><%= ($TEXT->{'lxc_choose_volume'} || 'Keep them on a volume') %></a>
   </div>
+% } elsif ($storage_vol eq "") {
+  <p class="text-muted"><i class="fa fa-hdd-o"></i> <%= ($TEXT->{'lxc_pick_on_create'} || 'Containers are kept on a volume, picked when you create the first one.') %></p>
 % } else {
   <p><i class="fa fa-hdd-o"></i> <%= ($TEXT->{'lxc_kept_on'} || 'Containers are kept on') %> <b><%= $storage_vol %></b>
      &nbsp;<a href="?action=storagemenu">[<%= ($TEXT->{'lxc_change'} || 'Change') %>]</a></p>

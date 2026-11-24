@@ -7,12 +7,6 @@
    <form role="form" method="post" action="/lxc">
    <input type="hidden" name="action" value="create">
    <div class="panel-body">
-% if ($storage_vol eq "") {
-    <div class="alert alert-warning">
-     <%= ($TEXT->{'lxc_internal_warning'} || 'Containers are kept on the system disk, which a firmware update wipes.') %>
-     <a href="?action=storagemenu" class="alert-link"><%= ($TEXT->{'lxc_choose_volume'} || 'Keep them on a volume') %></a>
-    </div>
-% }
     <div class="form-group">
      <label><%= ($TEXT->{'lxc_name'}) %></label>
      <input class="form-control" name="name" required maxlength="64" pattern="[A-Za-z0-9][A-Za-z0-9._\-]*">
@@ -43,10 +37,27 @@
       <b><%= ($TEXT->{'lxc_network_lan'} || 'Your network') %></b> &mdash;
       <%= ($TEXT->{'lxc_network_lan_help'} || 'its own address from your router, like another computer on the network. Other devices can reach it; the NAS itself cannot.') %></label></div>
     </div>
+    <div class="form-group" id="lxc-storage">
+     <label><%= ($TEXT->{'lxc_volume'} || 'Volume') %></label>
+% if ($storage_vol ne "") {
+     <p class="form-control-static"><i class="fa fa-hdd-o"></i> <b><%= $storage_vol %></b></p>
+     <p class="help-block"><%= ($TEXT->{'lxc_volume_set_help'} || 'Every container is kept on this volume. To move them all to another one, use Change on the containers page.') %></p>
+% } elsif (keys %$volumes) {
+     <select class="form-control" name="vol" required>
+%   for my $v (sort keys %$volumes) {
+      <option value="<%= $v %>"><%= $v %></option>
+%   }
+     </select>
+     <p class="help-block"><%= ($TEXT->{'lxc_volume_help'} || "Containers are kept on a volume (in its lxc folder), so they survive firmware updates, which wipe the system disk. This container and every one after it go here.") %></p>
+% } else {
+     <p class="text-danger"><%= ($TEXT->{'lxc_no_vol_create'} || 'Containers are kept on a volume, and there is none yet.') %>
+      <a href="/volume"><%= ($TEXT->{'lxc_create_vol'} || 'Create a volume first') %></a></p>
+% }
+    </div>
     <div class="checkbox"><label><input type="checkbox" name="autostart" value="1"> <%= ($TEXT->{'lxc_autostart'} || 'Start at boot') %></label></div>
    </div>
    <div class="panel-footer"><center>
-    <button type="submit" class="btn btn-primary" <%= (keys %$images) ? '' : 'disabled' %>><%= ($TEXT->{'lxc_create_button'} || 'Create') %></button>
+    <button type="submit" class="btn btn-primary" <%= ((keys %$images) && ($storage_vol ne '' || keys %$volumes)) ? '' : 'disabled' %>><%= ($TEXT->{'lxc_create_button'} || 'Create') %></button>
     <a class="btn btn-default" href="/lxc"><%= ($TEXT->{'lxc_cancel'} || 'Cancel') %></a>
    </center></div>
    </form>

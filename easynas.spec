@@ -35,7 +35,7 @@ Requires:       dmidecode
 Obsoletes:      easynas-mm-plex < 1.99-5
 # The NAS-user frame, templates/layouts/user.html.ep (needed by fs-files).
 Provides:       easynas(user-layout)
-Provides:       easynas(lxc-helper) = 2
+Provides:       easynas(lxc-helper) = 3
 # The core only lets GETs show things (POST for changes, see lib/EasyNAS.pm);
 # these add-on releases are the first whose pages make their changes by POST,
 # so older ones are updated along with the core.
@@ -377,11 +377,11 @@ fi
 #### lxc ####
 %package        srv-lxc
 Version:        %{version}
-Release:        9
+Release:        10
 Summary:        Virtualization addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
-Requires:       easynas(lxc-helper) >= 2
+Requires:       easynas(lxc-helper) >= 3
 Requires:       lxc
 Requires:       ttyd
 # lxc-create's download template
@@ -975,6 +975,12 @@ Polish Language for EasyNAS
     way)
   - Samba (fs-samba 6): a new share's name is checked, and adding one says so.
     Adding a share is a function the setup wizard runs too
+  - LXC (srv-lxc 10): containers are only kept on a volume. The first
+    container's Create form asks for the volume (or links to the Volumes page
+    when there is none), and every container after goes there too; the
+    storage page moves them to another volume, with no way back to the system
+    disk. lxc-helper.sh refuses to create a container before a volume is set
+    or while it isn't mounted (easynas(lxc-helper) 3)
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

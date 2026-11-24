@@ -77,10 +77,13 @@ sub systems_list {
 }
 
 # Where containers are kept: the volume ("pool/vol") from our fstab bind line,
-# or "" for the system disk.
+# or "" before one is picked. They are only ever kept on a volume (the system
+# disk is wiped by a firmware update): the first container's Create form
+# picks it, and every container after goes there too.
+our $FSTAB = "/etc/fstab";
 sub storage_vol {
   my $mount_dir = get_mount_dir();
-  open(my $fh, '<', '/etc/fstab') or return "";
+  open(my $fh, '<', $FSTAB) or return "";
   while (<$fh>) {
     if (m{^(\S+)/lxc\s+/var/lib/lxc\s.*easynas-lxc-storage}) {
       my $p = $1; $p =~ s{^\Q$mount_dir\E/}{}; close $fh; return $p;
@@ -91,6 +94,14 @@ sub storage_vol {
 }
 
 sub helper (@args) { return system("/usr/bin/sudo", $HELPER, @args) == 0 ? 1 : 0; }
+
+# A volume ("pool/vol") from the Volumes page, as the path lxc-helper.sh
+# takes; undef for anything else.
+sub volume_path ($vol) {
+  return undef unless defined $vol && $vol =~ m{^[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$} && $vol !~ /\.\./;
+  my %vols = vol_info();
+  return exists $vols{$vol} ? get_mount_dir()."/$vol" : undef;
+}
 
 sub view ($self) {
   my $action = $self->param('action') // '';
@@ -136,35 +147,40 @@ sub view ($self) {
   ##### create #####
   # Downloading the image takes minutes, so the helper runs in its own
   # transient unit and the list shows the container as "creating" meanwhile.
+  # Containers live on a volume: until one is set, the form asks for it and
+  # it is set up first (the helper refuses to create on the system disk).
   if ($post && $action eq "create") {
     my %img = images();
     my ($dist, $rel) = split(/:/, $self->param('image') // '', 2);
     my $net  = ($self->param('network') // '') eq 'lan' ? 'lan' : 'nat';
     my $auto = $self->param('autostart') ? 1 : 0;
     my %systems = systems_list();
+    my $new_storage = storage_vol() eq "" ? volume_path($self->param('vol')) : "";
     if (!$named) {
       $result = "fail"; $msg = $T->('lxc_bad_name', "A name has letters, digits, '.', '_' and '-', and starts with a letter or digit.");
     } elsif ($systems{$name}) {
       $result = "fail"; $msg = $T->('lxc_exists', 'There is already a container with that name.');
     } elsif (!defined $rel || !grep { $_ eq $rel } @{$img{$dist // ''} // []}) {
       $result = "fail"; $msg = $T->('lxc_bad_image', 'Pick an image from the list.');
+    } elsif (!defined $new_storage) {
+      $result = "fail"; $msg = $T->('lxc_bad_vol', 'Pick a volume.');
+    } elsif ($new_storage ne "" && !helper("storage", $new_storage)) {
+      $result = "fail";
+      $msg = $T->('lxc_storage_failed', 'Container storage was not changed. Stop every container first; see /var/log/easynas/lxc.log.');
     } elsif (system("/usr/bin/sudo","/usr/bin/systemd-run","--collect","--quiet","--unit=easynas-lxc-create-$name",
                     $HELPER,"create",$name,$dist,$rel,lxc_arch(),$net,$auto) != 0) {
       $result = "fail"; $msg = $T->('lxc_failed', 'That did not work. See /var/log/easynas/lxc.log.');
     } else {
+      write_log("lxc","INFO","Container storage set to $new_storage") if $new_storage ne "";
       write_log("lxc","INFO","Creating container $name from $dist $rel");
       $result = "success";
       $msg = $T->('lxc_creating', 'Downloading the image and creating the container. This takes a few minutes; the list updates by itself.');
     }
   }
 
-  ##### storage #####
+  ##### storage: move the containers to another volume #####
   if ($post && $action eq "setstorage") {
-    my $sel = $self->param('radio_sel') // '';
-    my $vol = $self->param('vol') // '';
-    my $target = $sel eq 'internal' ? 'internal'
-               : ($sel eq 'vol' && $vol =~ m{^[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$} && $vol !~ /\.\./) ? get_mount_dir()."/$vol"
-               : undef;
+    my $target = volume_path($self->param('vol'));
     if (!defined $target) {
       $result = "fail"; $msg = $T->('lxc_bad_vol', 'Pick a volume.');
     } elsif (helper("storage", $target)) {
@@ -199,8 +215,9 @@ sub view ($self) {
   $self->stash(addon => $addon, TEXT => \%TEXT, result => $result, msg => $msg);
   if ($action eq "createlxcmenu") {
     my %img = images();
+    my %vol = vol_info();
     $self->render(template => 'easynas/lxc_create', images => \%img, arch => lxc_arch(),
-                  storage_vol => storage_vol());
+                  storage_vol => storage_vol(), volumes => \%vol);
     return;
   }
   if ($action eq "storagemenu") {

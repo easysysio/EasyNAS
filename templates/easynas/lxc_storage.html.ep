@@ -7,14 +7,10 @@
    <form role="form" method="post" action="/lxc">
    <input type="hidden" name="action" value="setstorage">
    <div class="panel-body">
-    <p class="text-muted"><%= ($TEXT->{'lxc_storage_help'} || 'Keep containers on a volume so they survive firmware updates, which wipe the system disk. Existing containers are copied over; stop them all first.') %></p>
-    <div class="radio"><label>
-     <input type="radio" name="radio_sel" value="internal" <%= $storage_vol eq "" ? "checked" : "" %>>
-     <%= ($TEXT->{'lxc_internal'} || 'Internal (system disk)') %></label></div>
-    <div class="radio"><label>
-     <input type="radio" name="radio_sel" value="vol" <%= $storage_vol ne "" ? "checked" : "" %>>
-     <%= ($TEXT->{'lxc_volume'} || 'Volume') %></label>
-     <select class="form-control" name="vol">
+    <p class="text-muted"><%= ($TEXT->{'lxc_storage_help'} || 'Containers are kept on a volume so they survive firmware updates, which wipe the system disk. Existing containers are copied over; stop them all first.') %></p>
+    <div class="form-group">
+     <label><%= ($TEXT->{'lxc_volume'} || 'Volume') %></label>
+     <select class="form-control" name="vol" required>
 % for my $v (sort keys %$volumes) {
       <option value="<%= $v %>" <%= ($v eq $storage_vol) ? "selected" : "" %>><%= $v %></option>
 % }
@@ -25,7 +21,7 @@
 % }
    </div>
    <div class="panel-footer"><center>
-    <button type="submit" class="btn btn-primary"><%= ($TEXT->{'lxc_save'} || 'Save') %></button>
+    <button type="submit" class="btn btn-primary" <%= (keys %$volumes) ? '' : 'disabled' %>><%= ($TEXT->{'lxc_save'} || 'Save') %></button>
     <a class="btn btn-default" href="/lxc"><%= ($TEXT->{'lxc_cancel'} || 'Cancel') %></a>
    </center></div>
    </form>

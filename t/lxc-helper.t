@@ -20,7 +20,7 @@ sub slurp { my ($f) = @_; open my $fh, '<', $f or return undef; local $/; my $s 
 # was given and makes the container, unless told to fail.
 for my $tool (qw(systemctl lxc-destroy lxc-ls umount mount mountpoint systemd-run ss sleep)) {
   put("$d/bin/$tool", "#!/bin/sh\necho \"$tool \$*\" >> $d/calls\n" .
-      ($tool eq 'mountpoint' ? "exit 1\n" : $tool eq 'lxc-ls' ? "cat $d/lxc-ls 2>/dev/null\n" : $tool eq 'ss' ? "echo LISTEN\n" : "exit 0\n"));
+      ($tool eq 'mountpoint' ? "[ -e $d/mounted ]\n" : $tool eq 'lxc-ls' ? "cat $d/lxc-ls 2>/dev/null\n" : $tool eq 'ss' ? "echo LISTEN\n" : "exit 0\n"));
 }
 put("$d/bin/ip", "#!/bin/sh\necho \"ip \$*\" >> $d/calls\n" .
     "case \"\$*\" in *'route show default'*) echo 'default via 192.168.1.1 dev enp3s0 proto dhcp';; esac\n" .
@@ -79,7 +79,20 @@ like $calls, qr/apparmor_parser -r \Q$d\E\/lxc-containers\n(?:.*\n)*systemctl st
 ($rc) = run('net');
 is slurp("$d/lxc-net"), qq{USE_LXC_BRIDGE="true"\n}, 'written once';
 
-# ---- create
+# ---- create: only onto a volume
+($rc, $calls) = run(qw(create web debian trixie arm64 nat 1));
+is $rc, 1, 'create: refused before containers have a volume';
+unlike $calls, qr/lxc-create/, '...nothing downloaded onto the system disk';
+is slurp("$d/state/web"), "failed\n", '...and the page is told';
+run(qw(delete web));
+put("$d/fstab", "/dev/sda1 /mnt/pool btrfs defaults 0 0\n/mnt/pool/data/lxc $d/lxc none bind 0 0 # easynas-lxc-storage\n");
+($rc, $calls) = run(qw(create web debian trixie arm64 nat 1));
+is $rc, 1, 'create: refused while the volume is not mounted';
+like $calls, qr/mount \Q$d\E\/lxc/, '...after trying to mount it';
+unlike $calls, qr/lxc-create/;
+run(qw(delete web));
+put("$d/mounted", '');
+
 ($rc, $calls) = run(qw(create web debian trixie arm64 nat 1));
 is $rc, 0, 'create: ok';
 like $calls, qr/lxc-create -n web -f \S+ -t download -- -d debian -r trixie -a arm64/, 'downloads the image';
@@ -141,10 +154,11 @@ like slurp("$d/fstab"), qr{^/mnt/pool/data/lxc \Q$d\E/lxc none bind,x-systemd\.r
      'bind line, after the volume';
 is slurp("$d/dropin/easynas-storage.conf"), "[Unit]\nRequiresMountsFor=$d/lxc\n", 'lxc.service waits for it';
 like $calls, qr/mount \Q$d\E\/lxc/, 'mounted';
-($rc) = run('storage', 'internal');
-unlike slurp("$d/fstab"), qr/easynas-lxc-storage/, 'internal: bind line gone';
-ok !-e "$d/dropin/easynas-storage.conf", '...and the drop-in';
+is scalar(() = slurp("$d/fstab") =~ /easynas-lxc-storage/g), 1, 'one bind line: the old one replaced';
 like slurp("$d/fstab"), qr{^/dev/sda1 /mnt/pool}m, 'other lines kept';
+($rc, $calls) = run('storage', 'internal');
+is $rc, 1, 'storage: no going back to the system disk';
+like slurp("$d/fstab"), qr/easynas-lxc-storage/, '...the bind line stays';
 for my $bad ('/etc', '/mnt/../etc', 'relative') {
   ($rc) = run('storage', $bad);
   is $rc, 1, "storage refuses $bad";
