@@ -42,6 +42,35 @@
 #   easynas-root hostname <name>
 #       Set the host name: /etc/hostname, /etc/hosts and the running system.
 #
+#   easynas-root fs mkfs <name> <profile> <device>...
+#   easynas-root fs wipe <uuid>                        (delete a pool)
+#   easynas-root fs mkdir|rmdir|mount|umount <name>
+#   easynas-root fs mount-label|remount <name> <options>
+#   easynas-root fs label <name> <new name>
+#   easynas-root fs balance <start|pause|resume|cancel> <mount point>
+#   easynas-root fs scrub <start|cancel> <mount point>
+#   easynas-root fs convert <mount point> <profile>
+#   easynas-root fs replace <mount point> <old device> <new device>
+#   easynas-root fs replace-cancel <mount point>
+#   easynas-root fs device-add|device-remove <mount point> <device>
+#   easynas-root fs stats-reset <device>
+#   easynas-root disk wipe <device>
+#       The btrfs pools under /mnt/<name>. A disk that gets erased (mkfs,
+#       wipe, a new device in a pool) must be one nothing uses: not mounted,
+#       not swap, not under RAID/LVM, not in a mounted pool. The system's
+#       file systems (ROOT, BOOT) are left alone. Long operations run in
+#       their own unit (systemd-run), logging to balance.log.
+#
+#   easynas-root vol create|delete <fs> <volume>
+#   easynas-root vol snapshot <fs> <volume> <snapshot>
+#   easynas-root vol owner <fs> <volume> <user> <group> <mode>
+#       A volume: a subvolume directly under /mnt/<fs>, never a link.
+#
+#   easynas-root query <what> ...
+#       Read-only: btrfs-show [<name|uuid|device>], btrfs-df, btrfs-usage,
+#       subvolumes, device-stats, status <balance|scrub|replace>, smart-scan,
+#       smart-info, smart-health, du <fs> <volume>, holders <mount point>.
+#
 # Exit status: 0 done, 1 the command failed, 2 refused (bad arguments).
 #
 # This file is part of EasyNAS (c) created by Yariv Hakim
@@ -193,6 +222,25 @@ sub tftp_line {
   return "\"$l\"";
 }
 
+# /etc/fstab: a pool's line as the filesystem page writes it,
+#   LABEL=<name> /mnt/<name> btrfs <options> 0 0
+# (or UUID=..., as older releases wrote it).
+sub fstab_line {
+  my ($l) = @_;
+  my @f = split ' ', $l;
+  return "this line" unless @f == 6 && $f[2] eq 'btrfs' && $f[4] eq '0' && $f[5] eq '0';
+  return "this mount point" unless $f[1] =~ m{^/mnt/([A-Za-z0-9_][A-Za-z0-9_-]{0,63})$};
+  my $name = $1;
+  return "this device" unless $f[0] eq "LABEL=$name" || $f[0] =~ /^UUID=[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$/;
+  for (split /,/, $f[3], -1) {
+    return "mount option \"$_\"" unless /^(?:defaults|rw|ro|ssd|discard|noatime|autodefrag|compress=(?:lzo|zlib|zstd))$/;
+  }
+  return undef;
+}
+
+# The pages only take jobs out of easynas.cron (a deleted pool's, a volume's).
+sub no_line { return "a new line" }
+
 # path => [checker for added lines, or undef: read only]
 my %FILES = (
   '/etc/samba/smb.conf'               => [\&smb_line],
@@ -201,6 +249,8 @@ my %FILES = (
   '/etc/easynas/raddb/clients.conf'   => [\&radius_line],
   '/etc/easynas/minidlna'             => [\&dlna_line],
   '/etc/easynas/tftp'                 => [\&tftp_line],
+  '/etc/fstab'                        => [\&fstab_line],
+  '/etc/cron.d/easynas.cron'          => [\&no_line],
 );
 
 sub slurp_fh { my ($fh) = @_; local $/; my $s = <$fh>; return $s // '' }
@@ -369,6 +419,330 @@ sub hostname_cmd {
   exit 1;
 }
 
+########## storage ##########
+
+# The programs; t/easynas-root.t points EASYNAS_BIN_DIR at fakes.
+my $BIN_DIR = $ENV{EASYNAS_BIN_DIR};
+my %BIN = (btrfs => '/usr/sbin/btrfs', 'mkfs.btrfs' => '/usr/sbin/mkfs.btrfs', wipefs => '/usr/sbin/wipefs',
+           mount => '/usr/bin/mount', umount => '/usr/bin/umount', smartctl => '/usr/sbin/smartctl',
+           du => '/usr/bin/du', 'systemd-run' => '/usr/bin/systemd-run');
+sub bin { my ($n) = @_; return defined $BIN_DIR ? "$BIN_DIR/$n" : $BIN{$n} }
+
+my $MNT     = '/mnt';
+my $NAME_RE = qr/[A-Za-z0-9_][A-Za-z0-9_-]{0,63}/;    # a file system: its btrfs label, /mnt/<name> (never an -option)
+my $VOL_RE  = qr/[A-Za-z0-9_][A-Za-z0-9._-]{0,63}/;    # a volume (subvolume) in it
+my $DEV_RE  = qr{/dev/[A-Za-z0-9]{2,32}};
+my %PROFILE_MIN = (single => 1, raid0 => 2, raid1 => 2, raid5 => 3, raid6 => 4, raid10 => 4);
+my $OP_LOG  = "$PREFIX/var/log/easynas/balance.log";  # root's (conf-perms.sh)
+
+sub fs_arg   { my ($n) = @_; refuse("not a file system name") unless defined $n && $n =~ /^$NAME_RE$/; return $n }
+sub not_system { my ($n) = @_; refuse("$n is the system's") if $n eq 'ROOT' || $n eq 'BOOT'; return $n }
+sub mount_arg {
+  my ($m) = @_;
+  refuse("not a file system's mount point") unless defined $m && ($m eq '/' || $m =~ m{^$MNT/$NAME_RE$});
+  return $m eq '/' ? ($PREFIX eq '' ? '/' : $PREFIX) : "$PREFIX$m";
+}
+sub dev_arg  { my ($d) = @_; refuse("not a device") unless defined $d && $d =~ /^$DEV_RE$/; return $d }
+sub uuid_arg {
+  my ($u) = @_;
+  refuse("not a file system uuid") unless defined $u && $u =~ /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return lc $u;
+}
+sub profile_arg { my ($p) = @_; refuse("not a RAID profile") unless defined $p && $PROFILE_MIN{$p}; return $p }
+# Mount options: only those the filesystem page sets.
+sub opts_arg {
+  my ($o) = @_;
+  refuse("bad mount options") unless defined $o && $o ne '' && length($o) <= 200;
+  for (split /,/, $o, -1) {
+    refuse("mount option \"$_\" is not one EasyNAS sets")
+      unless /^(?:defaults|rw|ro|ssd|discard|noatime|autodefrag|compress=(?:lzo|zlib|zstd))$/;
+  }
+  return $o;
+}
+
+sub lines_of { my ($f) = @_; open(my $fh, '<', $f) or return (); my @l = <$fh>; close $fh; return @l }
+
+# Run a program, no shell. Its output passes through; a failure ends the
+# helper with status 1.
+sub run {
+  my @cmd = @_;
+  my $rc = system { $cmd[0] } @cmd;
+  return 1 if $rc == 0;
+  print STDERR "easynas-root: $cmd[0] failed (", ($rc == -1 ? $! : $? >> 8), ")\n";
+  exit 1;
+}
+sub run_exec { my @cmd = @_; { no warnings 'exec'; exec { $cmd[0] } @cmd; } print STDERR "easynas-root: $cmd[0]: $!\n"; exit 1 }
+
+# A long operation (balance, a device's removal...) in its own transient
+# unit: it outlives the web interface, which may restart meanwhile, and its
+# output goes to balance.log.
+sub background {
+  my @cmd = @_;
+  run_exec(bin('systemd-run'), '--collect', '--quiet',
+           '-p', "StandardOutput=append:$OP_LOG", '-p', "StandardError=append:$OP_LOG", '--', @cmd);
+}
+
+# Mount points in use, from the kernel.
+sub mounted_at {
+  my ($dir) = @_;
+  for (lines_of("$PREFIX/proc/mounts")) { my (undef, $mp) = split ' '; return 1 if defined $mp && $mp eq $dir }
+  return 0;
+}
+
+# A disk (or partition) nothing uses: not mounted, not swap, not under RAID
+# or LVM (holders), not in a mounted btrfs -- nor any of its partitions.
+# mkfs, wipefs and a new device in a pool get nothing else.
+sub disk_unused {
+  my ($dev) = @_;
+  dev_arg($dev);
+  (my $name = $dev) =~ s{^/dev/}{};
+  my $sys = "$PREFIX/sys/class/block";
+  refuse("$dev is not a disk") unless -e "$sys/$name";
+  my %part = ($name => 1);
+  if (opendir(my $d, "$sys/$name")) { $part{$_} = 1 for grep { /^\Q$name\E./ } readdir $d; closedir $d }
+  for (lines_of("$PREFIX/proc/mounts"), lines_of("$PREFIX/proc/swaps")) {
+    my ($src) = split ' ';
+    refuse("$dev is in use ($src)") if defined $src && $src =~ m{^/dev/(\S+)$} && $part{$1};
+  }
+  for my $p (sort keys %part) {
+    if (opendir(my $h, "$sys/$p/holders")) {
+      my @h = grep { !/^\./ } readdir $h;
+      closedir $h;
+      refuse("$dev is in use ($p is held by @h)") if @h;
+    }
+    my @in = glob("$PREFIX/sys/fs/btrfs/*/devices/$p");
+    refuse("$dev is in a mounted btrfs file system") if @in;
+  }
+  return $dev;
+}
+
+# `btrfs filesystem show <what>`: (label, uuid, member devices), or () when
+# there is no such file system.
+sub btrfs_show {
+  my ($what) = @_;
+  open(my $fh, '-|', bin('btrfs'), 'filesystem', 'show', $what) or return ();
+  my $s = slurp_fh($fh);
+  close $fh;
+  return () if $? != 0;
+  my ($label) = $s =~ /Label:\s*'([^']*)'/;
+  my ($uuid)  = $s =~ /uuid:\s*([0-9a-fA-F-]{36})/;
+  return () unless defined $uuid;
+  return ($label // '', lc $uuid, $s =~ m{\bpath\s+(/dev/\S+)}g);
+}
+sub active { my ($uuid) = @_; return -e "$PREFIX/sys/fs/btrfs/$uuid" }
+
+sub fs_cmd {
+  my ($op, @a) = @_;
+  $op //= '';
+  my %n = (mkdir => 1, rmdir => 1, mount => 1, 'mount-label' => 2, remount => 2, umount => 1, wipe => 1,
+           label => 2, balance => 2, convert => 2, scrub => 2, 'replace-cancel' => 1, replace => 3,
+           'device-add' => 2, 'device-remove' => 2, 'stats-reset' => 1);
+  refuse("usage: fs <action> ...") unless $n{$op} && @a == $n{$op} && !grep { !defined } @a;
+
+  if ($op eq 'mkdir') {
+    my $d = "$PREFIX$MNT/" . fs_arg($a[0]);
+    my @st = lstat($d);
+    refuse("$d is not a directory") if @st && !S_ISDIR($st[2]);
+    exit 0 if @st;
+    mkdir($d, 0755) or do { print STDERR "easynas-root: $d: $!\n"; exit 1 };
+    exit 0;
+  }
+  if ($op eq 'rmdir') {
+    my $d = "$PREFIX$MNT/" . not_system(fs_arg($a[0]));
+    my @st = lstat($d);
+    exit 0 unless @st;
+    refuse("$d is not a directory") unless S_ISDIR($st[2]);
+    refuse("$d is mounted") if mounted_at($d);
+    rmdir($d) or do { print STDERR "easynas-root: $d: $!\n"; exit 1 };
+    exit 0;
+  }
+  if ($op eq 'mount' || $op eq 'mount-label' || $op eq 'remount' || $op eq 'umount') {
+    my $fs = not_system(fs_arg($a[0]));
+    my $d = "$PREFIX$MNT/$fs";
+    my @st = lstat($d);
+    refuse("$d is not a directory") unless @st && S_ISDIR($st[2]);
+    run_exec(bin('umount'), $d)                                         if $op eq 'umount';
+    run_exec(bin('mount'), $d)                                          if $op eq 'mount';     # its fstab line
+    run_exec(bin('mount'), '-t', 'btrfs', '-o', opts_arg($a[1]), "LABEL=$fs", $d) if $op eq 'mount-label';
+    run_exec(bin('mount'), '-o', 'remount,' . opts_arg($a[1]), $d);
+  }
+  if ($op eq 'wipe') {
+    # Delete a file system: wipe the btrfs signature off every member. Only
+    # one that isn't mounted, nor the system's.
+    my $uuid = uuid_arg($a[0]);
+    my ($label, $u, @devs) = btrfs_show($uuid);
+    refuse("no file system $uuid") unless defined $u && $u eq $uuid;
+    not_system($label);
+    refuse("$uuid is mounted") if active($uuid);
+    disk_unused($_) for @devs;
+    run(bin('wipefs'), '-f', '-o', '0x10040', $_) for @devs;
+    exit 0;
+  }
+  if ($op eq 'label') {
+    # Rename a file system: its btrfs label, and its /mnt directory.
+    my ($old, $new) = (not_system(fs_arg($a[0])), not_system(fs_arg($a[1])));
+    my ($label, $uuid, @devs) = btrfs_show($old);
+    refuse("no file system $old") unless defined $uuid && $label eq $old && @devs;
+    refuse("$old is mounted") if active($uuid);
+    my ($l2) = btrfs_show($new);
+    refuse("there is a file system $new already") if defined $l2 && $l2 eq $new;
+    my ($from, $to) = ("$PREFIX$MNT/$old", "$PREFIX$MNT/$new");
+    my @st = lstat($from);
+    refuse("$from is not a directory") if @st && !S_ISDIR($st[2]);
+    refuse("$to is there already") if @st && lstat($to);
+    run(bin('btrfs'), 'filesystem', 'label', $devs[0], $new);
+    if (@st) { rename($from, $to) or do { print STDERR "easynas-root: $from: $!\n"; exit 1 } }
+    exit 0;
+  }
+  run_exec(bin('btrfs'), 'device', 'stats', '-z', dev_arg($a[0])) if $op eq 'stats-reset';
+  if ($op eq 'balance') {
+    my ($what, $mp) = ($a[0], mount_arg($a[1]));
+    background(bin('btrfs'), 'balance', 'start', $mp)        if $what eq 'start';
+    background(bin('btrfs'), 'balance', 'resume', $mp)       if $what eq 'resume';    # runs until done
+    run_exec(bin('btrfs'), 'balance', $what, $mp)            if $what eq 'pause' || $what eq 'cancel';
+    refuse("unknown balance action \"$what\"");
+  }
+  if ($op eq 'scrub') {
+    my ($what, $mp) = ($a[0], mount_arg($a[1]));
+    background(bin('btrfs'), 'scrub', 'start', '-B', $mp)    if $what eq 'start';
+    run_exec(bin('btrfs'), 'scrub', 'cancel', $mp)           if $what eq 'cancel';
+    refuse("unknown scrub action \"$what\"");
+  }
+  # The rest: <mount point> first.
+  my $m = mount_arg($a[0]);
+  if ($op eq 'convert') {
+    my $p = profile_arg($a[1]);
+    background(bin('btrfs'), 'balance', 'start', '--force', "-dconvert=$p", "-mconvert=$p", $m);
+  }
+  run_exec(bin('btrfs'), 'replace', 'cancel', $m)           if $op eq 'replace-cancel';
+  if ($op eq 'replace') {
+    my ($old, $new) = (dev_arg($a[1]), disk_unused($a[2]));
+    background(bin('btrfs'), 'replace', 'start', '-B', '-f', $old, $new, $m);
+  }
+  run_exec(bin('btrfs'), 'device', 'add', '-f', disk_unused($a[1]), $m) if $op eq 'device-add';
+  background(bin('btrfs'), 'device', 'remove', dev_arg($a[1]), $m)       if $op eq 'device-remove';
+  refuse("unknown fs action \"$op\"");
+}
+
+sub mkfs_cmd {
+  my ($name, $profile, @devs) = @_;
+  refuse("usage: fs mkfs <name> <profile> <device>...") unless defined $profile && @devs;
+  not_system(fs_arg($name));
+  profile_arg($profile);
+  my %seen;
+  for (@devs) { disk_unused($_); refuse("$_ twice") if $seen{$_}++ }
+  refuse("$profile needs $PROFILE_MIN{$profile} disks") if @devs < $PROFILE_MIN{$profile};
+  my ($label) = btrfs_show($name);
+  refuse("there is a file system $name already") if defined $label && $label eq $name;
+  run_exec(bin('mkfs.btrfs'), '-f', '-L', $name, '-d', $profile, '-m', $profile, @devs);
+}
+
+# A volume: a real directory /mnt/<fs>/<volume> on a mounted file system.
+sub vol_path {
+  my ($fs, $vol) = @_;
+  fs_arg($fs);
+  refuse("not a volume name") unless defined $vol && $vol =~ /^$VOL_RE$/;
+  my $top = "$PREFIX$MNT/$fs";
+  my @t = lstat($top);
+  refuse("$MNT/$fs is not a file system") unless @t && S_ISDIR($t[2]) && $t[4] == $>;
+  return "$top/$vol";
+}
+
+sub vol_cmd {
+  my ($op, @a) = @_;
+  $op //= '';
+  my %n = (create => 2, snapshot => 3, delete => 2, owner => 5);
+  refuse("usage: vol <create|snapshot|delete|owner> ...") unless $n{$op} && @a == $n{$op} && !grep { !defined } @a;
+  my $p = vol_path($a[0], $a[1]);
+  my @st = lstat($p);
+  if ($op eq 'create') {
+    refuse("$a[0]/$a[1] is there already") if @st;
+    run_exec(bin('btrfs'), 'subvolume', 'create', $p);
+  }
+  refuse("$a[0]/$a[1] is not a volume") unless @st && S_ISDIR($st[2]);
+  if ($op eq 'snapshot') {
+    my $to = vol_path($a[0], $a[2]);
+    refuse("$a[0]/$a[2] is there already") if lstat($to);
+    run_exec(bin('btrfs'), 'subvolume', 'snapshot', $p, $to);
+  }
+  run_exec(bin('btrfs'), 'subvolume', 'delete', $p) if $op eq 'delete';
+  # owner <fs> <vol> <user> <group> <mode>: who the volume's top directory
+  # belongs to. Through a handle on the directory itself, never a link.
+  my ($user, $group, $mode) = @a[2, 3, 4];
+  refuse("no user $user") unless user_ok($user);
+  refuse("no group $group") unless defined $group && $group =~ /^[A-Za-z0-9_][A-Za-z0-9._-]{0,31}$/ && defined getgrnam($group);
+  refuse("bad mode $mode") unless $mode =~ /^[0-7]{3}$/;
+  sysopen(my $dh, $p, O_RDONLY | O_DIRECTORY | O_NOFOLLOW) or do { print STDERR "easynas-root: $p: $!\n"; exit 1 };
+  my $ok = chown(scalar(getpwnam($user)), scalar(getgrnam($group)), $dh) && chmod(oct($mode), $dh);
+  unless ($ok) { print STDERR "easynas-root: $p: $!\n"; exit 1 }
+  exit 0;
+}
+
+sub disk_cmd {
+  my ($op, $dev) = @_;
+  refuse("usage: disk wipe <device>") unless defined $op && $op eq 'wipe' && defined $dev && @ARGV == 0;
+  run_exec(bin('wipefs'), '-f', '-o', '0x10040', disk_unused($dev));
+}
+
+# Read-only: what the storage pages show. Each runs one program; its output
+# is the answer.
+sub query_cmd {
+  my ($what, @a) = @_;
+  $what //= '';
+  my %n = ('btrfs-show' => [0, 1], 'btrfs-df' => [1, 1], 'btrfs-usage' => [1, 1], subvolumes => [1, 1],
+           'device-stats' => [1, 1], status => [2, 2], 'smart-scan' => [0, 0], 'smart-info' => [1, 1],
+           'smart-health' => [1, 1], du => [2, 2], holders => [1, 1]);
+  my $r = $n{$what} or refuse("usage: query <what> ...");
+  refuse("usage: query $what ...") if @a < $r->[0] || @a > $r->[1] || grep { !defined } @a;
+  if ($what eq 'btrfs-show') {
+    my @t;
+    if (@a) {
+      my $t = $a[0];
+      refuse("not a file system") unless $t =~ /^$NAME_RE$/ || $t =~ /^$DEV_RE$/
+                                      || $t =~ /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      @t = ($t);
+    }
+    run_exec(bin('btrfs'), 'filesystem', 'show', @t);
+  }
+  run_exec(bin('btrfs'), 'filesystem', 'df', mount_arg($a[0]))     if $what eq 'btrfs-df';
+  run_exec(bin('btrfs'), 'filesystem', 'usage', mount_arg($a[0]))  if $what eq 'btrfs-usage';
+  run_exec(bin('btrfs'), 'subvolume', 'list', mount_arg($a[0]))    if $what eq 'subvolumes';
+  if ($what eq 'device-stats') {
+    run_exec(bin('btrfs'), 'device', 'stats', $a[0] =~ m{^/dev/} ? dev_arg($a[0]) : mount_arg($a[0]));
+  }
+  if ($what eq 'status') {
+    my $mp = mount_arg($a[1]);
+    run_exec(bin('btrfs'), 'balance', 'status', $mp)        if $a[0] eq 'balance';
+    run_exec(bin('btrfs'), 'scrub', 'status', $mp)          if $a[0] eq 'scrub';
+    run_exec(bin('btrfs'), 'replace', 'status', '-1', $mp)  if $a[0] eq 'replace';
+    refuse("unknown status \"$a[0]\"");
+  }
+  run_exec(bin('smartctl'), '--scan')                       if $what eq 'smart-scan';
+  run_exec(bin('smartctl'), '-i', dev_arg($a[0]))           if $what eq 'smart-info';
+  run_exec(bin('smartctl'), '-H', dev_arg($a[0]))           if $what eq 'smart-health';
+  if ($what eq 'du') {
+    my $p = vol_path(@a);
+    my @st = lstat($p);
+    refuse("$a[0]/$a[1] is not a volume") unless @st && S_ISDIR($st[2]);
+    run_exec(bin('du'), '-h', '-s', '--', $p);
+  }
+  # holders <mount point>: the processes with a file open under it, or in it,
+  # as "name(pid)" lines -- why an unmount failed.
+  refuse("not a file system's mount point") if $a[0] eq '/';
+  my $real = mount_arg($a[0]);
+  opendir(my $pd, "$PREFIX/proc") or exit 0;
+  for my $pid (sort { $::a <=> $::b } grep { /^\d+$/ } readdir $pd) {
+    my @links = ("$PREFIX/proc/$pid/cwd");
+    if (opendir(my $fd, "$PREFIX/proc/$pid/fd")) { push @links, map { "$PREFIX/proc/$pid/fd/$_" } grep { /^\d+$/ } readdir $fd; closedir $fd }
+    next unless grep { my $t = readlink($_); defined $t && ($t eq $real || index($t, "$real/") == 0) } @links;
+    my ($comm) = lines_of("$PREFIX/proc/$pid/comm");
+    chomp($comm //= '?');
+    $comm =~ s/[^\x20-\x7e]/?/g;
+    print "$comm($pid)\n";
+  }
+  exit 0;
+}
+
 my %ACTIONS = map { $_ => 1 } qw(start stop restart restart-later reload enable disable);
 
 my $cmd = shift(@ARGV) // '';
@@ -387,5 +761,13 @@ if ($cmd eq 'service') {
 if ($cmd eq 'file')         { my @a = splice(@ARGV, 0, 2); file_cmd(@a) }
 if ($cmd eq 'share-marker') { my @a = splice(@ARGV, 0, 3); marker_cmd(@a) }
 if ($cmd eq 'hostname')     { my @a = splice(@ARGV, 0, 1); hostname_cmd(@a) }
+if ($cmd eq 'fs') {
+  my $op = shift(@ARGV) // '';
+  mkfs_cmd(splice(@ARGV)) if $op eq 'mkfs';
+  fs_cmd($op, splice(@ARGV));
+}
+if ($cmd eq 'vol')          { vol_cmd(splice(@ARGV)) }
+if ($cmd eq 'disk')         { my @a = splice(@ARGV, 0, 2); disk_cmd(@a) }
+if ($cmd eq 'query')        { query_cmd(splice(@ARGV)) }
 
-refuse("usage: easynas-root service|file|share-marker|hostname ...");
+refuse("usage: easynas-root service|file|share-marker|hostname|fs|vol|disk|query ...");

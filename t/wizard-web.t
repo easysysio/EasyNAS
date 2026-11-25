@@ -44,6 +44,11 @@ sub disk_info   { %DISK }
 sub setup_done  { \$DONE++; 1 }
 sub setup_needed { 0 }
 sub service_ctl  { my \$a = shift; system('/usr/bin/sudo', '/easynas/startup/easynas-root', 'service', \$a, \$_) for \@_; 1 }
+# The root helper's storage commands, recorded like system() and answered from \@RC.
+sub root_do      { push \@main::SYS, join(' ', 'easynas-root', \@_); my \$rc = shift(\@main::RC) // 0; return (\$rc == 0 ? 1 : 0, '') }
+sub root_append  { push \@main::SYS, join(' ', 'root_append', \@_); 1 }
+sub root_write   { push \@main::SYS, join(' ', 'root_write', \@_); 1 }
+sub root_read    { '' }
 for my \$n (\@EXPORT) { no strict 'refs'; *{\$n} = sub { return } unless defined &{\$n} }
 1;
 EOF2
@@ -120,25 +125,25 @@ $t->get_ok('/wizard?step=2')->status_is(200)
 
 $post->({action => 'fs', disks => 'sdb', fs_name => 'data'});
 $next->(2);
-ok !grep(/mkfs/, @PIPE), 'not confirmed: nothing erased';
+ok !grep(/mkfs/, @SYS), 'not confirmed: nothing erased';
 $t->get_ok('/wizard?step=2')->text_like('.alert-danger' => qr/Tick the box/);
 
 $post->({action => 'fs', disks => 'sda', fs_name => 'data', erase => 1});
 $next->(2);
-ok !grep(/mkfs/, @PIPE), 'the system disk is refused even when sent';
+ok !grep(/mkfs/, @SYS), 'the system disk is refused even when sent';
 
 $post->({action => 'fs', disks => 'sdb', fs_name => 'bad name', erase => 1});
 $next->(2);
-ok !grep(/mkfs/, @PIPE), 'a bad filesystem name is refused';
+ok !grep(/mkfs/, @SYS), 'a bad filesystem name is refused';
 
 $post->({action => 'fs', disks => ['sdb', 'sdd'], fs_name => 'data', erase => 1});
 $next->(3);
-my ($mkfs) = grep /mkfs/, @PIPE;
-like $mkfs, qr{mkfs\.btrfs -f -L data -d raid1 -m raid1  /dev/sdb /dev/sdd}, 'two disks: mirrored';
-ok grep(m{LABEL=data /mnt/data btrfs rw 0 0}, @PIPE), 'mounted read-write at boot';
+my ($mkfs) = grep /mkfs/, @SYS;
+is $mkfs, 'easynas-root fs mkfs data raid1 /dev/sdb /dev/sdd', 'two disks: mirrored';
+ok grep(m{^root_append /etc/fstab LABEL=data /mnt/data btrfs rw 0 0$}, @SYS), 'mounted read-write at boot';
 $post->({action => 'fs', disks => 'sdb', fs_name => 'one', erase => 1});
-($mkfs) = grep /mkfs/, @PIPE;
-like $mkfs, qr{-d single -m single  /dev/sdb}, 'one disk: as it is';
+($mkfs) = grep /mkfs/, @SYS;
+is $mkfs, 'easynas-root fs mkfs one single /dev/sdb', 'one disk: as it is';
 %easynas::FS = (data => []);
 
 $post->({action => 'fs', mode => 'existing', existing => 'ROOT'});
@@ -164,13 +169,12 @@ ok !grep(/subvolume/, @SYS), 'not a filesystem: nothing run';
 
 $post->({action => 'vol', vol_name => 'share', fs => 'data', access => 'only'});
 $next->(4);
-is_deeply \@SYS, ['/usr/bin/sudo /sbin/btrfs subvolume create /mnt/data/share',
-                  '/usr/bin/sudo /usr/bin/chown carol:users /mnt/data/share',
-                  '/usr/bin/sudo /bin/chmod 700 /mnt/data/share'], 'only carol: hers alone, run without a shell';
+is_deeply \@SYS, ['easynas-root vol create data share',
+                  'easynas-root vol owner data share carol users 700'], 'only carol: hers alone, through the root helper';
 
 $post->({action => 'vol', vol_name => 'family', fs => 'data', access => 'all'});
 $next->(4);
-is $SYS[2], '/usr/bin/sudo /bin/chmod 770 /mnt/data/family', 'all users: the users group shares it';
+like $SYS[1], qr{^easynas-root vol owner data family \S+ users 770$}, 'all users: the users group shares it';
 
 @RC = (256);
 $post->({action => 'vol', vol_name => 'taken', fs => 'data', access => 'all'});

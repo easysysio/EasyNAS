@@ -238,17 +238,17 @@ sub createvol($self) {
   $permission = $permission+7;
  } 
 
- my $path="$mount_dir/$fs/$vol";
- $rc = system("/usr/bin/sudo","/sbin/btrfs","subvolume","create",$path);
- if($rc != 0)
+ my ($ok,$out)=root_do('vol','create',$fs,$vol);
+ if(!$ok)
  {
+   write_log("volume","ERROR","volume $fs/$vol not created: $out");
    $result="fail";
    $msg=$TEXT{'vol_not_created'} || "The volume was not created. Is the filesystem mounted, and is the name free?";
  }
  else 
  {
-   system("/usr/bin/sudo","/usr/bin/chown","$user:$group",$path);
-   system("/usr/bin/sudo","/bin/chmod",sprintf("%03d",$permission),$path);
+   ($ok,$out)=root_do('vol','owner',$fs,$vol,$user,$group,sprintf("%03d",$permission));
+   write_log("volume","ERROR","volume $fs/$vol: owner not set: $out") unless $ok;
    write_log("volume","INFO","volume $fs/$vol created");
    $result="success";
    $msg=$TEXT{'vol_created'};
@@ -292,8 +292,15 @@ sub savevol($self) {
  {
   $permission = $permission+7;
  }
- $rc = system("/usr/bin/sudo /usr/bin/chown $user:$group $mount_dir/$fs/$vol > /dev/null");
- $rc = system("/usr/bin/sudo /bin/chmod $permission $mount_dir/$fs/$vol > /dev/null");
+ $user  = "root" if (!defined $user  || $user  eq "");
+ $group = "root" if (!defined $group || $group eq "");
+ my ($ok,$out)=root_do('vol','owner',$fs,$vol,$user,$group,sprintf("%03d",$permission));
+ if (!$ok) {
+  write_log("volume","ERROR","volume $fs/$vol: owner not set: $out");
+  $result="fail";
+  $msg=$TEXT{'vol_not_saved'} || "The volume's owner and permissions were not changed.";
+  return;
+ }
  $result="success";
  $msg=$TEXT{'vol_saved'};
  return;
@@ -343,16 +350,19 @@ sub createsnapshot($self) {
   $permission = $permission+7;
  }
  
- $rc = system("/usr/bin/sudo /sbin/btrfs subvolume snapshot $mount_dir/$fs/$vol $mount_dir/$fs/$snapshot > /dev/null");
- if($rc ne 0)
+ $user  = "root" if (!defined $user  || $user  eq "");
+ $group = "root" if (!defined $group || $group eq "");
+ my ($ok,$out)=root_do('vol','snapshot',$fs,$vol,$snapshot);
+ if(!$ok)
  {
+   write_log("volume","ERROR","snapshot $fs/$snapshot of $vol not made: $out");
    $result="fail";
    $msg=$TEXT{'vol_failed_to_add_snapshot'};
  }
  else
  {
-   $rc = system("/usr/bin/sudo /usr/bin/chown $user.$group $mount_dir/$fs/$snapshot > /dev/null");
-   $rc = system("/usr/bin/sudo /bin/chmod $permission $mount_dir/$fs/$snapshot > /dev/null");
+   ($ok,$out)=root_do('vol','owner',$fs,$snapshot,$user,$group,sprintf("%03d",$permission));
+   write_log("volume","ERROR","snapshot $fs/$snapshot: owner not set: $out") unless $ok;
    $result="success";
    $msg=$TEXT{'vol_snapshot_created'};
  }
@@ -364,19 +374,20 @@ sub createsnapshot($self) {
 sub deletevol($self) {
  my $vol=$self->param("vol");
  my $fs=$self->param("fs");
- my $cmount_dir;
- $cmount_dir = substr($mount_dir,1);
- my $rc = system("/usr/bin/sudo /sbin/btrfs subvolume delete $mount_dir/$fs/$vol > /dev/null");
- if ($rc ne 0)
+ my ($ok,$out)=root_do('vol','delete',$fs,$vol);
+ if (!$ok)
  {
+  write_log("volume","ERROR","volume $fs/$vol not deleted: $out");
   $result="fail";
   $msg=$TEXT{'vol_faild_to_delete'};
  }
  else 
  {
-  if (`/usr/bin/grep " $mount_dir/$fs/$vol " $conf_cron`)
-  {   
-    system("/usr/bin/sudo /usr/bin/sed -i '/.$cmount_dir.$fs.$vol /d' $conf_cron");
+  # Its jobs in easynas.cron (snapshots, ...) go with it.
+  my $cron=root_read($conf_cron);
+  my $kept=join('', grep { !/ \Q$mount_dir\/$fs\/$vol\E / } split /^/, $cron // "");
+  if (defined $cron && $kept ne $cron && root_write($conf_cron,$kept))
+  {
     service_ctl('restart','cron.service');
   }
   $result="success";

@@ -36,10 +36,10 @@ APP_GROUP=${EASYNAS_APP_GROUP:-easynas}
 MARK="$CONF_DIR/.root-owned"
 
 APP_FILES="admin.conf easynas.cert easynas.key easynas.conf easynas.lang session.secret wizard.done lxc-images"
-APP_LOGS="easynas.log balance.log"
+APP_LOGS="easynas.log"
 ROOT_DIRS="addons rsyncd raddb tgt"
 ROOT_FILES="minidlna tftp pure-ftpd.conf"
-ROOT_LOGS="update.log lxc.log"
+ROOT_LOGS="update.log lxc.log balance.log"
 # Root's state from older releases, now in /run/easynas and addons/.
 OLD_STATE="addonq addonq.cur addonq.lock addonq.new addonq.drainlock update.status easynas.updates easynas.core easynas.core.new"
 

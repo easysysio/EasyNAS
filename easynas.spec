@@ -37,8 +37,9 @@ Obsoletes:      easynas-mm-plex < 1.99-5
 Provides:       easynas(user-layout)
 Provides:       easynas(lxc-helper) = 6
 # startup/easynas-root: service <action> <unit>; 2: file, share-marker,
-# hostname; 3: startup/conf-perms.sh, root's /etc/easynas/{rsyncd,raddb,...}
-Provides:       easynas(root-helper) = 3
+# hostname; 3: startup/conf-perms.sh, root's /etc/easynas/{rsyncd,raddb,...};
+# 4: fs, vol, disk, query (the storage pages)
+Provides:       easynas(root-helper) = 4
 # The core only lets GETs show things (POST for changes, see lib/EasyNAS.pm);
 # these add-on releases are the first whose pages make their changes by POST,
 # so older ones are updated along with the core.
@@ -1051,6 +1052,20 @@ Polish Language for EasyNAS
     where easynas could leave a link. The root helper refuses a config in a
     directory others can change, and checks every line of one that isn't
     root's alone
+  - Storage through the root helper (root-helper 4): the filesystem, volume
+    and disk pages, and the reads behind them (btrfs, smartctl, du), call
+    `easynas-root fs|vol|disk|query` instead of sudo btrfs/mkfs/wipefs/
+    mount/sed/tee/rm. Before a disk is erased (a new pool, a disk added to
+    one, Format), the helper checks that nothing uses it: not mounted, not
+    swap, not under RAID or LVM, not in a mounted pool. /etc/fstab takes
+    only a pool's own line. Fixes shell injection through a volume's,
+    snapshot's or disk's name (save, snapshot, delete, Format, clear
+    errors). Format now wipes the btrfs signature; it was a no-op (-t brtfs)
+  - Balance, scrub, disk replace/removal and RAID conversion run in their
+    own unit (systemd-run), so they outlive a restart of the web interface;
+    resuming a paused balance no longer holds the page until it finishes.
+    Renaming a pool updates its fstab label too, and only its own line.
+    63 sudo calls left outside the helpers
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

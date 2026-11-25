@@ -22,7 +22,7 @@ use File::Basename qw(dirname);
 my $root = abs_path(dirname(__FILE__) . '/..');
 
 # The helpers: each checks its arguments itself.
-my $HELPER = qr{/easynas/startup/(?:easynas-root|lxc-helper\.sh|addon-worker\.sh|mariadb-storage\.sh)\b};
+my $HELPER = qr{/easynas/startup/(?:easynas-root|lxc-helper\.sh|addon-worker\.sh|mariadb-storage\.sh)\b|\$ROOT_HELPER\b};
 
 my %count;
 find({ no_chdir => 1, wanted => sub {

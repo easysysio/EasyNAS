@@ -47,13 +47,39 @@ sub build_mount_opts {
 }
 
 ####### fstab_remove #######
-# Remove this mountpoint's line(s) from a file (fstab/cron). Uses %-delimited
-# sed addresses so the path's slashes are matched literally -- the previous
-# '$mount_dir.$fs' pattern only worked because '.' happened to match '/'.
+# Remove the lines that name this mountpoint (" /mnt/<fs> ") from a file the
+# root helper manages (/etc/fstab, easynas.cron). 1 when done.
 sub fstab_remove {
  my ($fs,$file)=@_;
  my $mount_dir=get_mount_dir();
- `/usr/bin/sudo /bin/sed -i '\\% $mount_dir/$fs %d' $file`;
+ my $text=root_read($file);
+ return 0 unless defined $text;
+ my $kept=join('', grep { !/ \Q$mount_dir\/$fs\E / } split /^/, $text);
+ return 1 if $kept eq $text;
+ return root_write($file,$kept);
+}
+
+####### fstab_add #######
+# The pool's line in /etc/fstab, by label (it can't come out empty, and it
+# survives device reshuffles). 1 when done.
+sub fstab_add {
+ my ($fs,$optstr)=@_;
+ my $mount_dir=get_mount_dir();
+ return root_append("/etc/fstab","LABEL=$fs $mount_dir/$fs btrfs $optstr 0 0\n");
+}
+
+####### fs_do #######
+# A change through the root helper; on failure log what it said and set the
+# page's fail message. 1 when done.
+sub fs_do {
+ my ($what,$fail,@args)=@_;
+ my ($ok,$out)=root_do(@args);
+ return 1 if $ok;
+ $out =~ s/\s+/ /g;
+ write_log("filesystem","ERROR","$what failed: $out");
+ $result="fail";
+ $msg=$fail;
+ return 0;
 }
 
 ####### fs_op_info #######
@@ -64,17 +90,17 @@ sub fs_op_info {
  my $fs=shift;
  return () unless (mounted($fs) eq "Mounted");
  my $mount=fs_mount($fs);
- my $out=`/usr/bin/sudo /sbin/btrfs balance status $mount 2>/dev/null`;
+ my $out=root_query('status','balance',$mount);
  if ($out =~ /running|paused/i) {
   my $pct=($out =~ /(\d+)% left/) ? (100-$1) : "";
   return ("balance",$pct,($out =~ /paused/i) ? 1 : 0);
  }
- $out=`/usr/bin/sudo /sbin/btrfs scrub status $mount 2>/dev/null`;
+ $out=root_query('status','scrub',$mount);
  if ($out =~ /running/i) {
   my $pct=($out =~ /\(([\d.]+)%\)/) ? int($1) : "";
   return ("scrub",$pct,0);
  }
- $out=`/usr/bin/sudo /sbin/btrfs replace status -1 $mount 2>/dev/null`;
+ $out=root_query('status','replace',$mount);
  if ($out =~ /([\d.]+)% done/ && $out !~ /finished|never started|canceled/i) {
   return ("replace",int($1),0);
  }
@@ -280,16 +306,16 @@ sub view($self) {
       my $mount_dir = get_mount_dir();
       my $sdir = ($fs eq "ROOT") ? "/" : "$mount_dir/$fs";
       my $opts = "";
-      foreach (`/usr/bin/sudo /bin/cat /proc/mounts 2>/dev/null`) {
-        my ($dev,$mp,$type,$o) = split(' ',$_);
-        if (defined $mp && $mp eq $sdir && defined $type && $type eq "btrfs") { $opts=$o; last; }
+      foreach (mount_table()) {
+        my ($dev,$mp,$type,$o) = @$_;
+        if ($mp eq $sdir && $type eq "btrfs") { $opts=$o; last; }
       }
       my %mopt = map { $_ => 1 } split(/,/,$opts);
       my $cur_compress = ($opts =~ /compress(?:-force)?=(\w+)/) ? $1 : "none";
       my $cur_ro     = $mopt{ro} ? 1 : 0;
       my $cur_ssd    = $mopt{ssd} ? 1 : 0;
       my $cur_defrag = $mopt{autodefrag} ? 1 : 0;
-      my @disks = `/usr/bin/sudo /sbin/btrfs filesystem show $uuid | /usr/bin/grep devid`;
+      my @disks = grep { /devid/ } root_query('btrfs-show', (defined $uuid && $uuid ne "") ? $uuid : $fs);
       my %health = health_info();
       my $number_disks = 0;
       my @fsdisks;
@@ -360,9 +386,7 @@ sub deletefs($self) {
 	return;
     }
 
-    my $auto_mount = `/usr/bin/sudo /usr/bin/grep $uuid /etc/fstab`;
-    my @disks      = `/usr/bin/sudo /sbin/btrfs filesystem show $uuid | /usr/bin/grep devid`;
-    my @volumes    = `/usr/bin/sudo /sbin/btrfs subvolume list $mount_dir/$fs 2>/dev/null`;
+    my @volumes    = (mounted($fs) eq "Mounted") ? root_query('subvolumes',"$mount_dir/$fs") : ();
 
     if (@volumes)
     {
@@ -374,15 +398,7 @@ sub deletefs($self) {
     {
 	# Plain umount, NOT lazy: wiping member devices while open files keep
 	# the super alive would corrupt a filesystem that is still in use.
-	my $out = `/usr/bin/sudo /usr/bin/umount $mount_dir/$fs 2>&1`;
-	if ($? != 0)
-	{
-	    chomp $out;
-	    write_log("filesystem","ERROR","deletefs: umount $mount_dir/$fs failed: $out");
-	    $result="fail";
-	    $msg=$TEXT{'fs_failed_unmounting_fs'};
-	    return;
-	}
+	return unless fs_do("deletefs: umount $mount_dir/$fs",$TEXT{'fs_failed_unmounting_fs'},'fs','umount',$fs);
     }
     # Refuse while the super is still active in the kernel (lazy-unmount
     # zombie: clean mount table, devices still claimed) -- wipefs would fail
@@ -393,22 +409,10 @@ sub deletefs($self) {
 	$msg=$TEXT{'fs_busy'};
 	return;
     }
-    fstab_remove($fs,"/etc/fstab") if ($auto_mount);
-    foreach (@disks)
-    {
-	(undef,undef,undef,undef,undef,undef,undef,$disk) = split(" ",$_);
-	next unless (defined $disk && $disk =~ m{^/dev/[\w]+$});
-	my $out = `/usr/bin/sudo /usr/sbin/wipefs -f -o 0x10040 $disk 2>&1 >/dev/null`;
-	if ($? != 0)
-	{
-	   chomp $out;
-	   write_log("filesystem","ERROR","deletefs: wipefs $disk failed: $out");
-           $result="fail";
-	   $msg=$TEXT{'fs_failed_formating_disk'};
-	   return;
-	}
-    }
-    `/usr/bin/sudo /usr/bin/rm -fr $mount_dir/$fs`;
+    # The helper wipes the btrfs signature off every member device.
+    return unless fs_do("deletefs: wipe $uuid",$TEXT{'fs_failed_formating_disk'},'fs','wipe',$uuid);
+    fstab_remove($fs,"/etc/fstab");
+    root_do('fs','rmdir',$fs);
     fstab_remove($fs,$conf_cron);
      $result="success";
      $msg=$TEXT{'fs_deleted'};
@@ -460,7 +464,7 @@ sub changeraid($self) {
  }
 
  # Enforce the device-count minimum for the target profile.
- my @devs   = `/usr/bin/sudo /sbin/btrfs filesystem show $fs | /usr/bin/grep devid`;
+ my @devs   = grep { /devid/ } root_query('btrfs-show',$fs);
  my $number = scalar(@devs);
  my %req = ( raid0  => [2,'raid_0_require_two'],   raid1  => [2,'raid_1_require_two'],
             raid10 => [4,'raid_10_require_four'], raid5  => [3,'raid_5_require_three'],
@@ -475,9 +479,8 @@ sub changeraid($self) {
  # The user already confirmed via the force checkbox (required above), so pass
  # --force to btrfs too: conversions that reduce metadata redundancy (e.g.
  # raid1 -> single) are otherwise refused with "use --force if you want this".
- system("/usr/bin/nohup /usr/bin/sudo /sbin/btrfs balance start --force "
-       ."-dconvert=$raid -mconvert=$raid $mount "
-       .">>/var/log/easynas/balance.log 2>&1 &");
+ return unless fs_do("changeraid $fs to $raid",$TEXT{'fs_op_ctl_failed'} || "Could not start the conversion.",
+                    'fs','convert',$mount,$raid);
  $result="success";
  $msg=$TEXT{'raid_converting'}
       || "Converting the filesystem to $raid in the background. This can take a while.";
@@ -516,29 +519,23 @@ sub opcontrol {
   return;
  }
  my $mount=fs_mount($fs);
- my $err="";
+ my @do;
  if ($type eq "balance") {
   my %cmd=(pauseop=>"pause", resumeop=>"resume", stopop=>"cancel");
-  $err=`/usr/bin/sudo /sbin/btrfs balance $cmd{$what} $mount 2>&1 >/dev/null`;
+  @do=('fs','balance',$cmd{$what},$mount);
  }
  elsif ($what eq "stopop" && $type eq "scrub") {
-  $err=`/usr/bin/sudo /sbin/btrfs scrub cancel $mount 2>&1 >/dev/null`;
+  @do=('fs','scrub','cancel',$mount);
  }
  elsif ($what eq "stopop" && $type eq "replace") {
-  $err=`/usr/bin/sudo /sbin/btrfs replace cancel $mount 2>&1 >/dev/null`;
+  @do=('fs','replace-cancel',$mount);
  }
  else {
   $result="fail";
   $msg=$TEXT{'fs_op_no_pause'} || "This operation can only be stopped, not paused.";
   return;
  }
- if ($? != 0) {
-  chomp $err;
-  write_log("filesystem","ERROR","opcontrol $what ($type) on $fs failed: $err");
-  $result="fail";
-  $msg=$TEXT{'fs_op_ctl_failed'} || "Could not control the operation.";
-  return;
- }
+ return unless fs_do("opcontrol $what ($type) on $fs",$TEXT{'fs_op_ctl_failed'} || "Could not control the operation.",@do);
  write_log("filesystem","INFO","$type $what on $fs");
  $result="success";
  $msg=$TEXT{'fs_op_ctl_done'} || "Done.";
@@ -553,7 +550,7 @@ sub balance($self) {
  return unless require_mounted($fs);
  return if deny_if_op($fs);
  my $mount=fs_mount($fs);
- system("/usr/bin/nohup /usr/bin/sudo /sbin/btrfs balance start $mount >>/var/log/easynas/balance.log 2>&1 &");
+ return unless fs_do("balance $fs",$TEXT{'fs_op_ctl_failed'} || "Could not start the balance.",'fs','balance','start',$mount);
  $result="success";
  $msg=$TEXT{'fs_balancing'} || "Balancing the filesystem in the background.";
 }
@@ -567,7 +564,7 @@ sub scrub($self) {
  return unless require_mounted($fs);
  return if deny_if_op($fs);
  my $mount=fs_mount($fs);
- system("/usr/bin/sudo /sbin/btrfs scrub start $mount >/dev/null 2>&1");
+ return unless fs_do("scrub $fs",$TEXT{'fs_op_ctl_failed'} || "Could not start the scrub.",'fs','scrub','start',$mount);
  $result="success";
  $msg=$TEXT{'fs_scrubbing'} || "Scrub started; the filesystem is being verified.";
 }
@@ -581,7 +578,7 @@ sub repairhd($self) {
  return unless require_mounted($fs);
  return if deny_if_op($fs);
  my $mount=fs_mount($fs);
- system("/usr/bin/sudo /sbin/btrfs scrub start $mount >/dev/null 2>&1");
+ return unless fs_do("repair (scrub) $fs",$TEXT{'fs_op_ctl_failed'} || "Could not start the repair.",'fs','scrub','start',$mount);
  $result="success";
  $msg=$TEXT{'fs_repairing'} || "Repair started: a scrub rebuilds bad blocks from redundancy.";
 }
@@ -593,11 +590,11 @@ sub repairhd($self) {
 sub removehd($self) {
  my $fs=$self->param("fs");
  my $disk=$self->param("disk");
- unless (defined $disk && $disk =~ m{^/dev/[\w]+$}) { $result="fail"; $msg="Invalid disk."; return; }
+ unless (defined $disk && $disk =~ m{^/dev/[A-Za-z0-9]{2,32}$}) { $result="fail"; $msg="Invalid disk."; return; }
  return unless require_mounted($fs);
  return if deny_if_op($fs);
  my $mount=fs_mount($fs);
- system("/usr/bin/nohup /usr/bin/sudo /sbin/btrfs device remove $disk $mount >>/var/log/easynas/balance.log 2>&1 &");
+ return unless fs_do("remove $disk from $fs",$TEXT{'fs_op_ctl_failed'} || "Could not remove the disk.",'fs','device-remove',$mount,$disk);
  $result="success";
  $msg=$TEXT{'fs_removing_disk'} || "Removing the disk in the background; its data is being migrated.";
 }
@@ -614,8 +611,7 @@ sub addhd($self) {
  return unless require_mounted($fs);
  return if deny_if_op($fs);
  my $mount=fs_mount($fs);
- my $rc=system("/usr/bin/sudo /sbin/btrfs device add -f /dev/$disk $mount >/dev/null 2>&1");
- if ($rc ne 0) { $result="fail"; $msg=$TEXT{'fs_failed_adding_disk'} || "Failed to add the disk."; return; }
+ return unless fs_do("add /dev/$disk to $fs",$TEXT{'fs_failed_adding_disk'} || "Failed to add the disk.",'fs','device-add',$mount,"/dev/$disk");
  $result="success";
  $msg=$TEXT{'fs_disk_added'} || "Disk added. Run Balance to spread data across it.";
 }
@@ -629,12 +625,13 @@ sub replacehd($self) {
  my $fs=$self->param("fs");
  my $olddisk=$self->param("olddisk");
  my ($newdisk)=split(" ",$self->param("disk") // "");
- unless (defined $olddisk && $olddisk =~ m{^/dev/[\w]+$}) { $result="fail"; $msg="Invalid disk."; return; }
+ unless (defined $olddisk && $olddisk =~ m{^/dev/[A-Za-z0-9]{2,32}$}) { $result="fail"; $msg="Invalid disk."; return; }
  unless (defined $newdisk && $newdisk =~ /^[A-Za-z0-9]+$/) { $result="fail"; $msg="Invalid disk."; return; }
  return unless require_mounted($fs);
  return if deny_if_op($fs);
  my $mount=fs_mount($fs);
- system("/usr/bin/nohup /usr/bin/sudo /sbin/btrfs replace start -f $olddisk /dev/$newdisk $mount >>/var/log/easynas/balance.log 2>&1 &");
+ return unless fs_do("replace $olddisk with /dev/$newdisk in $fs",$TEXT{'fs_op_ctl_failed'} || "Could not replace the disk.",
+                    'fs','replace',$mount,$olddisk,"/dev/$newdisk");
  $result="success";
  $msg=$TEXT{'fs_replacing_disk'} || "Replacing the disk in the background.";
 }
@@ -652,7 +649,7 @@ sub createfs($self) {
     my $defrag     = $self->param("defrag");
     my $compress   = $self->param("compress");
     my $mount_dir=get_mount_dir();
-    my $raid_disks = "";
+    my @raid_disks;
     my $number     = 0;
     my $uuid;
     my $btrfs;
@@ -663,7 +660,7 @@ sub createfs($self) {
 	($disk,undef) = split(" ", $_);
 	# Form values are "sdX <size>"; the device part must be a bare name.
 	next unless (defined $disk && $disk =~ /^[A-Za-z0-9]+$/);
-	$raid_disks   = $raid_disks." "."/dev/".$disk;
+	push @raid_disks, "/dev/".$disk;
 	$number++;
     }
 
@@ -726,43 +723,17 @@ sub createfs($self) {
 	return;
     }
 
-    if ( !-d "$mount_dir/$fs") { 
-      $rc = system("/usr/bin/sudo /bin/mkdir $mount_dir/$fs");
-      if ($rc ne 0)
-      {
-	$result="fail";    
-        $msg=$TEXT{'failed_creating_directory'};
-	return;
-      }
-    }
-    my $err = `/usr/bin/sudo /sbin/mkfs.btrfs -f -L $fs -d $raid -m $raid $raid_disks 2>&1 >/dev/null`;
-    if ($? != 0)
-    {
-	chomp $err;
-	write_log("filesystem","ERROR","mkfs.btrfs -L $fs failed: $err");
-	$result="fail";
-	$msg=$TEXT{'failed_creating_fs'};
-	return;
-    }
-
-    $btrfs=`/usr/bin/sudo /usr/sbin/btrfs filesystem show $fs | /usr/bin/grep uuid`;
-    (undef,undef,undef,$uuid)=split(" ",$btrfs);
+    return unless fs_do("mkdir $mount_dir/$fs",$TEXT{'failed_creating_directory'},'fs','mkdir',$fs);
+    # The helper checks that no disk is in use (mounted, swap, a pool's).
+    return unless fs_do("mkfs.btrfs -L $fs",$TEXT{'failed_creating_fs'},'fs','mkfs',$fs,$raid,@raid_disks);
 
     if ($automount)
     {
 	my $optstr = build_mount_opts($access,$compress,$ssd,$defrag);
 	# Mount by label rather than UUID: it always resolves (the label was
-	# just written by mkfs) even if the uuid parse above came up empty.
-	`/bin/echo "LABEL=$fs $mount_dir/$fs btrfs $optstr 0 0" | /usr/bin/sudo /usr/bin/tee -a /etc/fstab >/dev/null`;
-	$err = `/usr/bin/sudo /usr/bin/mount $mount_dir/$fs 2>&1 >/dev/null`;
-	if ($? != 0)
-	{
-	    chomp $err;
-	    write_log("filesystem","ERROR","mount $mount_dir/$fs failed after create: $err");
-	    $result="fail";
-	    $msg=$TEXT{'failed_mounting_fs'};
-	    return;
-	}
+	# just written by mkfs).
+	unless (fstab_add($fs,$optstr)) { $result="fail"; $msg=$TEXT{'failed_mounting_fs'}; return; }
+	return unless fs_do("mount $mount_dir/$fs after create",$TEXT{'failed_mounting_fs'},'fs','mount',$fs);
     }
 
     $result="success";
@@ -788,17 +759,9 @@ sub unmount($self) {
     # the mount table looks clean but label/raid changes then fail with
     # "device busy" and nothing explains why. Fail honestly instead, and name
     # the processes holding files open so the user can close them.
-    my $out = `/usr/bin/sudo /usr/bin/umount $mount_dir/$fs 2>&1`;
-    if ($? != 0) {
-      my $holders="";
-      foreach my $p (glob("/proc/[0-9]*")) {
-        my $fd=`/usr/bin/sudo /bin/ls -l $p/fd $p/cwd 2>/dev/null`;
-        if ($fd =~ m{\Q$mount_dir/$fs\E}) {
-          my $comm=`/bin/cat $p/comm 2>/dev/null`; chomp $comm;
-          $holders.=" ".$comm."(".substr($p,6).")";
-        }
-      }
-      chomp $out;
+    my ($ok,$out) = root_do('fs','umount',$fs);
+    if (!$ok) {
+      my $holders=join('', map { chomp; " $_" } root_query('holders',"$mount_dir/$fs"));
       write_log("filesystem","ERROR","umount $mount_dir/$fs failed: $out; holders:".($holders||" none found"));
       $result="fail";
       $msg=$TEXT{'fs_failed_unmounting_fs'}.($holders ? ":".$holders : "");
@@ -820,28 +783,17 @@ sub mount($self)
  return unless valid_fs($fs);
 
  # The mountpoint may not exist (fresh /mnt after an OS reinstall).
- if ( !-d "$mount_dir/$fs") {
-  system("/usr/bin/sudo /bin/mkdir -p $mount_dir/$fs > /dev/null");
- }
+ root_do('fs','mkdir',$fs);
 
  # `mount <mountpoint>` needs an /etc/fstab entry to know the device. After a
  # reinstall (system disk wiped) -- or for a pool imported from another box --
  # there is none, so add one by btrfs label (the label equals the filesystem
  # name; see mkfs.btrfs -L in createfs) so it mounts now and at every boot.
- my $in_fstab = `/usr/bin/sudo /usr/bin/grep " $mount_dir/$fs " /etc/fstab 2>/dev/null`;
- if (!$in_fstab) {
-  `/bin/echo "LABEL=$fs $mount_dir/$fs btrfs defaults 0 0" | /usr/bin/sudo /usr/bin/tee -a /etc/fstab > /dev/null`;
+ if ((root_read("/etc/fstab") // "") !~ / \Q$mount_dir\/$fs\E /) {
+  fstab_add($fs,"defaults");
  }
 
- my $err = `/usr/bin/sudo /usr/bin/mount $mount_dir/$fs 2>&1 >/dev/null`;
-    if ($? != 0)
-    {
-     chomp $err;
-     write_log("filesystem","ERROR","mount $mount_dir/$fs failed: $err");
-     $result="fail";
-     $msg=$TEXT{'fs_failed_mounting'};
-     return;
-    }
+ return unless fs_do("mount $mount_dir/$fs",$TEXT{'fs_failed_mounting'},'fs','mount',$fs);
  # Re-apply any NFS/Samba shares recorded inside the volumes of this pool
  # (their in-volume markers survive a reinstall; see rediscover_shares).
  rediscover_shares();
@@ -866,36 +818,26 @@ sub changesettings($self) {
  return if deny_if_op($fs);
  my $optstr = build_mount_opts($access,$compress,$ssd,$defrag);
 
- if (!-d $dir) {
-  $rc = system("/usr/bin/sudo /bin/mkdir $dir");
-  if ($rc != 0) { $result="fail"; $msg=$TEXT{'fs_failed_creating_dir'}; return; }
- }
+ return unless fs_do("mkdir $dir",$TEXT{'fs_failed_creating_dir'},'fs','mkdir',$fs);
 
  # Drop any existing fstab entry for this mountpoint, then (when auto-mount is
  # on) write the new one -- appending blindly would pile up duplicate lines.
  # Mount by label: unlike a UUID parsed from btrfs output it cannot be empty,
  # and it survives device reshuffles.
- fstab_remove($fs,"/etc/fstab");
- if ($automount) {
-  `/bin/echo "LABEL=$fs $dir btrfs $optstr 0 0" | /usr/bin/sudo /usr/bin/tee -a /etc/fstab >/dev/null`;
+ my $fstab=root_read("/etc/fstab");
+ my $new=join('', grep { !/ \Q$dir\E / } split /^/, $fstab // "");
+ $new.="LABEL=$fs $dir btrfs $optstr 0 0\n" if ($automount);
+ if (!defined $fstab || ($new ne $fstab && !root_write("/etc/fstab",$new))) {
+  $result="fail";
+  $msg=$TEXT{'fs_failed_mounting'};
+  return;
  }
 
  # Apply live: remount in place when already mounted (you can't plain-mount an
  # already-mounted fs), otherwise a fresh mount by label (independent of the
  # fstab entry, which is only written when auto-mount is on).
- my $err;
- if (mounted($fs) eq "Mounted") {
-  $err = `/usr/bin/sudo /usr/bin/mount -o remount,$optstr $dir 2>&1 >/dev/null`;
- } else {
-  $err = `/usr/bin/sudo /usr/bin/mount -t btrfs -o $optstr LABEL=$fs $dir 2>&1 >/dev/null`;
- }
- if ($? != 0) {
-  chomp $err;
-  write_log("filesystem","ERROR","changesettings: mount $dir ($optstr) failed: $err");
-  $result="fail";
-  $msg=$TEXT{'fs_failed_mounting'};
-  return;
- }
+ return unless fs_do("changesettings: mount $dir ($optstr)",$TEXT{'fs_failed_mounting'},
+                    'fs',(mounted($fs) eq "Mounted") ? 'remount' : 'mount-label',$fs,$optstr);
  $result="success";
  $msg=$TEXT{'fs_mounted'};
 }
@@ -964,18 +906,23 @@ sub changename($self) {
 
   # Capture stderr (stdout is discarded): on failure the real btrfs error
   # lands in the easynas log instead of vanishing behind a generic message.
-  my $err = `/usr/bin/sudo /sbin/btrfs filesystem label $path $newfs 2>&1 >/dev/null`;
-  if ($? != 0)
-  {
-   chomp $err;
-   write_log("filesystem","ERROR","btrfs filesystem label $path $newfs failed: $err");
-   $msg=$TEXT{'fs_failed_changing_label'};
-   $result="fail";
-   return;
-  }
+  # The helper relabels it and renames its /mnt directory.
+  return unless fs_do("relabel $fs to $newfs",$TEXT{'fs_failed_changing_label'},'fs','label',$fs,$newfs);
 
-  `/usr/bin/sudo /usr/bin/mv $mount_dir/$fs $mount_dir/$newfs`;
-  `/usr/bin/sudo /usr/bin/sed -i 's%$mount_dir/$fs%$mount_dir/$newfs%g' /etc/fstab`;
+  # Its fstab line: the new mountpoint, and the new label to mount by.
+  my $fstab=root_read("/etc/fstab");
+  if (defined $fstab) {
+   my $new=join('', map {
+     my $l=$_;
+     if ($l =~ / \Q$mount_dir\/$fs\E /) {
+      $l =~ s/ \Q$mount_dir\/$fs\E / $mount_dir\/$newfs /;
+      $l =~ s/^LABEL=\Q$fs\E /LABEL=$newfs /;
+     }
+     $l } split /^/, $fstab);
+   if ($new ne $fstab && !root_write("/etc/fstab",$new)) {
+    write_log("filesystem","ERROR","changename: /etc/fstab not updated for $newfs");
+   }
+  }
    $msg=$TEXT{'fs_name_changed'};
    $result="success";
    return;

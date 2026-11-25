@@ -238,4 +238,186 @@ for my $bad ('nas;reboot', '-n', 'a..b', 'x' x 64, 'nas name', '') {
   is $rc, 2, "refused host name: '$bad'";
   is $calls, '', '...nothing run';
 }
+# ===================== storage =====================
+# Fake programs: each records "<name> <args>"; btrfs `filesystem show <x>`
+# prints $d/show/<x> (or $d/show/ALL), and fails when there is none.
+mkdir "$d/bin"; mkdir "$d/show";
+for my $p (qw(mkfs.btrfs wipefs mount umount smartctl du systemd-run)) {
+  put("$d/bin/$p", "#!/bin/sh\necho \"$p \$*\" >> $d/calls\n");
+  chmod 0755, "$d/bin/$p";
+}
+put("$d/bin/btrfs", <<"SH");
+#!/bin/sh
+echo "btrfs \$*" >> $d/calls
+if [ "\$1 \$2" = "filesystem show" ]; then
+  f="$d/show/\${3:-ALL}"
+  [ -f "\$f" ] && cat "\$f" && exit 0
+  exit 1
+fi
+exit 0
+SH
+chmod 0755, "$d/bin/btrfs";
+$ENV{EASYNAS_BIN_DIR} = "$d/bin";
+
+my $act = '11111111-2222-3333-4444-555555555555';
+my $old = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+mkdir $_ for map { "$r$_" } qw(/sys /sys/class /sys/class/block /sys/fs /sys/fs/btrfs /proc /mnt/old);
+mkdir "$r/sys/class/block/$_" for qw(sda sda/sda1 sda1 sdb sdc sdd sdd/holders sdd/holders/md0 sde sdf);
+mkdir $_ for "$r/sys/fs/btrfs/$act", "$r/sys/fs/btrfs/$act/devices", "$r/sys/fs/btrfs/$act/devices/sde";
+put("$r/proc/mounts", "/dev/sda1 / btrfs rw 0 0\n/dev/sdc $r/mnt/data btrfs rw 0 0\nproc /proc proc rw 0 0\n");
+put("$r/proc/swaps", "Filename Type Size Used Priority\n");
+put("$d/show/pool2", "Label: 'pool2'  uuid: 99999999-2222-3333-4444-555555555555\n");
+put("$d/show/$old", "Label: 'old'  uuid: $old\n\tTotal devices 2 FS bytes used 1G\n"
+                  . "\tdevid    1 size 1.00GiB used 0 path /dev/sdb\n\tdevid    2 size 1.00GiB used 0 path /dev/sdf\n");
+put("$d/show/old", slurp("$d/show/$old"));
+put("$d/show/$act", "Label: 'busy'  uuid: $act\n\tdevid    1 size 1G used 0 path /dev/sde\n");
+my $root_uuid = 'cccccccc-2222-3333-4444-555555555555';
+put("$d/show/$root_uuid", "Label: 'ROOT'  uuid: $root_uuid\n\tdevid    1 size 1G used 0 path /dev/sdb\n");
+
+($rc, $calls) = run(qw(fs mkfs pool raid1 /dev/sdb /dev/sdf));
+is $rc, 0, 'mkfs on two free disks';
+like $calls, qr{^mkfs\.btrfs -f -L pool -d raid1 -m raid1 /dev/sdb /dev/sdf$}m, '...as the page asked';
+for my $bad ([qw(pool single /dev/sda)], [qw(pool single /dev/sdc)], [qw(pool single /dev/sdd)],
+             [qw(pool single /dev/sde)], [qw(pool raid1 /dev/sdb)], [qw(ROOT single /dev/sdb)],
+             [qw(pool raid7 /dev/sdb)], ['po;ol', 'single', '/dev/sdb'], [qw(pool raid1 /dev/sdb /dev/sdb)],
+             [qw(pool single /dev/nosuch)], [qw(pool single /dev/sdb;reboot)], [qw(pool2 single /dev/sdb)],
+             [qw(pool single)]) {
+  ($rc, $calls) = run('fs', 'mkfs', @$bad);
+  is $rc, 2, "mkfs refused: @$bad";
+  unlike $calls, qr/^mkfs/m, '...no mkfs';
+}
+
+($rc, $calls) = run('fs', 'wipe', $old);
+is $rc, 0, 'wipe a file system that is not mounted';
+like $calls, qr{^wipefs -f -o 0x10040 /dev/sdb\nwipefs -f -o 0x10040 /dev/sdf$}m, '...every member';
+for my $bad ($act, $root_uuid, 'nosuchuuid', '99999999-0000-0000-0000-000000000000') {
+  ($rc, $calls) = run('fs', 'wipe', $bad);
+  is $rc, 2, "wipe refused: $bad";
+  unlike $calls, qr/^wipefs/m, '...nothing wiped';
+}
+
+($rc, $calls) = run(qw(fs label old new));
+is $rc, 0, 'rename a file system';
+like $calls, qr{^btrfs filesystem label /dev/sdb new$}m, '...its label';
+ok -d "$r/mnt/new" && !-e "$r/mnt/old", '...and its directory';
+($rc) = run(qw(fs label busy x));
+is $rc, 2, 'rename refused: no file system "busy" by that name';
+($rc) = run(qw(fs label old ROOT));
+is $rc, 2, 'rename refused: to ROOT';
+
+($rc, $calls) = run(qw(fs mount data));
+is $calls, "mount $r/mnt/data\n", 'mount: by its fstab line';
+($rc, $calls) = run(qw(fs mount-label data rw,compress=zstd,noatime));
+is $calls, "mount -t btrfs -o rw,compress=zstd,noatime LABEL=data $r/mnt/data\n", 'mount by label, with options';
+($rc, $calls) = run(qw(fs remount data ro));
+is $calls, "mount -o remount,ro $r/mnt/data\n", 'remount';
+($rc, $calls) = run(qw(fs umount data));
+is $calls, "umount $r/mnt/data\n", 'umount';
+for my $bad ([qw(mount-label data rw,suid)], [qw(mount-label data rw,exec)], [qw(remount data ro,dev)],
+             [qw(umount ROOT)], [qw(mount ../etc)], [qw(mount nosuch)], [qw(mount-label data)], [qw(mount --bind)]) {
+  ($rc, $calls) = run('fs', @$bad);
+  is $rc, 2, "refused: fs @$bad";
+  is $calls, '', '...nothing run';
+}
+($rc) = run(qw(fs mkdir fresh));
+ok $rc == 0 && -d "$r/mnt/fresh", 'mkdir /mnt/<name>';
+($rc) = run(qw(fs rmdir fresh));
+ok $rc == 0 && !-e "$r/mnt/fresh", 'rmdir it';
+($rc) = run(qw(fs rmdir data));
+is $rc, 2, 'rmdir refused: mounted';
+
+($rc, $calls) = run(qw(fs balance start /mnt/data));
+is $rc, 0, 'balance start';
+like $calls, qr{^systemd-run --collect --quiet -p StandardOutput=append:\Q$r\E/var/log/easynas/balance\.log -p StandardError=append:\S+ -- \Q$d\E/bin/btrfs balance start \Q$r\E/mnt/data$}m,
+     '...in its own unit, logging to balance.log';
+($rc, $calls) = run(qw(fs balance pause /mnt/data));
+is $calls, "btrfs balance pause $r/mnt/data\n", 'balance pause';
+($rc, $calls) = run(qw(fs convert /mnt/data raid1));
+like $calls, qr{-- \S+/btrfs balance start --force -dconvert=raid1 -mconvert=raid1 \Q$r\E/mnt/data$}m, 'convert';
+($rc, $calls) = run(qw(fs scrub start /mnt/data));
+like $calls, qr{-- \S+/btrfs scrub start -B \Q$r\E/mnt/data$}m, 'scrub';
+($rc, $calls) = run(qw(fs replace /mnt/data /dev/sdc /dev/sdf));
+like $calls, qr{-- \S+/btrfs replace start -B -f /dev/sdc /dev/sdf \Q$r\E/mnt/data$}m, 'replace a disk';
+($rc, $calls) = run(qw(fs device-add /mnt/data /dev/sdf));
+is $calls, "btrfs device add -f /dev/sdf $r/mnt/data\n", 'add a disk';
+($rc, $calls) = run(qw(fs stats-reset /dev/sdc));
+is $calls, "btrfs device stats -z /dev/sdc\n", 'reset a disk\'s error counters';
+for my $bad ([qw(balance start /etc)], [qw(balance start /mnt/data/vol)], [qw(balance defrag /mnt/data)],
+             [qw(convert /mnt/data raid9)], [qw(replace /mnt/data /dev/sdc /dev/sda)],
+             [qw(device-add /mnt/data /dev/sdc)], [qw(device-remove /mnt/data sdc)], [qw(scrub start)]) {
+  ($rc, $calls) = run('fs', @$bad);
+  is $rc, 2, "refused: fs @$bad";
+  is $calls, '', '...nothing run';
+}
+
+($rc, $calls) = run(qw(disk wipe /dev/sdb));
+is $calls, "wipefs -f -o 0x10040 /dev/sdb\n", 'wipe a free disk';
+for my $bad (qw(/dev/sda /dev/sdc /dev/sde /dev/sdd sdb)) {
+  ($rc, $calls) = run('disk', 'wipe', $bad);
+  is $rc, 2, "wipe refused: $bad (in use, or not a disk)";
+}
+
+# volumes
+my ($me, $mygroup) = (scalar getpwuid($<), scalar getgrgid((split ' ', $()[0]));
+($rc, $calls) = run(qw(vol create data music));
+is $calls, "btrfs subvolume create $r/mnt/data/music\n", 'create a volume';
+($rc, $calls) = run(qw(vol snapshot data vol snap1));
+is $calls, "btrfs subvolume snapshot $r/mnt/data/vol $r/mnt/data/snap1\n", 'snapshot';
+($rc, $calls) = run(qw(vol delete data vol));
+is $calls, "btrfs subvolume delete $r/mnt/data/vol\n", 'delete';
+($rc) = run('vol', 'owner', 'data', 'vol', $me, $mygroup, '750');
+is $rc, 0, 'owner and mode';
+is sprintf('%o', (stat "$r/mnt/data/vol")[2] & 07777), '750', '...set';
+symlink("$r/outside", "$r/mnt/data/lnk");
+for my $bad ([qw(create data vol)], [qw(create data ../x)], [qw(create data .snapshots)], [qw(create data @)],
+             [qw(delete data lnk)], [qw(snapshot data vol vol)], [qw(create ../etc x)],
+             ['owner', 'data', 'lnk', $me, $mygroup, '755'], ['owner', 'data', 'vol', $me, $mygroup, '4755'],
+             ['owner', 'data', 'vol', 'nosuchuser42', $mygroup, '755'], [qw(create data)]) {
+  ($rc, $calls) = run('vol', @$bad);
+  is $rc, 2, "refused: vol @$bad";
+  is $calls, '', '...nothing run';
+}
+
+# queries
+($rc, $calls) = run(qw(query btrfs-show));
+is $calls, "btrfs filesystem show\n", 'query btrfs-show';
+($rc, $calls) = run(qw(query status replace /mnt/data));
+is $calls, "btrfs replace status -1 $r/mnt/data\n", 'query status';
+($rc, $calls) = run(qw(query du data vol));
+is $calls, "du -h -s -- $r/mnt/data/vol\n", 'query du';
+($rc, $calls) = run(qw(query smart-health /dev/sda));
+is $calls, "smartctl -H /dev/sda\n", 'query smart-health';
+mkdir $_ for "$r/proc/1234", "$r/proc/1234/fd", "$r/proc/99", "$r/proc/99/fd";
+put("$r/proc/1234/comm", "smbd\n");
+symlink("$r/mnt/data/vol/song.mp3", "$r/proc/1234/fd/3");
+symlink("/", "$r/proc/1234/cwd");
+symlink("$r/mnt/data2", "$r/proc/99/cwd");
+open(my $q, '-|', $^X, $helper, qw(query holders /mnt/data)) or die;
+my $held = do { local $/; <$q> };
+close $q;
+is $held, "smbd(1234)\n", 'query holders: what keeps a mount busy (not /mnt/data2)';
+for my $bad ([qw(btrfs-df /etc)], ['smart-info', '/dev/sda;id'], [qw(du data ../..)], [qw(holders /)],
+             [qw(status defrag /mnt/data)], [qw(btrfs-show --all-devices)], [qw(nosuch)]) {
+  ($rc, $calls) = run('query', @$bad);
+  is $rc, 2, "refused: query @$bad";
+  is $calls, '', '...nothing run';
+}
+
+# fstab and easynas.cron, through `file`
+put("$r/etc/fstab", "UUID=$root_uuid / btrfs defaults 0 0\n");
+($rc, $err) = feed("LABEL=data /mnt/data btrfs rw,compress=zstd 0 0\n", qw(file append /etc/fstab));
+is $rc, 0, 'fstab: a pool as the filesystem page writes it' or diag $err;
+for my $bad ("LABEL=data /mnt/other btrfs rw 0 0", "/dev/sdb /mnt/x btrfs rw 0 0", "LABEL=x /mnt/x btrfs rw,suid 0 0",
+             "LABEL=x /etc btrfs rw 0 0", "LABEL=x /mnt/x ext4 rw 0 0", "LABEL=x /mnt/x btrfs rw 0 1",
+             "tmpfs /tmp tmpfs rw 0 0") {
+  ($rc) = feed("$bad\n", qw(file append /etc/fstab));
+  is $rc, 2, "fstab refuses: $bad";
+}
+mkdir "$r/etc/cron.d";
+put("$r/etc/cron.d/easynas.cron", "0 */6 * * *  root /easynas/startup/check_update.pl\n0 1 * * * root /x /mnt/data/vol \n");
+($rc) = feed("0 */6 * * *  root /easynas/startup/check_update.pl\n", qw(file write /etc/cron.d/easynas.cron));
+is $rc, 0, 'easynas.cron: a job taken out';
+($rc) = feed("* * * * * root /bin/sh -c id\n", qw(file append /etc/cron.d/easynas.cron));
+is $rc, 2, '...none added';
+
 done_testing;

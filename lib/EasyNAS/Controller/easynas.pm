@@ -37,7 +37,8 @@ our @EXPORT    = qw( get_mount_dir get_conf_cron get_addons_file get_update_file
                      get_update_state raid_status
                      set_current_lang get_admin_group is_nas_admin
                      setup_needed setup_done zypper_run zypper_reason service_ctl
-                     root_read root_lines root_write root_append drop_block get_block);
+                     root_read root_lines root_write root_append drop_block get_block
+                     root_query root_do);
 
 ############# Declarations #####################
 my $authentication_enable = 1;
@@ -491,7 +492,8 @@ sub mounted
     
     # Match the exact mountpoint ("on <dir> type"), not a prefix -- a bare
     # grep for /mnt/Data also matches /mnt/Data2's mount line.
-    if ((`/usr/bin/sudo /bin/mount | /usr/bin/grep " on $mount_dir/$fs type "` eq "") && ($fs ne "ROOT"))
+    my $dir = "$mount_dir/$fs";
+    if (!(grep { $_->[1] eq $dir } mount_table()) && ($fs ne "ROOT"))
     {
         $result="UnMounted";
     }
@@ -559,6 +561,48 @@ sub root_write
 }
 sub root_append { return root_write($_[0], $_[1], 'append') }
 
+# The root helper's read-only answers (startup/easynas-root "query ..."):
+# what it printed, as lines in list context (as backticks gave them), else as
+# one string. Nothing when it refused. (Its exit status isn't the answer:
+# `btrfs balance status` exits 1 while a balance runs.)
+sub root_query
+{
+    my @args = @_;
+    open(my $fh, '-|', '/usr/bin/sudo', $ROOT_HELPER, 'query', @args) or return wantarray ? () : '';
+    my @l = <$fh>;
+    close $fh;
+    return wantarray ? @l : join('', @l);
+}
+
+# A change through the root helper ("fs ...", "vol ...", "disk ..."):
+# (1, its output) when done, else (0, what it said: the program's error, or
+# why the helper refused).
+sub root_do
+{
+    my @args = @_;
+    require IPC::Open3;
+    my ($in, $fh, $out);
+    my $pid = eval { IPC::Open3::open3($in, $fh, undef, '/usr/bin/sudo', $ROOT_HELPER, @args) };
+    return (0, "the root helper did not start: $@") unless $pid;
+    close $in;
+    { local $/; $out = <$fh> // ''; }
+    close $fh;
+    waitpid($pid, 0);
+    my $ok = $? == 0 ? 1 : 0;
+    chomp $out;
+    return ($ok, $out);
+}
+
+# Mount points, from the kernel (no root needed).
+sub mount_table
+{
+    my @m;
+    open(my $fh, '<', '/proc/mounts') or return ();
+    while (<$fh>) { my ($src, $mp, $type, $opts) = split ' '; push @m, [$src, $mp, $type, $opts] if defined $type; }
+    close $fh;
+    return @m;
+}
+
 # A sed '/start/,/end/' range over $text: the lines from one matching $start
 # through the next one matching $end (to the end when none does), every time.
 # drop_block is the text without them, get_block the first such range.
@@ -623,7 +667,7 @@ sub raid_status
     else {
      $dir=$mount_dir."/".$fs;
     }
-    @fs_df=`sudo /sbin/btrfs fi df $dir | grep "Data" `;
+    @fs_df=grep { /Data/ } root_query('btrfs-df',$dir);
     foreach (@fs_df) {
         ($null,$raid,$null,$null)=split(/ /,$_);
     }
@@ -1075,14 +1119,19 @@ sub disk_info
     my $presize;
     my $model;
     my @sysmon;
-    my @disks = `/usr/bin/sudo /usr/sbin/smartctl --scan`;
+    my @disks = root_query('smart-scan');
+    # The system disk holds /; a pool's disks are listed by btrfs.
+    my ($root_src) = map { $_->[0] } grep { $_->[1] eq '/' } mount_table();
+    $root_src //= '';
+    my $pools = root_query('btrfs-show');
 
 
     foreach (@disks)
     {
 	($disk,undef,$type,undef,undef,undef)=split(" ", $_);
 	(undef,undef,$disk_name)=split("/",$disk);
-	@sysmon = `/usr/bin/sudo /usr/sbin/smartctl -i  $disk`; 
+	next unless (defined $disk && $disk =~ m{^/dev/[A-Za-z0-9]{2,32}$});
+	@sysmon = root_query('smart-info',$disk);
 	foreach (@sysmon) 
 	{
 	  if ($_ =~ /User Capacity/s) {
@@ -1096,13 +1145,13 @@ sub disk_info
           }
 	}
 
-        if (index(`/usr/bin/sudo /usr/bin/mount | grep "on / "`,$disk) != -1) 
+        if (index($root_src,$disk) != -1)
         {
          $status="disk_system"; 
         }
 	else 
 	{
-	  if (`/usr/bin/sudo /sbin/btrfs filesystem show | /usr/bin/grep $disk`)
+	  if ($pools =~ m{\Q$disk\E})
  	  {
 	   $status="disk_used";
 	  }
@@ -1135,11 +1184,12 @@ sub health_info
  my $flush_errs="NA";
  my $corruption_errs="NA";
  my $generation_errs="NA";
- my @disks = `/usr/bin/sudo /usr/sbin/smartctl --scan`;
+ my @disks = root_query('smart-scan');
  foreach (@disks)
     {
         ($disk,undef,undef,undef,undef,undef)=split(" ", $_);
-        @sysmon = `/usr/bin/sudo /usr/sbin/smartctl -H  $disk`;
+        next unless (defined $disk && $disk =~ m{^/dev/[A-Za-z0-9]{2,32}$});
+        @sysmon = root_query('smart-health',$disk);
         $health="disk_bad";
         foreach (@sysmon)
         {
@@ -1147,7 +1197,7 @@ sub health_info
             $health="disk_good";
           }
         }
-        @errors=`/usr/bin/sudo /sbin/btrfs device stat $disk`;
+        @errors=root_query('device-stats',$disk);
 	foreach (@errors)
         {
           if ($_ =~ /write_io_errs/)
@@ -1202,14 +1252,15 @@ sub vol_info
   foreach $fs (keys %fs)
   {
    if ($fs ne "ROOT") {
-    @vols_info = `sudo /sbin/btrfs subvolume list $mount_dir/$fs`;
+    next unless ($fs =~ /^[A-Za-z0-9_-]{1,64}$/);
+    @vols_info = root_query('subvolumes',"$mount_dir/$fs");
     foreach (@vols_info)
     { 
       @vol_info=split(' ',$_);
       $vol=$vol_info[8];
       $id=$vol_info[1];
-      if ($vol ne "@") {
-       $du = `/usr/bin/sudo /usr/bin/du -h -a $mount_dir/$fs/$vol | /usr/bin/tail -1`;
+      if (defined $vol && $vol ne "@") {
+       $du = root_query('du',$fs,$vol);
        ($size,undef) = split(" ",$du);
        $volumes{$fs."/".$vol}=[$id,$vol,$fs,$size];
       }
@@ -1238,7 +1289,7 @@ sub fs_info
  my $missing;
  my %filesystems;
  my $dir;
- my @filesystem_list = `/usr/bin/sudo /sbin/btrfs filesystem show`;
+ my @filesystem_list = root_query('btrfs-show');
  my @usage;
  foreach (@filesystem_list)
     {
@@ -1283,7 +1334,7 @@ sub fs_info
         {
            $mounted="Mounted";
 	   $raid=raid_status($fs);
-	   @usage=`/usr/bin/sudo /sbin/btrfs filesystem usage $dir`;
+	   @usage=root_query('btrfs-usage',$dir);
        foreach (@usage)
        {
         if($_ =~ m/Device size:/)
@@ -1341,7 +1392,7 @@ sub fs_info
 
      # (1) Disk errors: any non-zero *_errs counter across the member devices.
      my $err = 0;
-     foreach (`/usr/bin/sudo /sbin/btrfs device stats $d 2>/dev/null`)
+     foreach (root_query('device-stats',$d))
         {
          if (/_errs\s+(\d+)/ && $1 > 0) { $err = 1; last; }
         }

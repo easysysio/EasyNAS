@@ -56,9 +56,11 @@ sub view ($self) {
 sub disk_format($self) {
 
  my $disk = $self->param("disk");
- my $rc = system("/usr/bin/sudo /usr/sbin/wipefs -t brtfs -f -o 0x10040  $disk >/dev/null");
- 
- if ($rc) {
+ # The helper wipes only a disk nothing uses (mounted, swap, a pool's).
+ my ($ok,$out) = root_do('disk','wipe',$disk // "");
+ write_log("disk","ERROR","format $disk failed: $out") unless $ok;
+
+ if (!$ok) {
   $result="fail";
   $msg=$TEXT{'disk_format_failed'};
  }
@@ -74,9 +76,10 @@ sub disk_format($self) {
 sub clean_errs($self)
 {
   my $disk=$self->param("disk");
-  my $rc=system("/usr/bin/sudo /usr/sbin/btrfs device stat -z $disk");
+  my ($ok,$out)=root_do('fs','stats-reset',$disk // "");
+  write_log("disk","ERROR","clearing the error counters of $disk failed: $out") unless $ok;
 
-  if ($rc) {
+  if (!$ok) {
    $result="fail";
    $msg=$TEXT{'disk_clean_errs_failed'};
   }
