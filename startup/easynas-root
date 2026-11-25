@@ -205,6 +205,27 @@ my %FILES = (
 
 sub slurp_fh { my ($fh) = @_; local $/; my $s = <$fh>; return $s // '' }
 
+# Root's own: owned by the helper's user and writable by nobody else.
+sub own_st { my @st = @_; return $st[4] == $> && !(S_IMODE($st[2]) & 022) }
+
+# Every directory between the prefix and $real must be a real directory of
+# the helper's user that nobody else can rename things in: writable only by
+# its owner, or sticky (like /etc/easynas, root:easynas 1775, where easynas
+# makes its own files but can't move root's). Else a directory easynas can
+# change could swap a file, or itself, between the checks and the write.
+sub safe_dirs {
+  my ($real) = @_;
+  my $d = $PREFIX;
+  my @parts = grep { length } split m{/}, substr(dirname($real), length $PREFIX);
+  for my $p (@parts) {
+    $d .= "/$p";
+    my @st = lstat($d);
+    refuse("$d is not a directory") unless @st && S_ISDIR($st[2]);
+    refuse("$d is not root's") unless $st[4] == $>;
+    refuse("others can change $d") if (S_IMODE($st[2]) & 022) && !(S_IMODE($st[2]) & 01000);
+  }
+}
+
 # The file's text, '' when it doesn't exist. A link is refused: these files
 # are plain files, and a link could point anywhere.
 sub read_config {
@@ -219,13 +240,20 @@ sub read_config {
 }
 
 # Write $text to $real in one step: a new file next to it, then renamed over
-# it, with the old file's owner and mode (a new one is the helper's, root's,
-# and 0644).
+# it. The new file is root's (the helper's user) and writable only by root,
+# with the old file's group and the rest of its mode (radiusd reads
+# clients.conf through its group); the easynas group, from older releases
+# that gave easynas these files, becomes root's. A new file is 0644.
 sub replace_file {
   my ($real, $text) = @_;
+  safe_dirs($real);
   my @st = lstat($real);
   refuse("$real is not a plain file") if @st && !S_ISREG($st[2]);
-  my ($uid, $gid, $mode) = @st ? ($st[4], $st[5], S_IMODE($st[2])) : ($>, (split ' ', $))[0], 0644);
+  my $egid = (split ' ', $))[0];
+  my $gid = @st ? $st[5] : $egid;
+  my $easynas = getgrnam('easynas');
+  $gid = $egid if defined $easynas && $gid == $easynas && $easynas != $egid;
+  my ($uid, $mode) = ($>, @st ? S_IMODE($st[2]) & ~022 : 0644);
   my $tmp = dirname($real) . '/.' . basename($real) . ".easynas-root.$$";
   sysopen(my $fh, $tmp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600)
     or do { print STDERR "easynas-root: $tmp: $!\n"; exit 1 };
@@ -262,17 +290,21 @@ sub file_cmd {
   refuse("usage: file read|write|append <path>") unless defined $path && @ARGV == 0;
   my $f = $FILES{$path} or refuse("$path is not a file EasyNAS manages");
   my $real = $PREFIX . $path;
-  if ($op eq 'read') { print read_config($real); exit 0 }
+  if ($op eq 'read') { safe_dirs($real); print read_config($real); exit 0 }
   refuse("unknown file action \"$op\"") unless $op eq 'write' || $op eq 'append';
   my $in = stdin_text();
   # one change at a time (each reads the file, then writes it)
   my $lock;
   flock($lock, LOCK_EX) if open($lock, '>>', "$PREFIX/run/easynas-root.lock");
+  safe_dirs($real);
   my $old = read_config($real);
   my $new = $op eq 'write' ? $in : $old . ($old eq '' || $old =~ /\n\z/ ? '' : "\n") . $in;
   $new .= "\n" if $new ne '' && $new !~ /\n\z/;
   refuse("more than $MAX_SIZE bytes") if length($new) > $MAX_SIZE;
-  check_added($path, $old, $new, $f->[0]);
+  # Lines already there may stay -- unless someone else could have put them
+  # there: a file that isn't root's alone has every line checked.
+  my @st = lstat($real);
+  check_added($path, (!@st || own_st(@st)) ? $old : '', $new, $f->[0]);
   replace_file($real, $new) unless $new eq $old;
   exit 0;
 }

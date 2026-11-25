@@ -11,16 +11,21 @@
 #       is still processed. zypper can't run concurrently anyway, so this
 #       serialization is required, not just cosmetic.
 #
-# State (all under the writable config dir, read by the addons page):
+# State, in /run/easynas (root's; read by the addons page). Not under
+# /etc/easynas: easynas makes files there, and could leave a link where root
+# is about to write.
 #   addonq      pending ops, one "<op>\t<package>" line per op, in order
 #   addonq.cur  the op currently running (absent when idle)
 #   update.status  "updating" while the queue is active (drives the banner)
+# The catalog (<package>.addon, easynas.updates) is in /etc/easynas/addons,
+# root's too.
 set -u
-DIR=/etc/easynas
+DIR=/run/easynas
 QUEUE="$DIR/addonq"
 CUR="$DIR/addonq.cur"
 LOG=/var/log/easynas/update.log
-ADDONDIR="$DIR/addons"
+ADDONDIR=/etc/easynas/addons
+mkdir -p -m 0755 "$DIR"
 
 valid_pkg() { case "$1" in easynas|easynas-[a-z0-9-]*) return 0 ;; *) return 1 ;; esac; }
 
@@ -29,7 +34,6 @@ if [ "${1:-}" = "enqueue" ]; then
     op="${2:-}"; pkg="${3:-}"
     case "$op" in install|update) ;; *) exit 2 ;; esac
     valid_pkg "$pkg" || exit 2
-    mkdir -p "$DIR"
     ( flock 8; printf '%s\t%s\n' "$op" "$pkg" >> "$QUEUE" ) 8>>"$QUEUE.lock"
     echo updating > "$DIR/update.status"
     exit 0
@@ -84,7 +88,7 @@ while :; do
     # Reflect the new state: refresh this addon's info and the pending-update
     # list so the grid and the sidebar badge are correct on the next reload.
     zypper --xmlout info "$pkg" > "$ADDONDIR/$pkg.addon" 2>/dev/null
-    zypper --quiet --xmlout lu -a --repo "$repo" > "$DIR/easynas.updates" 2>/dev/null
+    zypper --quiet --xmlout lu -a --repo "$repo" > "$ADDONDIR/easynas.updates" 2>/dev/null
 done
 
 # Queue drained: clear the current-op and the banner flag.

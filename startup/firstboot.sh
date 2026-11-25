@@ -44,19 +44,39 @@ persist_bind easynas  /etc/easynas
 persist_bind samba    /var/lib/samba
 persist_bind samba-cf /etc/samba      # smb.conf
 
+# Who owns what in /etc/easynas and /var/log/easynas: the web interface's
+# files are easynas's, the daemons' configs and root's logs root's (see
+# conf-perms.sh). Before anything below writes there.
+/easynas/startup/conf-perms.sh
+
+# Seeds of the web interface's own files. /etc/easynas is easynas's to make
+# files in, so each is made in a directory of root's first and then renamed
+# into place: a link easynas left at the name is replaced, not written
+# through.
+seed_app_file() {   # <tmpdir> <name> [mode]
+    chown easynas:easynas "$1/$2" && chmod "${3:-0644}" "$1/$2" && mv -fT "$1/$2" "${CONF_DIR}/$2"
+}
+
 # SSL certificate (conflict #3): generate only if missing, so an OS upgrade
 # never regenerates the appliance's identity.
-if [ ! -f ${CONF_DIR}/easynas.cert ]; then
-    openssl req -x509 -newkey rsa:2048 \
-        -keyout ${CONF_DIR}/easynas.key \
-        -out ${CONF_DIR}/easynas.cert \
-        -sha256 -days 365 -nodes \
-        -subj "/C=US/ST=Oregon/O=EasyNAS/OU=Org/CN=easynas"
+if [ ! -f ${CONF_DIR}/easynas.cert ] || [ -L ${CONF_DIR}/easynas.cert ]; then
+    t=$(mktemp -d "${CONF_DIR}/.seed.XXXXXX") && {
+        openssl req -x509 -newkey rsa:2048 \
+            -keyout "$t/easynas.key" \
+            -out "$t/easynas.cert" \
+            -sha256 -days 365 -nodes \
+            -subj "/C=US/ST=Oregon/O=EasyNAS/OU=Org/CN=easynas" \
+        && seed_app_file "$t" easynas.key 0600 && seed_app_file "$t" easynas.cert
+        rm -rf "$t"
+    }
 fi
 
 # Listen port (conflict #1): seed the default if missing.
-if [ ! -f ${CONF_DIR}/easynas.conf ]; then
-    echo "EASYNAS_PORT=1443" > ${CONF_DIR}/easynas.conf
+if [ ! -f ${CONF_DIR}/easynas.conf ] || [ -L ${CONF_DIR}/easynas.conf ]; then
+    t=$(mktemp -d "${CONF_DIR}/.seed.XXXXXX") && {
+        echo "EASYNAS_PORT=1443" > "$t/easynas.conf" && seed_app_file "$t" easynas.conf
+        rm -rf "$t"
+    }
 fi
 # systemd holds the listening socket (easynas.socket); give it that port.
 /easynas/startup/web-port.sh --boot
@@ -67,9 +87,6 @@ fi
 if [ ! -f ${CRON} ]; then
     echo '0 */6 * * *  root sleep ${RANDOM:0:2}m ;/easynas/startup/check_update.pl' > ${CRON}
 fi
-
-chown -R easynas:easynas ${CONF_DIR}
-chown -R easynas:easynas /var/log/easynas
 
 # --- btrfs root snapshots (set up here, not at image-build) -------------------
 # The image ships a plain '@' subvolume root (KIWI btrfs_root_is_subvolume),

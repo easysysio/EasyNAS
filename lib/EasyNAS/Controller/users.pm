@@ -142,7 +142,7 @@ sub set_admin_password {
  my $salt='$6$'.join('',map { $c[int rand @c] } 1..16).'$';
  my $hash=crypt($password,$salt);
  return 'users_failed_to_change_password' if !defined $hash || $hash !~ /^\$6\$/;
- # /etc/easynas belongs to easynas: write a 0600 temp file next to
+ # easynas makes its files in /etc/easynas (conf-perms.sh): write a 0600 temp file next to
  # admin.conf and rename it over, so a failed write never leaves it half-done.
  my $conf="$ADMIN_CONF_DIR/admin.conf";
  my $tmp="$conf.new.$$";

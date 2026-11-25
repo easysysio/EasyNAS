@@ -36,8 +36,9 @@ Obsoletes:      easynas-mm-plex < 1.99-5
 # The NAS-user frame, templates/layouts/user.html.ep (needed by fs-files).
 Provides:       easynas(user-layout)
 Provides:       easynas(lxc-helper) = 6
-# startup/easynas-root: service <action> <unit>; 2: file, share-marker, hostname
-Provides:       easynas(root-helper) = 2
+# startup/easynas-root: service <action> <unit>; 2: file, share-marker,
+# hostname; 3: startup/conf-perms.sh, root's /etc/easynas/{rsyncd,raddb,...}
+Provides:       easynas(root-helper) = 3
 # The core only lets GETs show things (POST for changes, see lib/EasyNAS.pm);
 # these add-on releases are the first whose pages make their changes by POST,
 # so older ones are updated along with the core.
@@ -626,11 +627,11 @@ DLNA addon for EasyNAS
 #### RSync ####
 %package        fs-rsyncd
 Version:        %{version}
-Release:        9
+Release:        10
 Summary:        RSyncd addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
-Requires:       easynas(root-helper) >= 2
+Requires:       easynas(root-helper) >= 3
 Requires:       rsync
 
 %description fs-rsyncd
@@ -652,7 +653,9 @@ RSyncd addon for EasyNAS
 # Seed the addon's rsync config on first install. The rsyncd controller only
 # appends module sections to this file, so it must already exist with sane
 # globals. Never clobber an existing config so shares survive upgrades.
-mkdir -p /etc/easynas/rsyncd
+# conf-perms.sh makes /etc/easynas/rsyncd root's (rsync runs as root, and the
+# web interface's user can make files in /etc/easynas).
+/easynas/startup/conf-perms.sh || :
 if [ ! -e /etc/easynas/rsyncd/rsyncd.conf ] ; then
   cat > /etc/easynas/rsyncd/rsyncd.conf << 'RSCONF'
 # EasyNAS rsync daemon config. Module sections are appended below by the
@@ -678,11 +681,11 @@ fi
 #### Radius ####
 %package        srv-radius
 Version:        %{version}
-Release:        9
+Release:        10
 Summary:        Radius addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
-Requires:       easynas(root-helper) >= 2
+Requires:       easynas(root-helper) >= 3
 Requires:       freeradius-server
 
 %description srv-radius
@@ -706,9 +709,12 @@ Radius addon for EasyNAS
 # its whole config tree -- not just radiusd.conf/clients.conf -- so copy it
 # wholesale, preserving the mods-enabled/sites-enabled symlinks and the
 # root:radiusd ownership the daemon expects. Never clobber an existing tree, so
-# client edits survive upgrades.
+# client edits survive upgrades. conf-perms.sh makes /etc/easynas/raddb, root's
+# (the web interface's user can make files in /etc/easynas); the tree is
+# copied into it.
+/easynas/startup/conf-perms.sh || :
 if [ ! -e /etc/easynas/raddb/radiusd.conf ] && [ -d /etc/raddb ] ; then
-  cp -a /etc/raddb /etc/easynas/raddb
+  cp -a /etc/raddb/. /etc/easynas/raddb/
 fi
 /usr/bin/systemctl daemon-reload 2>/dev/null || true
 
@@ -1033,6 +1039,18 @@ Polish Language for EasyNAS
   - Logs, update progress, the admin password, the web port and the
     certificate are read and written directly, without sudo; an uploaded
     certificate must match its key. 134 sudo calls left outside the helpers
+  - /etc/easynas and /var/log/easynas are root:easynas 1775, no longer
+    easynas's: the web interface makes and replaces its own files there
+    (admin.conf, the certificate, easynas.conf, ...), but the daemons'
+    configs (rsyncd, raddb, tgt, minidlna, tftp, pure-ftpd.conf), the add-on
+    catalog and root's logs are root's. firstboot.sh no longer gives all of
+    /etc/easynas to easynas at every boot; startup/conf-perms.sh sets this
+    up, taking over the files older releases gave easynas on its first run
+  - The add-on queue and update status moved to /run/easynas, the update
+    list and core manifest to /etc/easynas/addons: root no longer writes
+    where easynas could leave a link. The root helper refuses a config in a
+    directory others can change, and checks every line of one that isn't
+    root's alone
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

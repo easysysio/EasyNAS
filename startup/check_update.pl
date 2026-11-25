@@ -30,9 +30,13 @@ my $fh;
 my $timestamp=localtime();
 
 ###### write log ######
- open($fh, '>>', $log_file) or die $!;
- print $fh $timestamp." [SYSTEM] Checking EasyNAS updates\n";
- close $fh;
+# easynas.log is the web interface's (easynas's): append without following a
+# link it may have left there.
+use Fcntl qw(O_WRONLY O_APPEND O_CREAT O_NOFOLLOW);
+ if (sysopen($fh, $log_file, O_WRONLY|O_APPEND|O_CREAT|O_NOFOLLOW, 0644)) {
+  print $fh $timestamp." [SYSTEM] Checking EasyNAS updates\n";
+  close $fh;
+ }
 
 ##### Capture Stats ######
 # All external calls are bounded by timeouts so a slow or unreachable endpoint
@@ -58,16 +62,16 @@ foreach (`/usr/bin/sudo /usr/bin/zypper --quiet lr -E 2>/dev/null`) {
 }
 `/usr/bin/sudo /usr/bin/zypper --quiet --gpg-auto-import-keys refresh`;
 `/usr/bin/sudo /usr/bin/zypper --quiet --xmlout search easynas | /usr/bin/sudo /usr/bin/tee /etc/easynas/addons/easynas.addons`;
-`/usr/bin/sudo /usr/bin/zypper --quiet --xmlout lu -a --repo $repo | /usr/bin/sudo /usr/bin/tee  /etc/easynas/easynas.updates`;
+`/usr/bin/sudo /usr/bin/zypper --quiet --xmlout lu -a --repo $repo | /usr/bin/sudo /usr/bin/tee  /etc/easynas/addons/easynas.updates`;
 
 ####### Core (firmware) image update #######
 # Fetch the channel's per-arch core-image manifest (version/date/file/sha256)
-# into easynas.core, for the core-update page to come (docs/core-update-design.md).
+# into addons/easynas.core, for the core-update page to come (docs/core-update-design.md).
 my $channel = ($repo eq "EasyNAS_Beta") ? "testing" : "stable";
 # Fetch with --fail to a temp file and only replace easynas.core on success, so
 # a missing manifest (e.g. an empty channel -> HTTP 404) or an offline check
 # can't overwrite the previous manifest with a 404 body or an empty file.
-my $core_tmp="/etc/easynas/easynas.core.new";
+my $core_tmp="/etc/easynas/addons/easynas.core.new";
 # curl writes the file itself (-o) rather than via a pipe, so $core_rc reflects
 # curl's own exit status -- a piped 'tee' would always exit 0 and mask --fail.
 # The Raspberry Pi image is its own flavour, with its own manifest
@@ -81,7 +85,7 @@ if (open(my $mfh, '<', '/proc/device-tree/model')) {
 my $core_rc=system("curl -fs --connect-timeout 5 --max-time 15 -o $core_tmp "
                   ."https://repo.easysys.io/easynas/$channel/RAW/latest.$flavour$arc");
 if ($core_rc == 0 && -s $core_tmp) {
-  `/bin/mv $core_tmp /etc/easynas/easynas.core`;
+  `/bin/mv $core_tmp /etc/easynas/addons/easynas.core`;
 } else {
   `/bin/rm -f $core_tmp`;
 }

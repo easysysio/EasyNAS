@@ -148,6 +148,40 @@ for my $bad ("TFTP_OPTIONS=-c", "TFTP_USER=nosuchuser42", "TFTP_DIRECTORY=/", "T
   is $rc, 2, "tftp refuses: $bad";
 }
 
+# Whose files and directories (older releases gave /etc/easynas to easynas)
+{
+  my $tf = "$r/etc/easynas/tftp";
+  my $good = "TFTP_USER=nobody\nTFTP_OPTIONS=\nTFTP_DIRECTORY=/mnt/data/vol \n";
+  put($tf, "TFTP_OPTIONS=-c\n");            # a line the helper wouldn't write
+  ($rc) = feed("TFTP_OPTIONS=-c\n", qw(file write /etc/easynas/tftp));
+  is $rc, 0, 'lines already in a file only root can change may stay';
+  chmod 0664, $tf;
+  ($rc) = feed("TFTP_OPTIONS=-c\n", qw(file write /etc/easynas/tftp));
+  is $rc, 2, '...not in a file others could have changed';
+  ($rc, $err) = feed($good, qw(file write /etc/easynas/tftp));
+  is $rc, 0, '...which can be rewritten with lines that pass' or diag $err;
+  is sprintf('%o', (stat $tf)[2] & 07777), '644', '...and is then writable only by root';
+
+  chmod 0775, "$r/etc/easynas";
+  ($rc) = feed($good, qw(file write /etc/easynas/tftp));
+  is $rc, 2, 'a directory on the way others can write to is refused';
+  ($rc) = run(qw(file read /etc/easynas/tftp));
+  is $rc, 2, '...for a read too';
+  chmod 01775, "$r/etc/easynas";
+  ($rc, $err) = feed($good, qw(file write /etc/easynas/tftp));
+  is $rc, 0, '...unless it is sticky (/etc/easynas: root:easynas 1775)' or diag $err;
+  chmod 0755, "$r/etc/easynas";
+
+  rename "$r/etc/easynas/raddb", "$r/outside/raddb";
+  symlink "$r/outside/raddb", "$r/etc/easynas/raddb";
+  my $was = -e "$r/outside/raddb/clients.conf" ? slurp("$r/outside/raddb/clients.conf") : undef;
+  ($rc) = feed("client a {\n", qw(file append /etc/easynas/raddb/clients.conf));
+  is $rc, 2, 'a directory on the way that is a link is refused';
+  is((-e "$r/outside/raddb/clients.conf" ? slurp("$r/outside/raddb/clients.conf") : undef), $was,
+     '...nothing written through it');
+  unlink "$r/etc/easynas/raddb"; rename "$r/outside/raddb", "$r/etc/easynas/raddb";
+}
+
 put("$r/outside/x", "secret\n");
 symlink("$r/outside/x", "$r/etc/exports.lnk");
 unlink $ex; symlink("$r/outside/x", $ex);

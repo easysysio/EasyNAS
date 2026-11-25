@@ -8,7 +8,7 @@ my $addon = get_addon_info("logs");
 my %TEXT=get_lang_text($addon->{'name'});
 
 # Viewable logs, whitelisted: the file choice comes from the query string.
-# The logs are world-readable (/var/log/easynas belongs to easynas), so they
+# The logs are world-readable (see startup/conf-perms.sh), so they
 # are read directly, without sudo.
 my %LOGS = (
  easynas => "/var/log/easynas/easynas.log",

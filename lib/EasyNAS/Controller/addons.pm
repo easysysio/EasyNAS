@@ -154,7 +154,7 @@ sub view ($self) {
 # (zypper lu --xmlout). Returns package -> new edition.
 sub addon_updates {
  my %u;
- my $file="/etc/easynas/easynas.updates";
+ my $file=get_update_file();
  return %u unless (-e $file);
  my $dom;
  eval { $dom = XML::LibXML->load_xml(location => $file) };
@@ -194,11 +194,11 @@ sub start_worker {
 # (the one running now) or "waiting" (still queued). Empty when idle.
 sub queue_state {
  my %st;
- if (open(my $c,'<','/etc/easynas/addonq.cur')) {
+ if (open(my $c,'<','/run/easynas/addonq.cur')) {
   my $l=<$c>; close $c;
   if (defined $l && $l=~/^(\w+)\t(\S+)/) { $st{$2}=($1 eq 'install')?'installing':'updating'; }
  }
- if (open(my $q,'<','/etc/easynas/addonq')) {
+ if (open(my $q,'<','/run/easynas/addonq')) {
   while (my $l=<$q>) { $st{$2}||='waiting' if ($l=~/^(\w+)\t(\S+)/); }
   close $q;
  }
@@ -206,12 +206,12 @@ sub queue_state {
 }
 
 ############## refresh_update_list ##############
-# Regenerate /etc/easynas/easynas.updates from the live rpmdb so the pending-
+# Regenerate /etc/easynas/addons/easynas.updates from the live rpmdb so the pending-
 # update count (dashboard banner + sidebar badge) recomputes immediately after
 # an addon action, instead of waiting for the 6-hourly check_update.pl.
 sub refresh_update_list {
  my $repo=active_channel_repo();
- `/usr/bin/sudo /usr/bin/zypper --quiet --xmlout lu -a --repo $repo | /usr/bin/sudo /usr/bin/tee /etc/easynas/easynas.updates >/dev/null`;
+ `/usr/bin/sudo /usr/bin/zypper --quiet --xmlout lu -a --repo $repo | /usr/bin/sudo /usr/bin/tee /etc/easynas/addons/easynas.updates >/dev/null`;
 }
 
 

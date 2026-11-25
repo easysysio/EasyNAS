@@ -68,7 +68,7 @@ my $conf_hosts = "/etc/hosts";
 my $conf_webui = "/usr/lib/systemd/system/easynas.service";
 my $log_file = $log_dir."/easynas.log";
 my $addons_file= $addons_update_dir."/easynas.addons";
-my $update_file = $conf_dir."/easynas.updates";
+my $update_file = $conf_dir."/addons/easynas.updates";   # root's (check_update.pl, addon-worker.sh)
 
 # get_addons() cache. The addon catalog (~25 files under $addons_dir) is parsed
 # on every page render -- often several times (get_menu/get_addon_info call it) --
@@ -466,8 +466,8 @@ sub write_log
  my $message=$_[2];
  my $timestamp=localtime();
  my $FH;
- # '>>' makes the file when it isn't there: /var/log/easynas is easynas's
- # (startup/firstboot.sh), so no root is needed.
+ # '>>' makes the file when it isn't there: easynas makes files in
+ # /var/log/easynas (startup/conf-perms.sh), so no root is needed.
  open($FH, '>>', $log_file) or return;
  print $FH $timestamp." "."[$addon]"." ".$type." ".$message."\n";
  close $FH;
@@ -680,7 +680,7 @@ sub set_current_lang
     write_lang($lang);
 }
 
-# The language file is the web interface's own (easynas owns /etc/easynas,
+# The language file is the web interface's own (easynas makes its files in /etc/easynas,
 # see startup/firstboot.sh): written directly, no root needed.
 sub write_lang
 {
@@ -1013,7 +1013,7 @@ sub addons_info
 # writes it), else "". Read by the layout so every page shows a banner.
 sub get_update_state
 {
-  open(my $fh, '<', $conf_dir."/update.status") or return "";
+  open(my $fh, '<', "/run/easynas/update.status") or return "";   # addon-worker.sh's
   my $s = <$fh>;
   close $fh;
   chomp $s if defined $s;

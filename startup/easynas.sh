@@ -22,7 +22,7 @@ CHOOSE=""
 
 # The web administrator's credential lives in a file on the config layer, not a
 # local account (see docs/identity-design.md). Runs as the easynas user, which
-# owns /etc/easynas, so no sudo is needed to write it.
+# makes its files in /etc/easynas (conf-perms.sh), so no sudo is needed to write it.
 ADMIN_CONF=/etc/easynas/admin.conf
 
 set_admin_password() {
@@ -34,7 +34,7 @@ set_admin_password() {
         if [ "$p1" != "$p2" ] ; then echo "Passwords do not match, try again." ; continue ; fi
         break
     done
-    # The console autologin user is 'easynas', which owns /etc/easynas
+    # The console autologin user is 'easynas', whose files in /etc/easynas are its own
     # ('admin' exists solely as the web-UI login hashed below). Written to a
     # 0600 temp file, then moved over, so it is never readable by others.
     local hash

@@ -10,7 +10,7 @@ my $result;
 my $addon = get_addon_info("settings");
 my %TEXT=get_lang_text($addon->{'name'});
 
-# The web interface's own files (easynas owns /etc/easynas, see
+# The web interface's own files (easynas makes its files in /etc/easynas, see
 # startup/firstboot.sh): written directly, no root needed. t/web.t points
 # them elsewhere.
 our $CONF_DIR = "/etc/easynas";
