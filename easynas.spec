@@ -1018,6 +1018,10 @@ Polish Language for EasyNAS
     iSCSI, RADIUS and MariaDB add-ons use it (easynas(root-helper) 1).
     t/sudo-calls.t counts the sudo calls still made outside the helpers
     (200) and only lets the number go down
+  - Core update check: a Raspberry Pi asks for its own image's manifest,
+    latest.rpi.aarch64. The RPi and generic arm64 images now have their own
+    files (EasyNAS-RPi.aarch64-* and EasyNAS.aarch64-*), so a channel can
+    publish both
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

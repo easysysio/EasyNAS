@@ -70,8 +70,16 @@ my $channel = ($repo eq "EasyNAS_Beta") ? "testing" : "stable";
 my $core_tmp="/etc/easynas/easynas.core.new";
 # curl writes the file itself (-o) rather than via a pipe, so $core_rc reflects
 # curl's own exit status -- a piped 'tee' would always exit 0 and mask --fail.
+# The Raspberry Pi image is its own flavour, with its own manifest
+# (latest.rpi.aarch64); latest.aarch64 is the generic UEFI arm64 board image.
+my $flavour="";
+if (open(my $mfh, '<', '/proc/device-tree/model')) {
+  my $model = <$mfh> // "";
+  close $mfh;
+  $flavour = "rpi." if $model =~ /Raspberry Pi/;
+}
 my $core_rc=system("curl -fs --connect-timeout 5 --max-time 15 -o $core_tmp "
-                  ."https://repo.easysys.io/easynas/$channel/RAW/latest.$arc");
+                  ."https://repo.easysys.io/easynas/$channel/RAW/latest.$flavour$arc");
 if ($core_rc == 0 && -s $core_tmp) {
   `/bin/mv $core_tmp /etc/easynas/easynas.core`;
 } else {
