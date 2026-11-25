@@ -6,7 +6,6 @@ use Mojo::IOLoop::Stream;
 use Mojo::JSON qw(from_json);
 use Mojo::Util qw(encode);
 use POSIX ();
-use File::Temp ();
 
 my $addon = get_addon_info("lxc");
 my %TEXT = get_lang_text($addon->{'name'});
@@ -20,28 +19,6 @@ my $NAME_RE = qr/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 # How the terminal runs "lxc-helper.sh attach <name>" on a pseudo-terminal:
 # ($fh of its master side, $pid). Replaced in t/lxc-web.t.
 our $SPAWN = \&spawn_pty;
-
-# The new container's root password goes to the helper as a SHA-512 crypt
-# hash in a file of its own ($TMP/easynas-lxc-pw.*, 0600), never on a
-# command line (which ps and the journal show). The helper removes it.
-our $TMP = "/tmp";
-our $CRYPT = sub ($password, $salt) { crypt($password, $salt) };
-
-sub root_hash_file ($password) {
-  my @c = ('.', '/', 0..9, 'A'..'Z', 'a'..'z');
-  open(my $rnd, '<:raw', '/dev/urandom') or return;
-  read($rnd, my $bytes, 16) == 16 or return;
-  close $rnd;
-  my $salt = '$6$' . join('', map { $c[ord($_) % 64] } split //, $bytes) . '$';
-  my $hash = $CRYPT->($password, $salt) // '';
-  return unless $hash =~ m{^\$6\$[./0-9A-Za-z]{1,16}\$[./0-9A-Za-z]{86}$};
-  my ($fh, $file) = eval { File::Temp::tempfile('easynas-lxc-pw.XXXXXXXXXX', DIR => $TMP, UNLINK => 0) };
-  return unless $fh;
-  chmod 0600, $file;
-  print $fh "$hash\n";
-  close $fh or do { unlink $file; return };
-  return $file;
-}
 
 # The images on offer: the "default" variant of every system image for this
 # machine on images.linuxcontainers.org (what lxc-create's download template
@@ -187,32 +164,19 @@ sub view ($self) {
     my $auto = $self->param('autostart') ? 1 : 0;
     my %systems = systems_list();
     my $new_storage = storage_vol() eq "" ? volume_path($self->param('vol')) : "";
-    my $pw1 = $self->param('password1') // '';
-    my $pw2 = $self->param('password2') // '';
-    my $pwfile;
     if (!$named) {
       $result = "fail"; $msg = $T->('lxc_bad_name', "A name has letters, digits, '.', '_' and '-', and starts with a letter or digit.");
     } elsif ($systems{$name}) {
       $result = "fail"; $msg = $T->('lxc_exists', 'There is already a container with that name.');
     } elsif (!defined $rel || !grep { $_ eq $rel } @{$img{$dist // ''} // []}) {
       $result = "fail"; $msg = $T->('lxc_bad_image', 'Pick an image from the list.');
-    } elsif ($pw1 eq '') {
-      $result = "fail"; $msg = $T->('lxc_no_password', "Enter the container's root password.");
-    } elsif ($pw1 ne $pw2) {
-      $result = "fail"; $msg = $T->('lxc_password_mismatch', "The passwords don't match.");
-    } elsif ($pw1 =~ /[\0\r\n]/) {
-      $result = "fail"; $msg = $T->('lxc_bad_password', "A password can't have line breaks.");
     } elsif (!defined $new_storage) {
       $result = "fail"; $msg = $T->('lxc_bad_vol', 'Pick a volume.');
     } elsif ($new_storage ne "" && !helper("storage", $new_storage)) {
       $result = "fail";
       $msg = $T->('lxc_storage_failed', 'Container storage was not changed. Stop every container first; see /var/log/easynas/lxc.log.');
-    } elsif (!($pwfile = root_hash_file($pw1))) {
-      $result = "fail"; $msg = $T->('lxc_failed', 'That did not work. See /var/log/easynas/lxc.log.');
-      write_log("lxc","ERROR","could not prepare the root password of $name");
     } elsif (system("/usr/bin/sudo","/usr/bin/systemd-run","--collect","--quiet","--unit=easynas-lxc-create-$name",
-                    $HELPER,"create",$name,$dist,$rel,lxc_arch(),$net,$auto,$pwfile) != 0) {
-      unlink $pwfile;
+                    $HELPER,"create",$name,$dist,$rel,lxc_arch(),$net,$auto) != 0) {
       $result = "fail"; $msg = $T->('lxc_failed', 'That did not work. See /var/log/easynas/lxc.log.');
     } else {
       write_log("lxc","INFO","Container storage set to $new_storage") if $new_storage ne "";

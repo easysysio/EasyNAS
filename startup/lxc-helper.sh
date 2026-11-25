@@ -17,11 +17,9 @@
 #       drop-in.
 #   lxc-helper.sh start <name>
 #       Start a container, with the reason in lxc.log if it won't.
-#   lxc-helper.sh create <name> <dist> <release> <arch> <nat|lan> <0|1> <password-file>
+#   lxc-helper.sh create <name> <dist> <release> <arch> <nat|lan> <0|1>
 #       Download an image from images.linuxcontainers.org and make a container
-#       of it, with the root password whose SHA-512 crypt hash is in
-#       <password-file> (/tmp/easynas-lxc-pw.*, written by lxc.pm and removed
-#       here at once, so the password is never on a command line). Slow, so lxc.pm runs it in its own transient unit; progress is
+#       of it. Slow, so lxc.pm runs it in its own transient unit; progress is
 #       /run/easynas-lxc/<name> ("creating", then gone, or "failed").
 #       Only onto a volume: refused until "storage" has put /var/lib/lxc on
 #       one and while that volume isn't mounted.
@@ -51,7 +49,6 @@ DROPIN=${EASYNAS_LXC_DROPIN:-/etc/systemd/system/lxc.service.d/easynas-storage.c
 NETCONF=${EASYNAS_LXC_NETCONF:-/etc/default/lxc-net}
 AA_SYS=${EASYNAS_AA_SYS:-/sys/kernel/security/apparmor}
 AA_PROFILES=${EASYNAS_AA_PROFILES:-/etc/apparmor.d/lxc-containers}
-PWDIR=${EASYNAS_LXC_PWDIR:-/tmp}
 
 log() { echo "$(date '+%F %T') [lxc] $*" >> "$LOG"; }
 die() { log "$*"; echo "$*" >&2; exit 1; }
@@ -112,16 +109,8 @@ start)
     ;;
 
 create)
-    name="${1:-}"; dist="${2:-}"; rel="${3:-}"; arch="${4:-}"; net="${5:-}"; auto="${6:-0}"; pwfile="${7:-}"
-    # The root password's hash: read it, and remove the file whatever
-    # happens next.
-    hash=""
-    if echo "$pwfile" | grep -Eq "^$PWDIR/easynas-lxc-pw\.[A-Za-z0-9_]{8,}\$"; then
-        [ -f "$pwfile" ] && [ ! -L "$pwfile" ] && hash=$(head -n 1 "$pwfile")
-        rm -f "$pwfile"
-    fi
+    name="${1:-}"; dist="${2:-}"; rel="${3:-}"; arch="${4:-}"; net="${5:-}"; auto="${6:-0}"
     need_name "$name"
-    echo "$hash" | grep -Eq '^\$6\$[./0-9A-Za-z]{1,16}\$[./0-9A-Za-z]{86}$' || die "no root password for $name"
     echo "$dist$rel" | grep -Eq '^[A-Za-z0-9._-]+$' || die "bad image"
     case "$arch" in amd64|arm64) ;; *) die "bad architecture" ;; esac
     case "$net"  in nat|lan) ;; *) die "bad network" ;; esac
@@ -153,23 +142,15 @@ create)
     printf 'lxc.net.0.flags = up\nlxc.net.0.hwaddr = 10:66:6a:xx:xx:xx\nlxc.start.auto = %s\n' "$auto" >> "$conf"
 
     log "creating $name from $dist $rel ($arch, $net network)"
-    fail_create() {
+    if lxc-create -n "$name" -f "$conf" -t download -- -d "$dist" -r "$rel" -a "$arch" >> "$LOG" 2>&1; then
+        rm -f "$conf" "$STATE/$name"
+        log "created $name"
+    else
         rm -f "$conf"
         lxc-destroy -n "$name" >/dev/null 2>&1
         echo failed > "$STATE/$name"
-        die "$1"
-    }
-    lxc-create -n "$name" -f "$conf" -t download -- -d "$dist" -r "$rel" -a "$arch" >> "$LOG" 2>&1 \
-        || fail_create "creating $name failed"
-    # The root password, straight into the (stopped) container's shadow file:
-    # every image has one with a locked root line. (The crypt alphabet has no
-    # "|", "&" or "\", so the hash is safe in the sed replacement.)
-    shadow="$LXCPATH/$name/rootfs/etc/shadow"
-    { [ -f "$shadow" ] && [ ! -L "$shadow" ] && grep -q '^root:' "$shadow" \
-      && sed -i "s|^root:[^:]*:|root:$hash:|" "$shadow" && grep -qF "root:$hash:" "$shadow"; } \
-        || fail_create "could not set the root password of $name"
-    rm -f "$conf" "$STATE/$name"
-    log "created $name"
+        die "creating $name failed"
+    fi
     ;;
 
 delete)

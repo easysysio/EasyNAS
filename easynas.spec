@@ -35,7 +35,7 @@ Requires:       dmidecode
 Obsoletes:      easynas-mm-plex < 1.99-5
 # The NAS-user frame, templates/layouts/user.html.ep (needed by fs-files).
 Provides:       easynas(user-layout)
-Provides:       easynas(lxc-helper) = 5
+Provides:       easynas(lxc-helper) = 6
 # The core only lets GETs show things (POST for changes, see lib/EasyNAS.pm);
 # these add-on releases are the first whose pages make their changes by POST,
 # so older ones are updated along with the core.
@@ -377,11 +377,11 @@ fi
 #### lxc ####
 %package        srv-lxc
 Version:        %{version}
-Release:        12
+Release:        13
 Summary:        Virtualization addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
-Requires:       easynas(lxc-helper) >= 5
+Requires:       easynas(lxc-helper) >= 6
 Requires:       lxc
 # the web terminal's pseudo-terminal
 Requires:       perl(IO::Pty)
@@ -990,15 +990,14 @@ Polish Language for EasyNAS
     sign-in (only from the appliance's own pages), which runs lxc-attach on a
     pseudo-terminal (lxc-helper.sh attach; easynas(lxc-helper) 4). No more
     port 8080 or ttyd; requires perl(IO::Pty)
-  - LXC (srv-lxc 12): the Create form sets the container's root password
-    (images come with root locked). It reaches lxc-helper.sh as a SHA-512
-    hash in a 0600 file the helper removes at once -- never on a command
-    line -- and goes into the container's /etc/shadow
-    (easynas(lxc-helper) 5)
   - Update channel and "Check for updates": a failure now says what zypper
     said ("Valid metadata not found at specified URL", a lock...) on the page
     and in the log, instead of a bare "Could not change the update channel",
     or "Checked for updates" over a list that was never refreshed
+  - LXC (srv-lxc 13): the Create form no longer asks for a root password
+    (srv-lxc 12 did). The terminal is already a root shell, so set one there
+    with passwd if the container needs it (for SSH). easynas(lxc-helper) 6:
+    create takes no password file again
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

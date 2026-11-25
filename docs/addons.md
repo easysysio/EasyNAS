@@ -57,9 +57,7 @@ After installing a language pack, select the language in **Admin → Settings**.
 (Debian, Ubuntu, Alpine, openSUSE and more) sharing the NAS's kernel.
 
 1. **Create new System**: name it, pick an image (downloaded from
-   images.linuxcontainers.org for your machine), set its **root password**
-   (the images come with root locked; you sign in with it over SSH, once
-   that is installed in the container), and pick the network:
+   images.linuxcontainers.org for your machine), and pick the network:
     - **Private**: an address on a network inside the NAS (10.0.3.x). It
       reaches the internet; other devices can't reach it.
     - **Your network**: its own address from your router. Other devices can

@@ -47,13 +47,6 @@ my $state = $stub->child('state')->make_path;
 my $fstab = $stub->child('fstab');
 put_file($fstab, "LABEL=pool /mnt/pool btrfs rw 0 0\n");
 $EasyNAS::Controller::Lxc::FSTAB = "$fstab";
-# The root password: hashed (a stand-in for crypt, as a Mac's has no SHA-512)
-# into a file of its own.
-my $pwdir = $stub->child('tmp')->make_path;
-$EasyNAS::Controller::Lxc::TMP = "$pwdir";
-my @CRYPTED;
-$EasyNAS::Controller::Lxc::CRYPT = sub ($pw, $salt) { push @CRYPTED, [$pw, $salt]; $salt . ('h' x 86) };
-my %PW = (password1 => "s3cret pw", password2 => "s3cret pw");
 $EasyNAS::Controller::Lxc::STATE  = "$state";
 $EasyNAS::Controller::Lxc::IMAGES = $stub->child('images').'';
 put_file($EasyNAS::Controller::Lxc::IMAGES, join '', map { "$_\n" }
@@ -111,51 +104,25 @@ $t->get_ok('/lxc?action=createlxcmenu')->status_is(200)
     ->element_exists('button[type="submit"][disabled]', '...and can\'t create');
 }
 
-# ---- create: the root password
-@SYS = ();
-$t->post_ok('/lxc' => form => { action => 'create', name => 'box', image => 'debian:trixie', vol => 'pool/data' })
-  ->content_like(qr/Enter the container(?:'|&#39;)s root password/);
-$t->post_ok('/lxc' => form => { action => 'create', name => 'box', image => 'debian:trixie', vol => 'pool/data', password1 => 'a', password2 => 'b' })
-  ->content_like(qr/The passwords don(?:'|&#39;)t match/);
-$t->post_ok('/lxc' => form => { action => 'create', name => 'box', image => 'debian:trixie', vol => 'pool/data', password1 => "a\nb", password2 => "a\nb" })
-  ->content_like(qr/line breaks/);
-is scalar(@SYS), 0, 'no password: nothing ran';
-is_deeply [glob("$pwdir/*")], [], '...and no file written';
-$t->get_ok('/lxc?action=createlxcmenu')->element_exists('input[type="password"][name="password1"][required]')
-  ->element_exists('input[type="password"][name="password2"][required]');
-
 # ---- create: the first one picks the volume
 @SYS = ();
-$t->post_ok('/lxc' => form => { action => 'create', %PW, name => 'box', image => 'debian:trixie' })->content_like(qr/Pick a volume/);
-$t->post_ok('/lxc' => form => { action => 'create', %PW, name => 'box', image => 'debian:trixie', vol => 'pool/nope' })->content_like(qr/Pick a volume/);
-$t->post_ok('/lxc' => form => { action => 'create', %PW, name => 'box', image => 'debian:trixie', vol => '../../etc' })->content_like(qr/Pick a volume/);
+$t->post_ok('/lxc' => form => { action => 'create', name => 'box', image => 'debian:trixie' })->content_like(qr/Pick a volume/);
+$t->post_ok('/lxc' => form => { action => 'create', name => 'box', image => 'debian:trixie', vol => 'pool/nope' })->content_like(qr/Pick a volume/);
+$t->post_ok('/lxc' => form => { action => 'create', name => 'box', image => 'debian:trixie', vol => '../../etc' })->content_like(qr/Pick a volume/);
 is scalar(@SYS), 0, 'not a volume: nothing ran';
 @RC = (256);
-$t->post_ok('/lxc' => form => { action => 'create', %PW, name => 'box', image => 'debian:trixie', vol => 'pool/data' })
+$t->post_ok('/lxc' => form => { action => 'create', name => 'box', image => 'debian:trixie', vol => 'pool/data' })
   ->content_like(qr/Container storage was not changed/, 'the volume could not be set up: says so');
 is_deeply $helper->(), [['storage', '/mnt/pool/data']];
 ok !grep({ $_->[1] eq '/usr/bin/systemd-run' } @SYS), '...and creates nothing';
 @SYS = ();
-$t->post_ok('/lxc' => form => { action => 'create', %PW, name => 'box', image => 'debian:trixie', network => 'lan', autostart => 1, vol => 'pool/data' })
+$t->post_ok('/lxc' => form => { action => 'create', name => 'box', image => 'debian:trixie', network => 'lan', autostart => 1, vol => 'pool/data' })
   ->status_is(200)->content_like(qr/Downloading the image/);
-my $pwfile = $SYS[-1][-1];
 is_deeply [map { [@$_[1..$#$_]] } @SYS],
   [['/easynas/startup/lxc-helper.sh', 'storage', '/mnt/pool/data'],
    ['/usr/bin/systemd-run', '--collect', '--quiet', '--unit=easynas-lxc-create-box',
-    '/easynas/startup/lxc-helper.sh', 'create', 'box', 'debian', 'trixie', 'arm64', 'lan', 1, $pwfile]],
+    '/easynas/startup/lxc-helper.sh', 'create', 'box', 'debian', 'trixie', 'arm64', 'lan', 1]],
   'puts containers on the volume, then runs the helper in its own unit, as list arguments';
-like $pwfile, qr{^\Q$pwdir\E/easynas-lxc-pw\.\w{10}$}, 'the password goes as a file';
-is $CRYPTED[-1][0], 's3cret pw', '...hashed';
-like $CRYPTED[-1][1], qr{^\$6\$[./0-9A-Za-z]{16}\$$}, '...as SHA-512 with a fresh salt';
-isnt $CRYPTED[-2][1], $CRYPTED[-1][1], '...a different one each time' if @CRYPTED > 1;
-open(my $pf, '<', $pwfile) or die; my $inside = do { local $/; <$pf> }; close $pf;
-is $inside, $CRYPTED[-1][1] . ('h' x 86) . "\n", '...holding only the hash';
-is((stat $pwfile)[2] & 0777, 0600, '...readable by this account only');
-ok !grep({ grep { defined && /s3cret/ } @$_ } @SYS), 'the password is on no command line';
-unlink $pwfile;
-@SYS = (); @RC = (0, 256);
-$t->post_ok('/lxc' => form => { action => 'create', %PW, name => 'box', image => 'debian:trixie', vol => 'pool/data' })->content_like(qr/That did not work/);
-ok !-e $SYS[-1][-1], 'the create did not start: its password file is removed';
 
 # ---- after that, every container goes to that volume
 put_file($fstab, "LABEL=pool /mnt/pool btrfs rw 0 0\n/mnt/pool/data/lxc /var/lib/lxc none bind,x-systemd.requires-mounts-for=/mnt/pool 0 0 # easynas-lxc-storage\n");
@@ -164,19 +131,19 @@ $t->get_ok('/lxc?action=createlxcmenu')
   ->text_is('#lxc-storage .form-control-static b' => 'pool/data');
 $t->get_ok('/lxc')->content_like(qr/Containers are kept on.*pool\/data/s)->content_unlike(qr/system disk, which a firmware update wipes/);
 @SYS = ();
-$t->post_ok('/lxc' => form => { action => 'create', %PW, name => 'box9', image => 'debian:trixie', vol => 'pool/media' });
+$t->post_ok('/lxc' => form => { action => 'create', name => 'box9', image => 'debian:trixie', vol => 'pool/media' });
 is_deeply [map { $_->[1] } @SYS], ['/usr/bin/systemd-run'], 'the volume is set: only the create runs...';
 is_deeply $helper->(), [], '...with no storage change, whatever the form says';
 put_file($fstab, "LABEL=pool /mnt/pool btrfs rw 0 0\n");
 @SYS = ();
-$t->post_ok('/lxc' => form => { action => 'create', %PW, name => 'x;reboot', image => 'debian:trixie' })->content_like(qr/A name has letters/);
-$t->post_ok('/lxc' => form => { action => 'create', %PW, name => 'web', image => 'debian:trixie' })->content_like(qr/already a container/);
-$t->post_ok('/lxc' => form => { action => 'create', %PW, name => 'box2', image => 'ubuntu:noble' })->content_like(qr/Pick an image/, 'not an image for this machine');
-$t->post_ok('/lxc' => form => { action => 'create', %PW, name => 'box2', image => 'debian:trixie;id' })->content_like(qr/Pick an image/);
+$t->post_ok('/lxc' => form => { action => 'create', name => 'x;reboot', image => 'debian:trixie' })->content_like(qr/A name has letters/);
+$t->post_ok('/lxc' => form => { action => 'create', name => 'web', image => 'debian:trixie' })->content_like(qr/already a container/);
+$t->post_ok('/lxc' => form => { action => 'create', name => 'box2', image => 'ubuntu:noble' })->content_like(qr/Pick an image/, 'not an image for this machine');
+$t->post_ok('/lxc' => form => { action => 'create', name => 'box2', image => 'debian:trixie;id' })->content_like(qr/Pick an image/);
 is scalar(@SYS), 0, 'none of those ran anything';
-$t->post_ok('/lxc' => form => { action => 'create', %PW, name => 'box3', image => 'alpine:3.23', network => 'bogus', vol => 'pool/data' });
-is $SYS[-1][-3], 'nat', 'any other network is the private one';
-is $SYS[-1][-2], 0, 'autostart off unless ticked';
+$t->post_ok('/lxc' => form => { action => 'create', name => 'box3', image => 'alpine:3.23', network => 'bogus', vol => 'pool/data' });
+is $SYS[-1][-2], 'nat', 'any other network is the private one';
+is $SYS[-1][-1], 0, 'autostart off unless ticked';
 
 # ---- delete, autostart, start
 @SYS = ();
