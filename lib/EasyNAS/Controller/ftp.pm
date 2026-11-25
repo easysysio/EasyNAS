@@ -22,15 +22,15 @@ sub view ($self) {
 
 ##### ftpon #####
  if (defined($action) && $action eq "ftpon") {
-  `/usr/bin/sudo /usr/bin/systemctl start $service`;
-  `/usr/bin/sudo /usr/bin/systemctl enable $service`;
+  service_ctl('start',$service);
+  service_ctl('enable',$service);
   write_log($addon->{"name"},"INFO","FTP Service started");
  }
 
 #### ftpoff #####
  if (defined($action) && $action eq "ftpoff") {
-  `/usr/bin/sudo /usr/bin/systemctl stop $service`;
-  `/usr/bin/sudo /usr/bin/systemctl disable $service`;
+  service_ctl('stop',$service);
+  service_ctl('disable',$service);
   write_log($addon->{"name"},"INFO","FTP Service stopped");
  }
 

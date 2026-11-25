@@ -1,0 +1,24 @@
+# sudo calls each file still makes outside the helpers (see t/sudo-calls.t).
+# Only ever lower these.
+7 lib/EasyNAS/Controller/addons.pm
+2 lib/EasyNAS/Controller/disk.pm
+6 lib/EasyNAS/Controller/dlna.pm
+30 lib/EasyNAS/Controller/easynas.pm
+1 lib/EasyNAS/Controller/files.pm
+41 lib/EasyNAS/Controller/filesystem.pm
+2 lib/EasyNAS/Controller/groups.pm
+6 lib/EasyNAS/Controller/iscsi.pm
+1 lib/EasyNAS/Controller/login.pm
+1 lib/EasyNAS/Controller/logs.pm
+3 lib/EasyNAS/Controller/lxc.pm
+2 lib/EasyNAS/Controller/mariadb.pm
+10 lib/EasyNAS/Controller/network.pm
+6 lib/EasyNAS/Controller/nfs.pm
+9 lib/EasyNAS/Controller/radius.pm
+8 lib/EasyNAS/Controller/rsyncd.pm
+6 lib/EasyNAS/Controller/samba.pm
+18 lib/EasyNAS/Controller/settings.pm
+6 lib/EasyNAS/Controller/tftp.pm
+10 lib/EasyNAS/Controller/users.pm
+10 lib/EasyNAS/Controller/volume.pm
+15 startup/easynas.sh

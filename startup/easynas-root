@@ -1,0 +1,82 @@
+#!/usr/bin/perl
+#========================================================================
+# easynas-root -- the root side of the web interface.
+#
+# The web interface runs as the unprivileged "easynas" user and reaches root
+# only through sudo. The goal is a sudoers rule that allows it this script
+# and the other helpers in /easynas/startup (lxc-helper.sh ...), never ALL:
+# then a bug in a page can do only what these helpers allow, with the
+# arguments they accept, instead of anything at all. (Being allowed sudo on
+# tee, sed, systemctl or zypper is the same as being root: they can write any
+# file or run any command. So the commands are here, checked, not in sudoers.)
+#
+# Until every page goes through the helpers, sudoers still says ALL; see
+# t/sudo-calls.t for what is left.
+#
+#   easynas-root service <start|stop|restart|restart-later|reload|enable|disable> <unit>
+#       Control one systemd unit: one an installed add-on declares
+#       (<service> in /easynas/addons/*.easynas, root's package files) or one
+#       of the few the core itself manages. restart-later queues the restart
+#       and returns at once (for the web interface restarting itself).
+#
+# Exit status: 0 done, 1 the command failed, 2 refused (bad arguments).
+#
+# This file is part of EasyNAS (c) created by Yariv Hakim
+#========================================================================
+use strict;
+use warnings;
+
+$ENV{PATH} = '/usr/sbin:/usr/bin:/sbin:/bin';
+delete @ENV{qw(IFS CDPATH ENV BASH_ENV)};
+
+# Where things are; t/easynas-root.t points them elsewhere. (sudo drops the
+# environment: the sudoers rule for this script must not allow SETENV.)
+my $ADDONS    = $ENV{EASYNAS_ADDONS_DIR} // '/easynas/addons';
+my $SYSTEMCTL = $ENV{EASYNAS_SYSTEMCTL}  // '/usr/bin/systemctl';
+
+# Units the core manages besides the add-ons' own.
+my @CORE_UNITS = qw(easynas.service cron.service nmb.service rpcbind.service easynas-tftp.socket);
+
+sub refuse { print STDERR "easynas-root: $_[0]\n"; exit 2 }
+
+# "smb" and "smb.service" are the same unit.
+sub unit_name {
+  my ($u) = @_;
+  return undef unless defined $u && $u =~ /^[A-Za-z0-9][A-Za-z0-9@._-]{0,100}$/;
+  return $u =~ /\.(service|socket|timer|target|mount|path)$/ ? $u : "$u.service";
+}
+
+sub known_units {
+  my %ok = map { $_ => 1 } @CORE_UNITS;
+  if (opendir(my $d, $ADDONS)) {
+    for my $f (grep { /^[A-Za-z0-9_-]+\.easynas$/ } readdir $d) {
+      open(my $fh, '<', "$ADDONS/$f") or next;
+      while (<$fh>) {
+        next unless m{<service>\s*([^<\s]+)\s*</service>};
+        my $u = unit_name($1);
+        $ok{$u} = 1 if defined $u;
+      }
+      close $fh;
+    }
+    closedir $d;
+  }
+  return %ok;
+}
+
+my %ACTIONS = map { $_ => 1 } qw(start stop restart restart-later reload enable disable);
+
+my $cmd = shift(@ARGV) // '';
+if ($cmd eq 'service') {
+  refuse("usage: service <action> <unit>") unless @ARGV == 2;
+  my ($action, $unit) = @ARGV;
+  refuse("unknown action \"$action\"") unless $ACTIONS{$action};
+  my $u = unit_name($unit) // refuse("bad unit name");
+  my %ok = known_units();
+  refuse("unit $u is not one EasyNAS manages") unless $ok{$u};
+  my @run = $action eq 'restart-later' ? ('--no-block', 'restart', $u) : ($action, $u);
+  { no warnings 'exec'; exec { $SYSTEMCTL } $SYSTEMCTL, @run; }
+  print STDERR "easynas-root: $SYSTEMCTL: $!\n";
+  exit 1;
+}
+
+refuse("usage: easynas-root service <action> <unit>");

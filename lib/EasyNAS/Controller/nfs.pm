@@ -24,19 +24,19 @@ sub view ($self) {
 
 ##### nfson #####
  if (defined($action) && $action eq "nfson") {
-  `/usr/bin/sudo /usr/bin/systemctl start rpcbind.service`;
-  `/usr/bin/sudo /usr/bin/systemctl enable rpcbind.service`;
-  `/usr/bin/sudo /usr/bin/systemctl start $service`;
-  `/usr/bin/sudo /usr/bin/systemctl enable $service`;
+  service_ctl('start','rpcbind.service');
+  service_ctl('enable','rpcbind.service');
+  service_ctl('start',$service);
+  service_ctl('enable',$service);
   write_log($addon->{"name"},"INFO","NFS Service started");
  }
 
 #### nfsoff #####
  if (defined($action) && $action eq "nfsoff") {
-  `/usr/bin/sudo /usr/bin/systemctl stop $service`;
-  `/usr/bin/sudo /usr/bin/systemctl disable $service`;
-  `/usr/bin/sudo /usr/bin/systemctl stop rpcbind.service`;
-  `/usr/bin/sudo /usr/bin/systemctl disable rpcbind.service`;
+  service_ctl('stop',$service);
+  service_ctl('disable',$service);
+  service_ctl('stop','rpcbind.service');
+  service_ctl('disable','rpcbind.service');
   write_log($addon->{"name"},"INFO","NFS Service stopped");
  }
 
@@ -66,7 +66,7 @@ sub view ($self) {
    write_share_marker($path,"nfs",$export);
    $rc=system("/usr/bin/sudo /usr/sbin/exportfs -a >/dev/null");
    if (get_service_status($service)) {
-    $rc=system("/usr/bin/sudo /usr/bin/systemctl restart $service >/dev/null");
+    $rc=service_ctl('restart',$service) ? 0 : 1;
    }
    write_log($addon->{"name"},"INFO","NFS share was added");
   }
@@ -81,7 +81,7 @@ sub view ($self) {
   remove_share_marker("$mount_dir/$fs/$vol","nfs");
   `/usr/bin/sudo /usr/sbin/exportfs -a`;
   if (get_service_status($service)) {
-   `/usr/bin/sudo /usr/bin/systemctl reload $service`;
+   service_ctl('reload',$service);
   }
   write_log($addon->{"name"},"INFO","NFS share was deleted");
  }

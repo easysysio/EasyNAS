@@ -43,6 +43,7 @@ sub vol_info    { %VOL }
 sub disk_info   { %DISK }
 sub setup_done  { \$DONE++; 1 }
 sub setup_needed { 0 }
+sub service_ctl  { my \$a = shift; system('/usr/bin/sudo', '/easynas/startup/easynas-root', 'service', \$a, \$_) for \@_; 1 }
 for my \$n (\@EXPORT) { no strict 'refs'; *{\$n} = sub { return } unless defined &{\$n} }
 1;
 EOF2
@@ -197,7 +198,7 @@ is scalar(@SHARES), 0, 'not a volume: nothing added';
 $post->({action => 'share', share_name => 'share', vol => 'data/share'});
 $next->(5);
 is_deeply \@SHARES, [['share', 'data/share', 'no', 'no']], 'shared read-write, for signed-in users';
-ok grep(m{systemctl enable smb\.service}, @PIPE) && grep(m{systemctl start nmb\.service}, @PIPE), 'Samba started, and at boot';
+ok grep(m{easynas-root service enable smb\.service}, @SYS) && grep(m{easynas-root service start nmb\.service}, @SYS), 'Samba started, and at boot';
 
 {
   no warnings 'redefine';

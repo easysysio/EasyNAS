@@ -36,6 +36,8 @@ Obsoletes:      easynas-mm-plex < 1.99-5
 # The NAS-user frame, templates/layouts/user.html.ep (needed by fs-files).
 Provides:       easynas(user-layout)
 Provides:       easynas(lxc-helper) = 6
+# startup/easynas-root: service <action> <unit>
+Provides:       easynas(root-helper) = 1
 # The core only lets GETs show things (POST for changes, see lib/EasyNAS.pm);
 # these add-on releases are the first whose pages make their changes by POST,
 # so older ones are updated along with the core.
@@ -377,7 +379,7 @@ fi
 #### lxc ####
 %package        srv-lxc
 Version:        %{version}
-Release:        13
+Release:        14
 Summary:        Virtualization addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
@@ -423,10 +425,11 @@ fi
 #### mariadb ####
 %package        srv-mariadb
 Version:        %{version}
-Release:        5
+Release:        6
 Summary:        MariaDB addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
+Requires:       easynas(root-helper) >= 1
 Requires:       mariadb
 Requires:       mariadb-client
 
@@ -443,10 +446,11 @@ MariaDB addon for EasyNAS
 ##### TFTP #####
 %package        fs-tftp
 Version:        %{version}
-Release:        5
+Release:        6
 Summary:        TFTP addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
+Requires:       easynas(root-helper) >= 1
 Requires:       tftp
 
 %description fs-tftp
@@ -500,10 +504,11 @@ and act with its permissions.
 ##### FTP ####
 %package        fs-ftp
 Version:        %{version}
-Release:        5
+Release:        6
 Summary:        FTP addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
+Requires:       easynas(root-helper) >= 1
 Requires:       pureftpd
 
 %description fs-ftp
@@ -523,10 +528,11 @@ FTP addon for EasyNAS
 ##### NFS ####
 %package        fs-nfs
 Version:        %{version}
-Release:        5
+Release:        6
 Summary:        NFS addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
+Requires:       easynas(root-helper) >= 1
 Requires:       nfs-kernel-server
 
 %description fs-nfs
@@ -547,10 +553,11 @@ NFS addon for EasyNAS
 ##### SAMBA ####
 %package        fs-samba
 Version:        %{version}
-Release:        6
+Release:        7
 Summary:        SAMBA addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
+Requires:       easynas(root-helper) >= 1
 Requires:       samba
 Requires:       samba-winbind
 Requires:       rpcbind
@@ -572,10 +579,11 @@ SAMBA addon for EasyNAS
 ##### SSH ####
 %package        fs-ssh
 Version:        %{version}
-Release:        4
+Release:        5
 Summary:        SSH addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
+Requires:       easynas(root-helper) >= 1
 Requires:       openssh
 
 %description fs-ssh
@@ -593,10 +601,11 @@ SSH addon for EasyNAS
 #### DLNA ####
 %package        mm-dlna
 Version:        %{version}
-Release:        5
+Release:        6
 Summary:        DLNA addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
+Requires:       easynas(root-helper) >= 1
 Requires:       minidlna
 Requires:       ffmpeg
 
@@ -617,10 +626,11 @@ DLNA addon for EasyNAS
 #### RSync ####
 %package        fs-rsyncd
 Version:        %{version}
-Release:        7
+Release:        8
 Summary:        RSyncd addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
+Requires:       easynas(root-helper) >= 1
 Requires:       rsync
 
 %description fs-rsyncd
@@ -668,10 +678,11 @@ fi
 #### Radius ####
 %package        srv-radius
 Version:        %{version}
-Release:        7
+Release:        8
 Summary:        Radius addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
+Requires:       easynas(root-helper) >= 1
 Requires:       freeradius-server
 
 %description srv-radius
@@ -713,10 +724,11 @@ fi
 #### iSCSI ####
 %package        stg-iscsi
 Version:        %{version}
-Release:        5
+Release:        6
 Summary:        iSCSI Initiator addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
+Requires:       easynas(root-helper) >= 1
 Requires:       tgt
 
 %description stg-iscsi
@@ -998,6 +1010,14 @@ Polish Language for EasyNAS
     (srv-lxc 12 did). The terminal is already a root shell, so set one there
     with passwd if the container needs it (for SSH). easynas(lxc-helper) 6:
     create takes no password file again
+  - Towards a sudoers rule without ALL: services are now started, stopped,
+    restarted, reloaded, enabled and disabled through startup/easynas-root,
+    a root helper that only touches the units EasyNAS manages (the add-ons'
+    <service> and a few core ones), and their state is read without sudo
+    (systemctl is-active). The Samba, NFS, FTP, SSH, rsync, TFTP, DLNA,
+    iSCSI, RADIUS and MariaDB add-ons use it (easynas(root-helper) 1).
+    t/sudo-calls.t counts the sudo calls still made outside the helpers
+    (200) and only lets the number go down
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

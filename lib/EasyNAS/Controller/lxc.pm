@@ -101,7 +101,8 @@ sub storage_vol {
   return "";
 }
 
-sub helper (@args) { return system("/usr/bin/sudo", $HELPER, @args) == 0 ? 1 : 0; }
+# (The path spelled out, as in every sudo of a helper: t/sudo-calls.t looks for it.)
+sub helper (@args) { return system("/usr/bin/sudo", "/easynas/startup/lxc-helper.sh", @args) == 0 ? 1 : 0; }
 
 # A volume ("pool/vol") from the Volumes page, as the path lxc-helper.sh
 # takes; undef for anything else.
@@ -314,7 +315,7 @@ sub spawn_pty ($name) {
       open(STDERR, '>&', $slave) or die;
       close $slave;
       $ENV{TERM} = 'xterm-256color';
-      exec('/usr/bin/sudo', $HELPER, 'attach', $name);
+      exec('/usr/bin/sudo', '/easynas/startup/lxc-helper.sh', 'attach', $name);
     };
     POSIX::_exit(127);
   }

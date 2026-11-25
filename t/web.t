@@ -26,7 +26,7 @@ use Exporter 'import';
 our \@EXPORT = qw(get_addon_info get_lang_text write_log get_update_state
                  get_conf_hosts get_addons is_nas_admin get_admin_group
                  users_info groups_info get_group_default get_mount_dir setup_needed
-                 zypper_run zypper_reason);
+                 zypper_run zypper_reason service_ctl);
 our \@LOG;
 our \$UPDATE_STATE = '';
 sub get_addon_info { return { name => \$_[0], program => \$_[0] } }
@@ -48,6 +48,7 @@ our \$SETUP = 0;
 sub setup_needed { \$SETUP }
 # zypper, recorded like system() is below and answered from \@RC/\@OUT.
 sub zypper_run { push \@main::SYS, ['/usr/bin/sudo', '/usr/bin/zypper', \@_]; my \$rc = shift(\@main::RC) // 0; return (\$rc, shift(\@main::OUT) // '') }
+sub service_ctl { push \@main::SYS, ['service_ctl', \@_]; return 1 }
 sub zypper_reason { my \$o = shift // ''; \$o =~ s/\\s+/ /g; \$o =~ s/^ | \$//g; return \$o }
 1;
 EOF

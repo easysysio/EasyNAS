@@ -24,15 +24,15 @@ sub view ($self) {
 
 ##### iscsion #####
  if (defined($action) && $action eq "iscsion") {
-  `/usr/bin/sudo /usr/bin/systemctl start $service`;
-  `/usr/bin/sudo /usr/bin/systemctl enable $service`;
+  service_ctl('start',$service);
+  service_ctl('enable',$service);
   write_log($addon->{"name"},"INFO","iSCSI target started");
  }
 
 #### iscsioff #####
  if (defined($action) && $action eq "iscsioff") {
-  `/usr/bin/sudo /usr/bin/systemctl stop $service`;
-  `/usr/bin/sudo /usr/bin/systemctl disable $service`;
+  service_ctl('stop',$service);
+  service_ctl('disable',$service);
   write_log($addon->{"name"},"INFO","iSCSI target stopped");
  }
 

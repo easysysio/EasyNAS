@@ -24,15 +24,15 @@ sub view ($self) {
 
 ##### rsyncdon #####
  if (defined($action) && $action eq "rsyncdon") {
-  `/usr/bin/sudo /usr/bin/systemctl start $service`;
-  `/usr/bin/sudo /usr/bin/systemctl enable $service`;
+  service_ctl('start',$service);
+  service_ctl('enable',$service);
   write_log($addon->{"name"},"INFO","RSync Service started");
  }
 
 #### rsyncdoff #####
  if (defined($action) && $action eq "rsyncdoff") {
-  `/usr/bin/sudo /usr/bin/systemctl stop $service`;
-  `/usr/bin/sudo /usr/bin/systemctl disable $service`;
+  service_ctl('stop',$service);
+  service_ctl('disable',$service);
   write_log($addon->{"name"},"INFO","RSync Service stopped");
  }
 
@@ -69,7 +69,7 @@ sub view ($self) {
    `/bin/echo "comment = $name" | /usr/bin/sudo /usr/bin/tee -a $addon->{config} >/dev/null`;
    write_share_marker($path,"rsyncd","$name");
    if (get_service_status($service)) {
-    $rc=system("/usr/bin/sudo /usr/bin/systemctl reload $service >/dev/null");
+    $rc=service_ctl('reload',$service) ? 0 : 1;
    }
    write_log($addon->{"name"},"INFO","RSync share was added");
   }
@@ -83,7 +83,7 @@ sub view ($self) {
    $rc=system("/usr/bin/sudo /usr/bin/sed -i '/#### $name ####/,/comment = $name/d' $addon->{config}");
    remove_share_marker("$mount_dir/$vol","rsyncd") if ($vol ne "");
    if (get_service_status($service)) {
-    `/usr/bin/sudo /usr/bin/systemctl restart $service`;
+    service_ctl('restart',$service);
    }
    write_log($addon->{"name"},"INFO","RSync share was deleted");
   }

@@ -22,8 +22,8 @@ sub view ($self) {
 
   ### activate ###
   if (defined $action && $action eq "activate") {
-   `/usr/bin/sudo /usr/bin/systemctl start $service`;
-   `/usr/bin/sudo /usr/bin/systemctl enable $service`;
+   service_ctl('start',$service);
+   service_ctl('enable',$service);
    write_log($addon->{"name"},"INFO","$addon->{\"description\"} Service started");
   }
 

@@ -36,7 +36,7 @@ our @EXPORT    = qw( get_mount_dir get_conf_cron get_addons_file get_update_file
                      write_share_marker remove_share_marker rediscover_shares
                      get_update_state raid_status
                      set_current_lang get_admin_group is_nas_admin
-                     setup_needed setup_done zypper_run zypper_reason);
+                     setup_needed setup_done zypper_run zypper_reason service_ctl);
 
 ############# Declarations #####################
 my $authentication_enable = 1;
@@ -501,17 +501,27 @@ sub mounted
 }    
 
 ######## get_service_status ########
+# 1 while the unit runs. Reading a unit's state needs no root (and no shell).
 sub get_service_status
 {
     my $service=$_[0];
-    if (`/usr/bin/sudo /usr/bin/systemctl status $service | /usr/bin/grep "Active: active"` eq "")
-    {
-        return 0;
+    return 0 unless defined $service && $service =~ /^[A-Za-z0-9][A-Za-z0-9@._-]*$/;
+    return system('/usr/bin/systemctl','is-active','--quiet',$service) == 0 ? 1 : 0;
+}
+
+######## service_ctl ########
+# Start/stop/restart/restart-later/reload/enable/disable systemd units, as
+# root, through the root helper (startup/easynas-root), which only touches
+# units EasyNAS manages. 1 when every one of them did it.
+sub service_ctl
+{
+    my ($action, @units) = @_;
+    my $ok = 1;
+    for my $u (@units) {
+        $ok = 0 if system('/usr/bin/sudo', '/easynas/startup/easynas-root', 'service', $action, $u) != 0;
     }
-    else {
-        return 1;
-    }
-} 
+    return $ok;
+}
 
 ########### get_compress_status ##########
 # The live compression algorithm of a mounted filesystem, from /proc/mounts:
@@ -1341,7 +1351,7 @@ sub rediscover_shares
   }
  }
  `/usr/bin/sudo /usr/sbin/exportfs -a 2>/dev/null`;
- `/usr/bin/sudo /usr/bin/systemctl reload smb.service 2>/dev/null`;
+ service_ctl('reload','smb.service') if get_service_status('smb.service');
 }
 
 

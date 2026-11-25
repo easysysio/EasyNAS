@@ -211,7 +211,7 @@ sub upload_crt($self) {
  $result="success";
  $msg=$TEXT{'settings_cert_uploaded'} || "Certificate uploaded. Restarting to apply it...";
  # Restart so the daemon picks up the new cert/key.
- system("/usr/bin/sudo /usr/bin/systemctl restart easynas.service &");
+ service_ctl('restart-later','easynas.service');
  return;
 }
 

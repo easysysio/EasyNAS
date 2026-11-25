@@ -377,7 +377,7 @@ sub deletevol($self) {
   if (`/usr/bin/grep " $mount_dir/$fs/$vol " $conf_cron`)
   {   
     system("/usr/bin/sudo /usr/bin/sed -i '/.$cmount_dir.$fs.$vol /d' $conf_cron");
-    system("/usr/bin/sudo /usr/bin/systemctl restart cron.service restart");
+    service_ctl('restart','cron.service');
   }
   $result="success";
   $msg=$TEXT{'vol_deleted'};

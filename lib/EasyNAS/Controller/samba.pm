@@ -77,16 +77,16 @@ sub apply_share {
  close($fh);
  write_share_marker($path,"smb",$section);
  if (get_service_status($service)) {
-  system("/usr/bin/sudo /usr/bin/systemctl restart $service > /dev/null");
+  service_ctl('restart',$service);
  }
 }
 
 # Start Samba now and at boot (smb, and nmb for network browsing).
 sub samba_start {
-  `/usr/bin/sudo /usr/bin/systemctl start $service`;
-  `/usr/bin/sudo /usr/bin/systemctl enable $service`;
-  `/usr/bin/sudo /usr/bin/systemctl start nmb.service`;
-  `/usr/bin/sudo /usr/bin/systemctl enable nmb.service`;
+  service_ctl('start',$service);
+  service_ctl('enable',$service);
+  service_ctl('start','nmb.service');
+  service_ctl('enable','nmb.service');
   write_log($addon->{"name"},"INFO","Samba Service started");
 }
 
@@ -137,10 +137,10 @@ sub view ($self) {
 
 #### sambaoff #####
  if (defined($action) && $action eq "sambaoff") {
-  `/usr/bin/sudo /usr/bin/systemctl stop $service`;
-  `/usr/bin/sudo /usr/bin/systemctl disable $service`;
-  `/usr/bin/sudo /usr/bin/systemctl stop nmb.service`;
-  `/usr/bin/sudo /usr/bin/systemctl disable nmb.service`;
+  service_ctl('stop',$service);
+  service_ctl('disable',$service);
+  service_ctl('stop','nmb.service');
+  service_ctl('disable','nmb.service');
   write_log($addon->{"name"},"INFO","Samba Service stopped");
  }
 
@@ -209,7 +209,7 @@ sub view ($self) {
   $rc=system("/usr/bin/sudo /usr/bin/sed -i '/#### $share ####/,/comment = $share/d' $config");
   remove_share_marker("$mount_dir/$vol","smb") if (defined($vol) && $vol ne "");
   if (get_service_status($service)) {
-   $rc=system("/usr/bin/sudo /usr/bin/systemctl restart $service > /dev/null");
+   $rc=service_ctl('restart',$service) ? 0 : 1;
   }
   write_log($addon->{"name"},"INFO","Samba share was deleted");
  }

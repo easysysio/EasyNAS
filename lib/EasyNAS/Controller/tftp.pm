@@ -24,17 +24,17 @@ sub view ($self) {
 
 ##### tftpon #####
  if (defined($action) && $action eq "tftpon") {
-  `/usr/bin/sudo /usr/bin/systemctl start easynas-tftp.socket`;
-  `/usr/bin/sudo /usr/bin/systemctl start $service`;
-  `/usr/bin/sudo /usr/bin/systemctl enable easynas-tftp.socket`;
+  service_ctl('start','easynas-tftp.socket');
+  service_ctl('start',$service);
+  service_ctl('enable','easynas-tftp.socket');
   write_log($addon->{"name"},"INFO","TFTP Service started");
  }
 
 #### tftpoff #####
  if (defined($action) && $action eq "tftpoff") {
-  `/usr/bin/sudo /usr/bin/systemctl stop $service`;
-  `/usr/bin/sudo /usr/bin/systemctl stop easynas-tftp.socket`;
-  `/usr/bin/sudo /usr/bin/systemctl disable easynas-tftp.socket`;
+  service_ctl('stop',$service);
+  service_ctl('stop','easynas-tftp.socket');
+  service_ctl('disable','easynas-tftp.socket');
   write_log($addon->{"name"},"INFO","TFTP Service stopped");
  }
 
@@ -50,7 +50,7 @@ sub view ($self) {
    `/bin/echo "TFTP_OPTIONS=" | /usr/bin/sudo /usr/bin/tee -a $addon->{config} >/dev/null`;
    `/bin/echo "TFTP_DIRECTORY=$dirname " | /usr/bin/sudo /usr/bin/tee -a $addon->{config} >/dev/null`;
    if (get_service_status($service)) {
-    $rc=system("/usr/bin/sudo /usr/bin/systemctl restart $service >/dev/null");
+    $rc=service_ctl('restart',$service) ? 0 : 1;
    }
    write_log($addon->{"name"},"INFO","TFTP share was set to $dirname");
   }
@@ -64,7 +64,7 @@ sub view ($self) {
  if (defined($action) && $action eq "delete") {
   $rc=system("/usr/bin/sudo /usr/bin/sed -i '/TFTP_DIRECTORY/d' $addon->{config}");
   if (get_service_status($service)) {
-   `/usr/bin/sudo /usr/bin/systemctl restart $service`;
+   service_ctl('restart',$service);
   }
   write_log($addon->{"name"},"INFO","TFTP share was removed");
  }

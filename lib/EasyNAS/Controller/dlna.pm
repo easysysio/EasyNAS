@@ -24,15 +24,15 @@ sub view ($self) {
 
 ##### dlnaon #####
  if (defined($action) && $action eq "dlnaon") {
-  `/usr/bin/sudo /usr/bin/systemctl enable $service`;
-  `/usr/bin/sudo /usr/bin/systemctl start $service`;
+  service_ctl('enable',$service);
+  service_ctl('start',$service);
   write_log($addon->{"name"},"INFO","DLNA Service started");
  }
 
 #### dlnaoff #####
  if (defined($action) && $action eq "dlnaoff") {
-  `/usr/bin/sudo /usr/bin/systemctl disable $service`;
-  `/usr/bin/sudo /usr/bin/systemctl stop $service`;
+  service_ctl('disable',$service);
+  service_ctl('stop',$service);
   write_log($addon->{"name"},"INFO","DLNA Service stopped");
  }
 
@@ -48,7 +48,7 @@ sub view ($self) {
   if ($dir ne "") {
    $rc=system("/usr/bin/sudo /usr/bin/sed -i '\\%^media_dir=%cmedia_dir=$dir' $addon->{config}");
    if (get_service_status($service)) {
-    `/usr/bin/sudo /usr/bin/systemctl restart $service`;
+    service_ctl('restart',$service);
    }
    write_log($addon->{"name"},"INFO","DLNA media directory set to $dir");
   }
@@ -77,7 +77,7 @@ sub view ($self) {
    $rc=system("/usr/bin/sudo /usr/bin/sed -i '/^notify_interval=/cnotify_interval=$scan' $addon->{config}");
    $rc=system("/usr/bin/sudo /usr/bin/sed -i '/^max_connections=/cmax_connections=$max' $addon->{config}");
    if (get_service_status($service)) {
-    `/usr/bin/sudo /usr/bin/systemctl restart $service`;
+    service_ctl('restart',$service);
    }
    write_log($addon->{"name"},"INFO","DLNA settings updated");
   }

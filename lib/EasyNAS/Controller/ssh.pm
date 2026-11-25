@@ -22,14 +22,14 @@ sub view ($self) {
 
 ##### sshon #####
  if (defined($action) && $action eq "sshon") {
-  `/usr/bin/sudo /usr/bin/systemctl start $service`;
-  `/usr/bin/sudo /usr/bin/systemctl enable $service`;
+  service_ctl('start',$service);
+  service_ctl('enable',$service);
  }
 
 #### sshoff #####
  if (defined($action) && $action eq "sshoff") {
-  `/usr/bin/sudo /usr/bin/systemctl stop $service`;
-  `/usr/bin/sudo /usr/bin/systemctl disable $service`;
+  service_ctl('stop',$service);
+  service_ctl('disable',$service);
  }
 
 ##### menu ######

@@ -24,15 +24,15 @@ sub view ($self) {
 
 ##### radiuson #####
  if (defined($action) && $action eq "radiuson") {
-  `/usr/bin/sudo /usr/bin/systemctl start $service`;
-  `/usr/bin/sudo /usr/bin/systemctl enable $service`;
+  service_ctl('start',$service);
+  service_ctl('enable',$service);
   write_log($addon->{"name"},"INFO","Radius Service started");
  }
 
 #### radiusoff #####
  if (defined($action) && $action eq "radiusoff") {
-  `/usr/bin/sudo /usr/bin/systemctl stop $service`;
-  `/usr/bin/sudo /usr/bin/systemctl disable $service`;
+  service_ctl('stop',$service);
+  service_ctl('disable',$service);
   write_log($addon->{"name"},"INFO","Radius Service stopped");
  }
 
@@ -67,7 +67,7 @@ sub view ($self) {
    `/bin/echo "secret = $secret" | /usr/bin/sudo /usr/bin/tee -a $clients >/dev/null`;
    `/bin/echo "}" | /usr/bin/sudo /usr/bin/tee -a $clients >/dev/null`;
    if (get_service_status($service)) {
-    $rc=system("/usr/bin/sudo /usr/bin/systemctl restart $service >/dev/null");
+    $rc=service_ctl('restart',$service) ? 0 : 1;
    }
    write_log($addon->{"name"},"INFO","Radius client $client added");
   }
@@ -79,7 +79,7 @@ sub view ($self) {
   if (defined $client && $client =~ /^[A-Za-z0-9_.-]{1,64}$/) {
    $rc=system("/usr/bin/sudo /bin/sed -i '/#### $client ####/,/}/d' $clients");
    if (get_service_status($service)) {
-    `/usr/bin/sudo /usr/bin/systemctl reload $service`;
+    service_ctl('reload',$service);
    }
    write_log($addon->{"name"},"INFO","Radius client $client deleted");
   }
