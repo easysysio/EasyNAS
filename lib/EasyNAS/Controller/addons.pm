@@ -225,7 +225,18 @@ sub refresh_update_list {
 # install/update queue is active, so this never races the worker's zypper lock.
 sub check_updates($self) {
  my $repo=active_channel_repo();
- `/usr/bin/sudo /usr/bin/zypper --quiet --gpg-auto-import-keys refresh $repo`;
+ my ($rc,$out)=zypper_run("--quiet","--gpg-auto-import-keys","refresh",$repo);
+ if ($rc != 0) {
+  # Say why (an unreachable channel, a lock) instead of "checked" over the
+  # old list: the list below is then not news.
+  write_log("addons","ERROR","check for updates: zypper refresh $repo failed: ".($out =~ s/\s+/ /gr));
+  my $r=zypper_reason($out);
+  $result="fail";
+  $msg=(($rc >> 8) == 7)
+     ? ($TEXT{'addons_check_locked'} || "The package manager is busy. Check again when the running install or update has finished.")
+     : ($TEXT{'addons_check_failed'} || "Could not check the update channel for updates.").($r ne '' ? " (zypper: $r)" : '');
+  return;
+ }
  `/usr/bin/sudo /usr/bin/zypper --quiet --xmlout search easynas | /usr/bin/sudo /usr/bin/tee /etc/easynas/addons/easynas.addons >/dev/null`;
  refresh_update_list();
  $result="success";

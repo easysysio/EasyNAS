@@ -995,6 +995,10 @@ Polish Language for EasyNAS
     hash in a 0600 file the helper removes at once -- never on a command
     line -- and goes into the container's /etc/shadow
     (easynas(lxc-helper) 5)
+  - Update channel and "Check for updates": a failure now says what zypper
+    said ("Valid metadata not found at specified URL", a lock...) on the page
+    and in the log, instead of a bare "Could not change the update channel",
+    or "Checked for updates" over a list that was never refreshed
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

@@ -36,7 +36,7 @@ our @EXPORT    = qw( get_mount_dir get_conf_cron get_addons_file get_update_file
                      write_share_marker remove_share_marker rediscover_shares
                      get_update_state raid_status
                      set_current_lang get_admin_group is_nas_admin
-                     setup_needed setup_done);
+                     setup_needed setup_done zypper_run zypper_reason);
 
 ############# Declarations #####################
 my $authentication_enable = 1;
@@ -309,6 +309,35 @@ sub is_nas_admin
  my @g = getgrnam($admin_group);
  return 0 unless @g;
  return (grep { $_ eq $user } split(' ', $g[3] // '')) ? 1 : 0;
+}
+
+############# zypper_run ###############
+# Run zypper (as root, never interactive) and return (exit status as
+# system() gives it, what it printed). Its messages say why it failed --
+# "Valid metadata not found at specified URL", a lock -- which a page can then
+# show instead of a bare "failed". List arguments, no shell.
+sub zypper_run
+{
+ my @args = @_;
+ require IPC::Open3;
+ my ($in, $fh, $out);
+ my $pid = eval { IPC::Open3::open3($in, $fh, undef, '/usr/bin/sudo', '/usr/bin/zypper', '--non-interactive', @args) };
+ return (255 << 8, "zypper did not start: $@") unless $pid;
+ close $in;
+ { local $/; $out = <$fh> // ''; }
+ close $fh;
+ waitpid($pid, 0);
+ return ($?, $out);
+}
+
+# The last few lines zypper printed, for a page message.
+sub zypper_reason
+{
+ my ($out) = @_;
+ my @l = grep { /\S/ && !/^(Retrieving|Building|Loading|Reading|Refreshing|Repository .* is up to date)/ } split /\n/, ($out // '');
+ my $r = join(' ', @l[ ($#l > 2 ? $#l - 2 : 0) .. $#l ]);
+ $r =~ s/\s+/ /g;
+ return substr($r, 0, 300);
 }
 
 ############# setup_needed ###############

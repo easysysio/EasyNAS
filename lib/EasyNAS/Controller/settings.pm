@@ -143,27 +143,35 @@ sub setchannel($self) {
  my $old=$CHANNEL{$have};
  my $rc;
 
+ my $out;
+ # zypper's own words, logged in full and shown with the message.
+ my $why = sub ($step, $out) {
+  write_log("settings","ERROR","update channel $have -> $want: zypper $step failed: ".($out =~ s/\s+/ /gr));
+  my $r = zypper_reason($out);
+  return $r ne '' ? " (zypper: $r)" : '';
+ };
+
  # A stale repo under the new alias (e.g. disabled by hand) would make addrepo
  # fail; clear it first. Fails harmlessly when there is none.
- system("/usr/bin/sudo","/usr/bin/zypper","--quiet","removerepo",$new->{alias});
- $rc=system("/usr/bin/sudo","/usr/bin/zypper","--quiet","addrepo","--refresh",$new->{url},$new->{alias});
+ zypper_run("--quiet","removerepo",$new->{alias});
+ ($rc,$out)=zypper_run("--quiet","addrepo","--refresh",$new->{url},$new->{alias});
  if ($rc != 0) {
   $result="fail";
   # zypper exits 7 when another zypper (an add-on install, an update) holds
   # its lock.
   $msg=(($rc >> 8) == 7)
      ? ($TEXT{'settings_channel_locked'} || "The package manager is busy (an add-on install or update is running). Try again when it has finished.")
-     : ($TEXT{'settings_channel_failed'} || "Could not change the update channel.");
+     : ($TEXT{'settings_channel_failed'} || "Could not change the update channel.").$why->("addrepo",$out);
   return;
  }
- $rc=system("/usr/bin/sudo","/usr/bin/zypper","--quiet","--non-interactive","--gpg-auto-import-keys","refresh",$new->{alias});
+ ($rc,$out)=zypper_run("--quiet","--gpg-auto-import-keys","refresh",$new->{alias});
  if ($rc != 0) {
-  system("/usr/bin/sudo","/usr/bin/zypper","--quiet","removerepo",$new->{alias});
+  zypper_run("--quiet","removerepo",$new->{alias});
   $result="fail";
-  $msg=$TEXT{'settings_channel_unreachable'} || "The channel's repository could not be reached; the update channel was not changed.";
+  $msg=($TEXT{'settings_channel_unreachable'} || "The channel's repository could not be reached; the update channel was not changed.").$why->("refresh",$out);
   return;
  }
- system("/usr/bin/sudo","/usr/bin/zypper","--quiet","removerepo",$old->{alias});
+ zypper_run("--quiet","removerepo",$old->{alias});
 
  # Rebuild the add-on catalog, the pending-update list and the core-image
  # manifest for the new channel. Several network round trips, so in its own

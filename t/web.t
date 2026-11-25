@@ -25,7 +25,8 @@ package easynas;
 use Exporter 'import';
 our \@EXPORT = qw(get_addon_info get_lang_text write_log get_update_state
                  get_conf_hosts get_addons is_nas_admin get_admin_group
-                 users_info groups_info get_group_default get_mount_dir setup_needed);
+                 users_info groups_info get_group_default get_mount_dir setup_needed
+                 zypper_run zypper_reason);
 our \@LOG;
 our \$UPDATE_STATE = '';
 sub get_addon_info { return { name => \$_[0], program => \$_[0] } }
@@ -45,6 +46,9 @@ sub get_group_default { 'users' }
 sub get_mount_dir { '/mnt' }
 our \$SETUP = 0;
 sub setup_needed { \$SETUP }
+# zypper, recorded like system() is below and answered from \@RC/\@OUT.
+sub zypper_run { push \@main::SYS, ['/usr/bin/sudo', '/usr/bin/zypper', \@_]; my \$rc = shift(\@main::RC) // 0; return (\$rc, shift(\@main::OUT) // '') }
+sub zypper_reason { my \$o = shift // ''; \$o =~ s/\\s+/ /g; \$o =~ s/^ | \$//g; return \$o }
 1;
 EOF
 $stub->child('layouts')->make_path;
@@ -117,7 +121,7 @@ $t->get_ok('/settings_page?ch=stable')
 # --- switching channels, through the page, with zypper mocked -------------
 # Every system() the controller makes is recorded, and answered from @RC
 # (exit status, shifted like system() returns it; 0 when @RC runs out).
-our (@SYS, @RC);
+our (@SYS, @RC, @OUT);
 my $on = 'testing';                      # what repo_list reports
 {
   no warnings qw(redefine once);
@@ -137,7 +141,7 @@ my $switch = sub ($method, $channel) {
     : $ts->post_ok('/settings' => form => { action => 'setchannel', channel => $channel });
   return $ts;
 };
-my $zyp = sub { [grep { $_->[1] eq '/usr/bin/zypper' } @SYS] };
+my $zyp = sub { [map { ref $_->[2] ? [@$_[0, 1], @{$_->[2]}] : $_ } grep { $_->[1] eq '/usr/bin/zypper' } @SYS] };
 
 $switch->(GET => 'stable')->status_is(200);
 is_deeply $zyp->(), [], 'GET never switches the channel';
@@ -158,7 +162,7 @@ $switch->(POST => 'stable')->content_like(qr/Update channel changed/);
 is_deeply [map { [@$_[2 .. $#$_]] } @{ $zyp->() }], [
   ['--quiet', 'removerepo', 'EasyNAS'],
   ['--quiet', 'addrepo', '--refresh', 'https://repo.easysys.io/easynas/stable/RPMS/', 'EasyNAS'],
-  ['--quiet', '--non-interactive', '--gpg-auto-import-keys', 'refresh', 'EasyNAS'],
+  ['--quiet', '--gpg-auto-import-keys', 'refresh', 'EasyNAS'],
   ['--quiet', 'removerepo', 'EasyNAS_Beta'],
 ], 'testing -> stable: add and refresh the new repo, then drop the old one';
 ok((grep { "@$_" =~ m{systemd-run .*check_update\.pl} } @SYS), 'update check started');
@@ -168,8 +172,21 @@ is $easynas::LOG[0][2], 'update channel changed from testing to stable', 'logged
 @RC = (0, 0, 1 << 8);
 $switch->(POST => 'stable')->content_like(qr/could not be reached/);
 is_deeply [map { "$_->[3] $_->[-1]" } @{ $zyp->() }],
-  ['removerepo EasyNAS', 'addrepo EasyNAS', '--non-interactive EasyNAS', 'removerepo EasyNAS'],
+  ['removerepo EasyNAS', 'addrepo EasyNAS', '--gpg-auto-import-keys EasyNAS', 'removerepo EasyNAS'],
   'unreachable: new repo removed, old one untouched';
+
+# zypper's reason reaches the page and the log.
+@easynas::LOG = ();
+@RC = (0, 0, 4 << 8);
+@OUT = ('', '', "Repository 'EasyNAS' is invalid.\n[EasyNAS|https://repo] Valid metadata not found at specified URL\n");
+$switch->(POST => 'stable')->content_like(qr/could not be reached.*\(zypper: Repository (?:'|&#39;)EasyNAS(?:'|&#39;) is invalid\. \[EasyNAS\|https:\/\/repo\] Valid metadata not found at specified URL\)/s,
+                                           'an unreachable channel says what zypper said');
+like $easynas::LOG[0][2], qr/zypper refresh failed: .*Valid metadata not found/, '...and logs it';
+@RC = (0, 1 << 8);
+@OUT = ('', "Repository named 'EasyNAS' already exists. Please use another alias.\n");
+$switch->(POST => 'stable')->content_like(qr/Could not change the update channel\. \(zypper: Repository named/, 'a failed addrepo too');
+is scalar @{ $zyp->() }, 2, '...and stops there';
+@OUT = ();
 
 # zypper locked by an add-on install.
 @RC = (0, 7 << 8);
