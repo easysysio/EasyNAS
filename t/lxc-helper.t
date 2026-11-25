@@ -30,7 +30,8 @@ put("$d/bin/lxc-create", <<"SH");
 echo "lxc-create \$*" >> $d/calls
 [ -e $d/fail-create ] && exit 1
 while [ \$# -gt 0 ]; do case "\$1" in -n) n=\$2; shift 2;; -f) /bin/cp "\$2" $d/created.conf; shift 2;; --) break;; *) shift;; esac; done
-mkdir -p $d/lxc/\$n && echo "lxc.uts.name = \$n" > $d/lxc/\$n/config
+mkdir -p $d/lxc/\$n/rootfs/etc && echo "lxc.uts.name = \$n" > $d/lxc/\$n/config
+[ -e $d/no-shadow ] || printf 'root:*:19000:0:99999:7:::\\nbin:*:19000::::::\\n' > $d/lxc/\$n/rootfs/etc/shadow
 SH
 put("$d/bin/apparmor_parser", <<"SH");
 #!/bin/sh
@@ -63,6 +64,12 @@ $ENV{EASYNAS_LXC_DROPIN} = "$d/dropin/easynas-storage.conf";
 $ENV{EASYNAS_LXC_NETCONF} = "$d/lxc-net";
 $ENV{EASYNAS_AA_SYS} = "$d/aa";
 $ENV{EASYNAS_AA_PROFILES} = "$d/lxc-containers";
+$ENV{EASYNAS_LXC_PWDIR} = "$d/tmp";
+mkdir "$d/tmp";
+# A root password file as lxc.pm writes it: a SHA-512 crypt hash.
+my $HASH = '$6$abcdefgh12345678$' . ('./AZaz09' x 11 . 'xyzw') =~ s/^(.{86}).*/$1/r;
+my $pwn = 0;
+sub pw { my ($h) = @_; my $f = sprintf("%s/tmp/easynas-lxc-pw.T%09d", $d, ++$pwn); put($f, ($h // $HASH) . "\n"); chmod 0600, $f; return $f }
 put("$d/fstab", "/dev/sda1 /mnt/pool btrfs defaults 0 0\n");
 
 sub run { unlink "$d/calls"; system('/bin/sh', $helper, @_); my $rc = $? >> 8; return ($rc, slurp("$d/calls") // '') }
@@ -80,47 +87,74 @@ like $calls, qr/apparmor_parser -r \Q$d\E\/lxc-containers\n(?:.*\n)*systemctl st
 is slurp("$d/lxc-net"), qq{USE_LXC_BRIDGE="true"\n}, 'written once';
 
 # ---- create: only onto a volume
-($rc, $calls) = run(qw(create web debian trixie arm64 nat 1));
+($rc, $calls) = run(qw(create web debian trixie arm64 nat 1), pw());
 is $rc, 1, 'create: refused before containers have a volume';
 unlike $calls, qr/lxc-create/, '...nothing downloaded onto the system disk';
 is slurp("$d/state/web"), "failed\n", '...and the page is told';
 run(qw(delete web));
 put("$d/fstab", "/dev/sda1 /mnt/pool btrfs defaults 0 0\n/mnt/pool/data/lxc $d/lxc none bind 0 0 # easynas-lxc-storage\n");
-($rc, $calls) = run(qw(create web debian trixie arm64 nat 1));
+($rc, $calls) = run(qw(create web debian trixie arm64 nat 1), pw());
 is $rc, 1, 'create: refused while the volume is not mounted';
 like $calls, qr/mount \Q$d\E\/lxc/, '...after trying to mount it';
 unlike $calls, qr/lxc-create/;
 run(qw(delete web));
 put("$d/mounted", '');
 
+# The root password, first.
+my $f = pw();
 ($rc, $calls) = run(qw(create web debian trixie arm64 nat 1));
+is $rc, 1, 'create: refused without a root password';
+unlike $calls, qr/lxc-create/;
+($rc, $calls) = run(qw(create web debian trixie arm64 nat 1), pw('plaintext'));
+is $rc, 1, '...or with a file that holds no hash';
+($rc, $calls) = run(qw(create web debian trixie arm64 nat 1), '/etc/shadow');
+is $rc, 1, '...or with some other file';
+ok -e '/etc/shadow' || $^O ne 'linux', '...which is left alone';
+symlink "$d/fstab", "$d/tmp/easynas-lxc-pw.Tlinklink1";
+($rc, $calls) = run(qw(create web debian trixie arm64 nat 1), "$d/tmp/easynas-lxc-pw.Tlinklink1");
+is $rc, 1, '...or with a symlink';
+ok -e "$d/fstab", '...whose target stays';
+
+($rc, $calls) = run(qw(create web debian trixie arm64 nat 1), $f);
 is $rc, 0, 'create: ok';
+ok !-e $f, 'the password file is gone';
+like slurp("$d/lxc/web/rootfs/etc/shadow"), qr/^\Qroot:$HASH:19000:0:99999:7:::\E\nbin:\*:/, 'root\'s password set, the rest kept';
+unlike slurp("$d/lxc.log"), qr/\Q$HASH\E/, 'the hash is not logged';
 like $calls, qr/lxc-create -n web -f \S+ -t download -- -d debian -r trixie -a arm64/, 'downloads the image';
 is slurp("$d/created.conf"),
    "lxc.net.0.type = veth\nlxc.net.0.link = lxcbr0\nlxc.net.0.flags = up\nlxc.net.0.hwaddr = 10:66:6a:xx:xx:xx\nlxc.start.auto = 1\n",
    'private network: on lxcbr0, autostart';
 ok !-e "$d/state/web", 'no state left behind';
 
-($rc) = run(qw(create lan1 alpine 3.23 arm64 lan 0));
+($rc) = run(qw(create lan1 alpine 3.23 arm64 lan 0), pw());
 is slurp("$d/created.conf"),
    "lxc.net.0.type = macvlan\nlxc.net.0.macvlan.mode = bridge\nlxc.net.0.link = enp3s0\nlxc.net.0.flags = up\nlxc.net.0.hwaddr = 10:66:6a:xx:xx:xx\nlxc.start.auto = 0\n",
    'LAN: macvlan on the default route\'s interface';
 
-($rc, $calls) = run(qw(create web debian trixie arm64 nat 0));
+($rc, $calls) = run(qw(create web debian trixie arm64 nat 0), pw());
 is $rc, 1, 'an existing name is refused';
 unlike $calls, qr/lxc-create/;
 
 put("$d/fail-create", '');
-($rc, $calls) = run(qw(create oops debian trixie arm64 nat 0));
+($rc, $calls) = run(qw(create oops debian trixie arm64 nat 0), pw());
 is $rc, 1, 'a failed download fails';
 is slurp("$d/state/oops"), "failed\n", '...and says so to the page';
 like $calls, qr/lxc-destroy -n oops/, '...and cleans up';
 unlink "$d/fail-create";
+put("$d/no-shadow", '');
+$f = pw();
+($rc, $calls) = run(qw(create noshadow debian trixie arm64 nat 0), $f);
+is $rc, 1, 'no shadow file to set the password in: fails';
+is slurp("$d/state/noshadow"), "failed\n", '...says so';
+like $calls, qr/lxc-destroy -n noshadow/, '...and cleans up';
+ok !-e $f, '...the password file gone too';
+unlink "$d/no-shadow";
+run(qw(delete noshadow));
 
 for my $bad (['../x', qw(debian trixie arm64 nat 0)], ['-rf', qw(debian trixie arm64 nat 0)],
              ['ok', 'deb;ian', qw(trixie arm64 nat 0)], ['ok', qw(debian trixie i386 nat 0)],
              ['ok', qw(debian trixie arm64 wifi 0)], ['ok', qw(debian trixie arm64 nat yes)]) {
-  ($rc, $calls) = run('create', @$bad);
+  ($rc, $calls) = run('create', @$bad, pw());
   is $rc, 1, "create refuses @$bad";
   unlike $calls, qr/lxc-create/;
 }

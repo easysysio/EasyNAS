@@ -35,7 +35,7 @@ Requires:       dmidecode
 Obsoletes:      easynas-mm-plex < 1.99-5
 # The NAS-user frame, templates/layouts/user.html.ep (needed by fs-files).
 Provides:       easynas(user-layout)
-Provides:       easynas(lxc-helper) = 4
+Provides:       easynas(lxc-helper) = 5
 # The core only lets GETs show things (POST for changes, see lib/EasyNAS.pm);
 # these add-on releases are the first whose pages make their changes by POST,
 # so older ones are updated along with the core.
@@ -377,11 +377,11 @@ fi
 #### lxc ####
 %package        srv-lxc
 Version:        %{version}
-Release:        11
+Release:        12
 Summary:        Virtualization addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
-Requires:       easynas(lxc-helper) >= 4
+Requires:       easynas(lxc-helper) >= 5
 Requires:       lxc
 # the web terminal's pseudo-terminal
 Requires:       perl(IO::Pty)
@@ -990,6 +990,11 @@ Polish Language for EasyNAS
     sign-in (only from the appliance's own pages), which runs lxc-attach on a
     pseudo-terminal (lxc-helper.sh attach; easynas(lxc-helper) 4). No more
     port 8080 or ttyd; requires perl(IO::Pty)
+  - LXC (srv-lxc 12): the Create form sets the container's root password
+    (images come with root locked). It reaches lxc-helper.sh as a SHA-512
+    hash in a 0600 file the helper removes at once -- never on a command
+    line -- and goes into the container's /etc/shadow
+    (easynas(lxc-helper) 5)
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv
