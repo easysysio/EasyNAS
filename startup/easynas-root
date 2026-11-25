@@ -19,6 +19,29 @@
 #       of the few the core itself manages. restart-later queues the restart
 #       and returns at once (for the web interface restarting itself).
 #
+#   easynas-root file read <path>
+#   easynas-root file write <path>      (the new content on stdin)
+#   easynas-root file append <path>     (the lines to add on stdin)
+#       Read or change one of the config files the root daemons read (smb.conf,
+#       /etc/exports, rsyncd.conf, RADIUS clients, DLNA, TFTP). Only the lines
+#       a change adds are checked, against what EasyNAS itself writes there
+#       (a share's path under /mnt, its read-only flag ...): those files can
+#       otherwise make the daemon run anything as root (Samba's "root preexec",
+#       rsync's "pre-xfer exec", FreeRADIUS back-ticks). Lines already in the
+#       file stay as they are, so hand edits survive. A write replaces the file
+#       in one step (a temporary file renamed over it), keeping its owner and
+#       mode.
+#
+#   easynas-root share-marker write <volume path> <smb|nfs|rsyncd>   (stdin)
+#   easynas-root share-marker remove <volume path> <smb|nfs|rsyncd>
+#       The share's record inside the volume, <volume>/.easynas/<type>.share
+#       (it travels with the data; see rediscover_shares in easynas.pm). The
+#       volume's users can write in the volume, so .easynas must be a real
+#       directory, never a link somewhere else.
+#
+#   easynas-root hostname <name>
+#       Set the host name: /etc/hostname, /etc/hosts and the running system.
+#
 # Exit status: 0 done, 1 the command failed, 2 refused (bad arguments).
 #
 # This file is part of EasyNAS (c) created by Yariv Hakim
@@ -33,6 +56,8 @@ delete @ENV{qw(IFS CDPATH ENV BASH_ENV)};
 # environment: the sudoers rule for this script must not allow SETENV.)
 my $ADDONS    = $ENV{EASYNAS_ADDONS_DIR} // '/easynas/addons';
 my $SYSTEMCTL = $ENV{EASYNAS_SYSTEMCTL}  // '/usr/bin/systemctl';
+my $PREFIX    = $ENV{EASYNAS_ROOT_PREFIX} // '';     # prepended to every file path
+my $HOSTNAME  = $ENV{EASYNAS_HOSTNAME_CMD} // '/usr/bin/hostname';
 
 # Units the core manages besides the add-ons' own.
 my @CORE_UNITS = qw(easynas.service cron.service nmb.service rpcbind.service easynas-tftp.socket);
@@ -63,6 +88,255 @@ sub known_units {
   return %ok;
 }
 
+########## files ##########
+
+use Fcntl qw(:DEFAULT :flock :mode);
+use File::Basename qw(dirname basename);
+
+my $MAX_SIZE = 1 << 20;
+
+# A path under /mnt, as a share's path is: /mnt/<fs>[/<volume>[/...]], with
+# no ".." and nothing a config file would read as more than a path.
+sub mnt_path {
+  my ($p) = @_;
+  return defined $p && $p =~ m{^/mnt(?:/[A-Za-z0-9_][A-Za-z0-9._-]*)*/?$} && $p !~ m{/\.\.?(?:/|$)};
+}
+sub user_ok  { my ($u) = @_; return defined $u && $u =~ /^[A-Za-z0-9_][A-Za-z0-9._-]{0,31}$/ && defined getpwnam($u) }
+# a group a share may run as: a real one, not root's (gid 0)
+sub group_ok {
+  my ($g) = @_;
+  return 0 unless defined $g && $g =~ /^[A-Za-z0-9_][A-Za-z0-9._-]{0,31}$/;
+  my @gr = getgrnam($g);
+  return @gr && $gr[2] != 0;
+}
+sub yes_no   { my ($v) = @_; return defined $v && $v =~ /^(?:yes|no|true|false|0|1)$/i }
+
+# Each checker gets a line the change adds; it returns a reason to refuse it,
+# or nothing when the line is fine.
+
+# smb.conf: share sections as samba.pm writes them (share_section).
+sub smb_line {
+  my ($l) = @_;
+  return if $l =~ /^\s*$/ || $l =~ /^\s*[#;]/;
+  if ($l =~ /^\s*\[([^\]]*)\]\s*$/) {
+    my $n = $1;
+    return "a section named \"$n\"" if $n !~ /^[A-Za-z0-9._-]{1,64}$/ || $n =~ /^(?:global|homes|printers)$/i;
+    return;
+  }
+  my ($k, $v) = $l =~ /^\s*([^=]+?)\s*=\s*(.*?)\s*$/ or return "not a parameter";
+  $k = lc $k; $k =~ s/\s+/ /g;
+  return                                     if $k eq 'path' && mnt_path($v);
+  return                                     if $k =~ /^(?:browsable|browseable|guest ok|read only|writable|writeable)$/ && yes_no($v);
+  return                                     if $k eq 'force user' && $v eq 'nobody';
+  return                                     if $k eq 'force group' && ($v eq 'nobody' || group_ok($v));
+  return                                     if $k =~ /^(?:valid users|write list)$/
+                                                && $v ne '' && !grep { !(/^@(.+)$/ && group_ok($1)) } split /[\s,]+/, $v;
+  return                                     if $k =~ /^vfs objects?$/ && $v eq 'recycle';
+  return                                     if $k eq 'recycle:repository' && $v eq 'recycle';
+  return                                     if $k =~ /^recycle:(?:touch|keeptree)$/ && yes_no($v);
+  return                                     if $k eq 'recycle:exclude_dir' && $v eq 'recycle';
+  return                                     if $k eq 'comment' && $v =~ /^[A-Za-z0-9._ -]{0,64}$/;
+  return "\"$k = $v\"";
+}
+
+# /etc/exports: "<path> *(rw|ro,sync,no_subtree_check)", as nfs.pm writes it.
+sub exports_line {
+  my ($l) = @_;
+  return if $l =~ /^\s*$/ || $l =~ /^\s*#/;
+  my ($p, $o) = $l =~ /^(\S+)\s+\*\(([^)]*)\)\s*$/ or return "\"$l\"";
+  return "not a path under /mnt: $p" unless mnt_path($p) && $p ne '/mnt' && $p ne '/mnt/';
+  return "options \"$o\"" unless $o =~ /^(?:rw|ro),sync,no_subtree_check$/;
+  return;
+}
+
+# rsyncd.conf: modules as rsyncd.pm writes them.
+sub rsyncd_line {
+  my ($l) = @_;
+  return if $l =~ /^\s*$/ || $l =~ /^\s*#/;
+  return if $l =~ /^\[[A-Za-z0-9_-]{1,64}\]$/ && $l !~ /^\[global\]$/i;
+  return if $l =~ /^path = (.*)$/ && mnt_path($1);
+  return if $l =~ /^read only = (?:yes|no)$/;
+  return if $l =~ /^comment = [A-Za-z0-9_-]{1,64}$/;
+  return "\"$l\"";
+}
+
+# RADIUS clients.conf: client blocks as radius.pm writes them. FreeRADIUS runs
+# a back-quoted value, and $INCLUDEs other files, so no ` or $ anywhere.
+sub radius_line {
+  my ($l) = @_;
+  return if $l =~ /^\s*$/ || $l =~ /^\s*#/;
+  return "\"$l\"" if $l =~ /[`\$\\'"]/;
+  return if $l =~ /^client [A-Za-z0-9_.-]{1,64} \{$/;
+  return if $l =~ /^ipaddr = [0-9a-fA-F.:\/]{3,45}$/;
+  return if $l =~ /^secret = [!-~]{1,128}$/ && $l !~ /[{}#]/;
+  return if $l eq '}';
+  return "\"$l\"";
+}
+
+# minidlna.conf: the settings dlna.pm changes.
+sub dlna_line {
+  my ($l) = @_;
+  return if $l =~ /^\s*$/ || $l =~ /^\s*#/;
+  return if $l =~ /^media_dir=(.*)$/ && mnt_path($1);
+  return if $l =~ /^(?:port|notify_interval|max_connections)=\d{1,5}$/;
+  return if $l =~ /^friendly_name=[A-Za-z0-9_. -]{1,64}$/;
+  return "\"$l\"";
+}
+
+# The TFTP settings: the user it serves as and the one directory it serves.
+sub tftp_line {
+  my ($l) = @_;
+  return if $l =~ /^\s*$/ || $l =~ /^\s*#/;
+  return if $l =~ /^TFTP_USER=(\S+)$/ && user_ok($1);
+  return if $l eq 'TFTP_OPTIONS=';
+  return if $l =~ /^TFTP_DIRECTORY=(\S+)\s*$/ && mnt_path($1);
+  return "\"$l\"";
+}
+
+# path => [checker for added lines, or undef: read only]
+my %FILES = (
+  '/etc/samba/smb.conf'               => [\&smb_line],
+  '/etc/exports'                      => [\&exports_line],
+  '/etc/easynas/rsyncd/rsyncd.conf'   => [\&rsyncd_line],
+  '/etc/easynas/raddb/clients.conf'   => [\&radius_line],
+  '/etc/easynas/minidlna'             => [\&dlna_line],
+  '/etc/easynas/tftp'                 => [\&tftp_line],
+);
+
+sub slurp_fh { my ($fh) = @_; local $/; my $s = <$fh>; return $s // '' }
+
+# The file's text, '' when it doesn't exist. A link is refused: these files
+# are plain files, and a link could point anywhere.
+sub read_config {
+  my ($real) = @_;
+  my @st = lstat($real);
+  return '' unless @st;
+  refuse("$real is not a plain file") unless S_ISREG($st[2]);
+  open(my $fh, '<', $real) or do { print STDERR "easynas-root: $real: $!\n"; exit 1 };
+  my $s = slurp_fh($fh);
+  close $fh;
+  return $s;
+}
+
+# Write $text to $real in one step: a new file next to it, then renamed over
+# it, with the old file's owner and mode (a new one is the helper's, root's,
+# and 0644).
+sub replace_file {
+  my ($real, $text) = @_;
+  my @st = lstat($real);
+  refuse("$real is not a plain file") if @st && !S_ISREG($st[2]);
+  my ($uid, $gid, $mode) = @st ? ($st[4], $st[5], S_IMODE($st[2])) : ($>, (split ' ', $))[0], 0644);
+  my $tmp = dirname($real) . '/.' . basename($real) . ".easynas-root.$$";
+  sysopen(my $fh, $tmp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600)
+    or do { print STDERR "easynas-root: $tmp: $!\n"; exit 1 };
+  my $ok = (print $fh $text) && chown($uid, $gid, $fh) && chmod($mode, $fh) && close($fh);
+  $ok &&= rename($tmp, $real);
+  unless ($ok) { my $e = $!; unlink $tmp; print STDERR "easynas-root: $real: $e\n"; exit 1 }
+}
+
+sub stdin_text {
+  binmode STDIN;
+  my $s = '';
+  while (read(STDIN, my $buf, 65536)) {
+    $s .= $buf;
+    refuse("more than $MAX_SIZE bytes") if length($s) > $MAX_SIZE;
+  }
+  refuse("not text") if $s =~ /[^\t\n\x20-\x7e\x80-\xff]/;
+  return $s;
+}
+
+# Every line of $new that $old doesn't have must pass $check.
+sub check_added {
+  my ($path, $old, $new, $check) = @_;
+  my %have;
+  $have{$_}++ for split /\n/, $old;
+  for my $l (split /\n/, $new) {
+    if ($have{$l}) { $have{$l}--; next }
+    my $why = $check->($l);
+    refuse("$path: EasyNAS does not write $why there") if defined $why;
+  }
+}
+
+sub file_cmd {
+  my ($op, $path) = @_;
+  refuse("usage: file read|write|append <path>") unless defined $path && @ARGV == 0;
+  my $f = $FILES{$path} or refuse("$path is not a file EasyNAS manages");
+  my $real = $PREFIX . $path;
+  if ($op eq 'read') { print read_config($real); exit 0 }
+  refuse("unknown file action \"$op\"") unless $op eq 'write' || $op eq 'append';
+  my $in = stdin_text();
+  # one change at a time (each reads the file, then writes it)
+  my $lock;
+  flock($lock, LOCK_EX) if open($lock, '>>', "$PREFIX/run/easynas-root.lock");
+  my $old = read_config($real);
+  my $new = $op eq 'write' ? $in : $old . ($old eq '' || $old =~ /\n\z/ ? '' : "\n") . $in;
+  $new .= "\n" if $new ne '' && $new !~ /\n\z/;
+  refuse("more than $MAX_SIZE bytes") if length($new) > $MAX_SIZE;
+  check_added($path, $old, $new, $f->[0]);
+  replace_file($real, $new) unless $new eq $old;
+  exit 0;
+}
+
+########## share markers ##########
+
+# <volume>/.easynas, opened without following a link, as a path through
+# /proc/self/fd that stays on that directory whatever is renamed meanwhile.
+sub marker_dir {
+  my ($vol, $create) = @_;
+  refuse("not a volume: $vol") unless defined $vol && $vol =~ m{^/mnt/[A-Za-z0-9_][A-Za-z0-9_-]*/[A-Za-z0-9_][A-Za-z0-9._-]*$};
+  my $real = $PREFIX . $vol;
+  my @v = lstat($real);
+  refuse("not a volume: $vol") unless @v && S_ISDIR($v[2]);
+  my $d = "$real/.easynas";
+  mkdir($d, 0755) if $create && !lstat($d);
+  my @st = lstat($d);
+  return undef unless @st;
+  refuse("$vol/.easynas is not a directory") unless S_ISDIR($st[2]);
+  sysopen(my $dh, $d, O_RDONLY | O_NOFOLLOW | O_DIRECTORY) or refuse("$vol/.easynas: $!");
+  my @o = stat($dh);
+  refuse("$vol/.easynas is not root's") unless $o[4] == $>;
+  return ($dh, '/proc/self/fd/' . fileno($dh));
+}
+
+sub marker_cmd {
+  my ($op, $vol, $type) = @_;
+  refuse("usage: share-marker write|remove <volume> <smb|nfs|rsyncd>") unless defined $type && @ARGV == 0;
+  refuse("unknown share type \"$type\"") unless $type =~ /^(?:smb|nfs|rsyncd)$/;
+  if ($op eq 'write') {
+    my $in = stdin_text();
+    my ($dh, $dir) = marker_dir($vol, 1);
+    refuse("$vol/.easynas could not be made") unless $dh;
+    my $tmp = "$dir/.$type.share.$$";
+    sysopen(my $fh, $tmp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0644) or do { print STDERR "easynas-root: $vol: $!\n"; exit 1 };
+    my $ok = (print $fh $in) && close($fh) && rename($tmp, "$dir/$type.share");
+    unless ($ok) { unlink $tmp; print STDERR "easynas-root: $vol/.easynas/$type.share: $!\n"; exit 1 }
+    exit 0;
+  }
+  if ($op eq 'remove') {
+    my ($dh, $dir) = marker_dir($vol, 0);
+    exit 0 unless $dh;
+    my @st = lstat("$dir/$type.share");
+    exit 0 unless @st;
+    unlink("$dir/$type.share") or do { print STDERR "easynas-root: $vol/.easynas/$type.share: $!\n"; exit 1 };
+    exit 0;
+  }
+  refuse("unknown share-marker action \"$op\"");
+}
+
+########## host name ##########
+
+sub hostname_cmd {
+  my ($name) = @_;
+  refuse("usage: hostname <name>") unless defined $name && @ARGV == 0;
+  my $label = qr/[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?/;
+  refuse("bad host name") unless length($name) <= 253 && $name =~ /^$label(?:\.$label)*$/;
+  replace_file("$PREFIX/etc/hostname", "$name\n");
+  replace_file("$PREFIX/etc/hosts", "############## EasyNAS hosts file ############\n127.0.0.1  localhost $name\n");
+  { no warnings 'exec'; exec { $HOSTNAME } $HOSTNAME, $name; }
+  print STDERR "easynas-root: $HOSTNAME: $!\n";
+  exit 1;
+}
+
 my %ACTIONS = map { $_ => 1 } qw(start stop restart restart-later reload enable disable);
 
 my $cmd = shift(@ARGV) // '';
@@ -78,5 +352,8 @@ if ($cmd eq 'service') {
   print STDERR "easynas-root: $SYSTEMCTL: $!\n";
   exit 1;
 }
+if ($cmd eq 'file')         { my @a = splice(@ARGV, 0, 2); file_cmd(@a) }
+if ($cmd eq 'share-marker') { my @a = splice(@ARGV, 0, 3); marker_cmd(@a) }
+if ($cmd eq 'hostname')     { my @a = splice(@ARGV, 0, 1); hostname_cmd(@a) }
 
-refuse("usage: easynas-root service <action> <unit>");
+refuse("usage: easynas-root service|file|share-marker|hostname ...");

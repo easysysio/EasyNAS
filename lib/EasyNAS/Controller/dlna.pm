@@ -10,6 +10,26 @@ my $addon = get_addon_info("dlna");
 my $service = ($addon->{service});
 my %TEXT=get_lang_text($addon->{'name'});
 
+# minidlna.conf with each key=value of %set in place of that key's line(s),
+# or added at the end when the file has none. 1 when written.
+sub set_config {
+  my ($config,%set)=@_;
+  my $conf=root_read($config);
+  return 0 unless defined $conf;
+  my $out="";
+  for my $l (split /^/, $conf) {
+   if ($l =~ /^([a-z_]+)=/ && exists $set{$1}) {
+    next unless defined $set{$1};
+    $l="$1=$set{$1}\n";
+    $set{$1}=undef;
+   }
+   $out.=$l;
+  }
+  $out.="\n" if $out ne "" && $out !~ /\n\z/;
+  $out.="$_=$set{$_}\n" for grep { defined $set{$_} } sort keys %set;
+  return root_write($config,$out);
+}
+
 sub view ($self) {
   if (!($self->session('is_auth'))) {
         $self->redirect_to('login');
@@ -45,8 +65,11 @@ sub view ($self) {
   if    ($sel eq "nas")                                        { $dir=$mount_dir; }
   elsif ($sel eq "fs"  && $fs  =~ m{^[A-Za-z0-9_-]+$})         { $dir="$mount_dir/$fs"; }
   elsif ($sel eq "vol" && $vol =~ m{^[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$}) { $dir="$mount_dir/$vol"; }
-  if ($dir ne "") {
-   $rc=system("/usr/bin/sudo /usr/bin/sed -i '\\%^media_dir=%cmedia_dir=$dir' $addon->{config}");
+  if ($dir ne "" && !set_config($addon->{config}, media_dir=>$dir)) {
+   $result="fail";
+   $msg=$TEXT{'dlna_failed'} || "The settings could not be saved.";
+  }
+  elsif ($dir ne "") {
    if (get_service_status($service)) {
     service_ctl('restart',$service);
    }
@@ -67,15 +90,16 @@ sub view ($self) {
   if ($port !~ /^\d+$/ || $port < 1 || $port > 65535
       || $host !~ /^[A-Za-z0-9_. -]{1,64}$/
       || $scan !~ /^\d+$/ || $scan < 1 || $scan > 9999
-      || $max !~ /^\d+$/) {
+      || $max !~ /^\d{1,5}$/) {
    $result="fail";
    $msg=$TEXT{'dlna_bad_input'} || "Invalid settings.";
   }
+  elsif (!set_config($addon->{config}, port=>$port, friendly_name=>$host,
+                      notify_interval=>$scan, max_connections=>$max)) {
+   $result="fail";
+   $msg=$TEXT{'dlna_failed'} || "The settings could not be saved.";
+  }
   else {
-   $rc=system("/usr/bin/sudo /usr/bin/sed -i '/^port=/cport=$port' $addon->{config}");
-   $rc=system("/usr/bin/sudo /usr/bin/sed -i '/^friendly_name=/cfriendly_name=$host' $addon->{config}");
-   $rc=system("/usr/bin/sudo /usr/bin/sed -i '/^notify_interval=/cnotify_interval=$scan' $addon->{config}");
-   $rc=system("/usr/bin/sudo /usr/bin/sed -i '/^max_connections=/cmax_connections=$max' $addon->{config}");
    if (get_service_status($service)) {
     service_ctl('restart',$service);
    }
@@ -86,7 +110,7 @@ sub view ($self) {
 ##### menu ######
   # Current config values for the form.
   my %cfg=(media_dir=>"",port=>"",friendly_name=>"",notify_interval=>"",max_connections=>"");
-  foreach (`/usr/bin/sudo /bin/cat $addon->{config} 2>/dev/null`) {
+  foreach (root_lines($addon->{config})) {
    if (/^(media_dir|port|friendly_name|notify_interval|max_connections)=(.*)$/) { $cfg{$1}=$2; }
   }
   # Which radio matches the current media_dir: whole NAS, one fs, or one volume.

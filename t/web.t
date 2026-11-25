@@ -26,7 +26,8 @@ use Exporter 'import';
 our \@EXPORT = qw(get_addon_info get_lang_text write_log get_update_state
                  get_conf_hosts get_addons is_nas_admin get_admin_group
                  users_info groups_info get_group_default get_mount_dir setup_needed
-                 zypper_run zypper_reason service_ctl);
+                 zypper_run zypper_reason service_ctl
+                 root_read root_lines root_write root_append drop_block get_block);
 our \@LOG;
 our \$UPDATE_STATE = '';
 sub get_addon_info { return { name => \$_[0], program => \$_[0] } }
@@ -49,6 +50,12 @@ sub setup_needed { \$SETUP }
 # zypper, recorded like system() is below and answered from \@RC/\@OUT.
 sub zypper_run { push \@main::SYS, ['/usr/bin/sudo', '/usr/bin/zypper', \@_]; my \$rc = shift(\@main::RC) // 0; return (\$rc, shift(\@main::OUT) // '') }
 sub service_ctl { push \@main::SYS, ['service_ctl', \@_]; return 1 }
+sub root_read   { '' }
+sub root_lines  { () }
+sub root_write  { push \@main::SYS, ['root_write', \@_]; 1 }
+sub root_append { push \@main::SYS, ['root_append', \@_]; 1 }
+sub drop_block  { \$_[0] }
+sub get_block   { '' }
 sub zypper_reason { my \$o = shift // ''; \$o =~ s/\\s+/ /g; \$o =~ s/^ | \$//g; return \$o }
 1;
 EOF
@@ -273,11 +280,16 @@ my $L = 'EasyNAS::Controller::Login';
 # copies the port into the socket's drop-in and restarts the right units.
 {
   @SYS = ();
+  no warnings 'once';
+  my $confdir = tempdir;
+  local $EasyNAS::Controller::Settings::CONF_DIR = "$confdir";
   my $tp = Test::Mojo->new;
   $tp->get_ok('/signin');
   $tp->post_ok('/settings' => form => { action => 'changesettings', port => '8443', hostname => 'nas' });
-  my ($conf) = grep { ($_->[0] // '') =~ m{tee /etc/easynas/easynas.conf} } @SYS;
-  like $conf->[0], qr/^\/bin\/echo "EASYNAS_PORT=8443" \|/, 'port written to the conf';
+  open(my $cf, '<', "$EasyNAS::Controller::Settings::CONF_DIR/easynas.conf");
+  is(($cf ? join('', <$cf>) : undef), "EASYNAS_PORT=8443\n", 'port written to the conf');
+  ok((grep { "@$_" eq '/usr/bin/sudo /easynas/startup/easynas-root hostname nas' } @SYS),
+     'host name set through the root helper');
   ok((grep { "@$_" eq '/usr/bin/sudo /usr/bin/systemd-run --collect --quiet /easynas/startup/web-port.sh --apply' } @SYS),
      'applied by web-port.sh, in its own unit');
   ok(!(grep { "@$_" =~ /systemctl (restart|daemon-reload)/ } @SYS), 'no restart of its own');
@@ -285,6 +297,10 @@ my $L = 'EasyNAS::Controller::Login';
   @SYS = ();
   $tp->post_ok('/settings' => form => { action => 'changesettings', port => '8443x; reboot', hostname => 'nas' });
   is scalar @SYS, 0, 'a port that is not a number changes nothing';
+
+  @SYS = ();
+  $tp->post_ok('/settings' => form => { action => 'changesettings', port => '8443', hostname => 'nas;reboot' });
+  is scalar @SYS, 0, 'a host name that is not one changes nothing';
 }
 
 # ===================== NAS accounts as administrators =====================

@@ -43,3 +43,4 @@ ON / OFF:  Start or stop the Rsyncd service<br>
 Username:  The user you will use to connect to the volume<br>
 Password:  The password you will use to connect to the volume<br>
 Shared Volumes: view and delete the volumes that have Rsyncd share";
+$TEXT{'rsyncd_failed'} = "The rsync share could not be saved.";

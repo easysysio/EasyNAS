@@ -41,3 +41,5 @@ The Radius service and the client will share a secret<br><br>
 ON / OFF:  start or stop radius service<br>
 Settings:  Ajusts radius service setting<br>
 Clients: Add or remove radius clients";
+$TEXT{'radius_failed'} = "The RADIUS client could not be saved.";
+$TEXT{'radius_bad_input'} = "Invalid client, IP, or secret.";

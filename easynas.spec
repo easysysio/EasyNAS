@@ -36,8 +36,8 @@ Obsoletes:      easynas-mm-plex < 1.99-5
 # The NAS-user frame, templates/layouts/user.html.ep (needed by fs-files).
 Provides:       easynas(user-layout)
 Provides:       easynas(lxc-helper) = 6
-# startup/easynas-root: service <action> <unit>
-Provides:       easynas(root-helper) = 1
+# startup/easynas-root: service <action> <unit>; 2: file, share-marker, hostname
+Provides:       easynas(root-helper) = 2
 # The core only lets GETs show things (POST for changes, see lib/EasyNAS.pm);
 # these add-on releases are the first whose pages make their changes by POST,
 # so older ones are updated along with the core.
@@ -446,11 +446,11 @@ MariaDB addon for EasyNAS
 ##### TFTP #####
 %package        fs-tftp
 Version:        %{version}
-Release:        6
+Release:        7
 Summary:        TFTP addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
-Requires:       easynas(root-helper) >= 1
+Requires:       easynas(root-helper) >= 2
 Requires:       tftp
 
 %description fs-tftp
@@ -528,11 +528,11 @@ FTP addon for EasyNAS
 ##### NFS ####
 %package        fs-nfs
 Version:        %{version}
-Release:        6
+Release:        7
 Summary:        NFS addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
-Requires:       easynas(root-helper) >= 1
+Requires:       easynas(root-helper) >= 2
 Requires:       nfs-kernel-server
 
 %description fs-nfs
@@ -553,11 +553,11 @@ NFS addon for EasyNAS
 ##### SAMBA ####
 %package        fs-samba
 Version:        %{version}
-Release:        7
+Release:        8
 Summary:        SAMBA addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
-Requires:       easynas(root-helper) >= 1
+Requires:       easynas(root-helper) >= 2
 Requires:       samba
 Requires:       samba-winbind
 Requires:       rpcbind
@@ -601,11 +601,11 @@ SSH addon for EasyNAS
 #### DLNA ####
 %package        mm-dlna
 Version:        %{version}
-Release:        6
+Release:        7
 Summary:        DLNA addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
-Requires:       easynas(root-helper) >= 1
+Requires:       easynas(root-helper) >= 2
 Requires:       minidlna
 Requires:       ffmpeg
 
@@ -626,11 +626,11 @@ DLNA addon for EasyNAS
 #### RSync ####
 %package        fs-rsyncd
 Version:        %{version}
-Release:        8
+Release:        9
 Summary:        RSyncd addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
-Requires:       easynas(root-helper) >= 1
+Requires:       easynas(root-helper) >= 2
 Requires:       rsync
 
 %description fs-rsyncd
@@ -678,11 +678,11 @@ fi
 #### Radius ####
 %package        srv-radius
 Version:        %{version}
-Release:        8
+Release:        9
 Summary:        Radius addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
-Requires:       easynas(root-helper) >= 1
+Requires:       easynas(root-helper) >= 2
 Requires:       freeradius-server
 
 %description srv-radius
@@ -1022,6 +1022,17 @@ Polish Language for EasyNAS
     latest.rpi.aarch64. The RPi and generic arm64 images now have their own
     files (EasyNAS-RPi.aarch64-* and EasyNAS.aarch64-*), so a channel can
     publish both
+  - Root helper 2: `file read|write|append` for smb.conf, /etc/exports and
+    the rsyncd, RADIUS, DLNA and TFTP configs, checking each line a change
+    adds; `share-marker` for a volume's .easynas markers; `hostname`. The
+    Samba, NFS, rsyncd, RADIUS, DLNA and TFTP add-ons edit their configs
+    through it (no more sudo sed/tee/cat). Fixes shell injection through a
+    Samba share name, the NFS access mode and the host name, and stops
+    rediscovered shares from copying a volume's smb.share into smb.conf
+    unchecked
+  - Logs, update progress, the admin password, the web port and the
+    certificate are read and written directly, without sudo; an uploaded
+    certificate must match its key. 134 sudo calls left outside the helpers
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv

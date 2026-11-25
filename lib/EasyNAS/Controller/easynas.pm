@@ -36,7 +36,8 @@ our @EXPORT    = qw( get_mount_dir get_conf_cron get_addons_file get_update_file
                      write_share_marker remove_share_marker rediscover_shares
                      get_update_state raid_status
                      set_current_lang get_admin_group is_nas_admin
-                     setup_needed setup_done zypper_run zypper_reason service_ctl);
+                     setup_needed setup_done zypper_run zypper_reason service_ctl
+                     root_read root_lines root_write root_append drop_block get_block);
 
 ############# Declarations #####################
 my $authentication_enable = 1;
@@ -440,7 +441,7 @@ sub get_lang
     }
     else
     {
-        `echo "en-en" | /usr/bin/sudo /usr/bin/tee $lang_conf`;
+        write_lang("en-en");
         return "en-en";
     }
 }
@@ -465,12 +466,9 @@ sub write_log
  my $message=$_[2];
  my $timestamp=localtime();
  my $FH;
- unless(-e $log_file) {
-    #Create the file if it doesn't exist
-    `sudo touch $log_file`;
-    `sudo chown easynas.easynas $log_file`;
- }
- open($FH, '>>', $log_file) or die $!;
+ # '>>' makes the file when it isn't there: /var/log/easynas is easynas's
+ # (startup/firstboot.sh), so no root is needed.
+ open($FH, '>>', $log_file) or return;
  print $FH $timestamp." "."[$addon]"." ".$type." ".$message."\n";
  close $FH;
 }
@@ -521,6 +519,69 @@ sub service_ctl
         $ok = 0 if system('/usr/bin/sudo', '/easynas/startup/easynas-root', 'service', $action, $u) != 0;
     }
     return $ok;
+}
+
+# The config files the root daemons read (smb.conf, /etc/exports, rsyncd.conf,
+# RADIUS clients, DLNA, TFTP) are read and changed through the root helper,
+# which checks what a change adds (startup/easynas-root "file"). No shell: the
+# text goes through a pipe.
+my $ROOT_HELPER = '/easynas/startup/easynas-root';
+
+# The file's text; '' when it doesn't exist, undef when it can't be read.
+sub root_read
+{
+    my ($path) = @_;
+    open(my $fh, '-|', '/usr/bin/sudo', $ROOT_HELPER, 'file', 'read', $path) or return undef;
+    local $/;
+    my $s = <$fh>;
+    close $fh;
+    return $? == 0 ? ($s // '') : undef;
+}
+
+# Its lines, as backticks gave them.
+sub root_lines
+{
+    my $s = root_read(@_);
+    return () unless defined $s && $s ne '';
+    return split /^/, $s;
+}
+
+# Replace the file with $text (or, with 'append', add $text at its end).
+# 1 when done; 0 when the helper refused it or failed (it says why in the
+# web server's log).
+sub root_write
+{
+    my ($path, $text, $op) = @_;
+    open(my $fh, '|-', '/usr/bin/sudo', $ROOT_HELPER, 'file', $op // 'write', $path) or return 0;
+    print $fh $text;
+    close $fh;
+    return $? == 0 ? 1 : 0;
+}
+sub root_append { return root_write($_[0], $_[1], 'append') }
+
+# A sed '/start/,/end/' range over $text: the lines from one matching $start
+# through the next one matching $end (to the end when none does), every time.
+# drop_block is the text without them, get_block the first such range.
+sub drop_block
+{
+    my ($text, $start, $end) = @_;
+    my ($out, $in) = ('', 0);
+    for my $l (split /^/, $text // '') {
+        if ($in) { $in = 0 if $l =~ $end; next }
+        if ($l =~ $start) { $in = 1; next }
+        $out .= $l;
+    }
+    return $out;
+}
+sub get_block
+{
+    my ($text, $start, $end) = @_;
+    my ($out, $in) = ('', 0);
+    for my $l (split /^/, $text // '') {
+        if ($in) { $out .= $l; last if $l =~ $end; next }
+        if ($l =~ $start) { $in = 1; $out .= $l }
+    }
+    return $out;
 }
 
 ########### get_compress_status ##########
@@ -602,7 +663,7 @@ sub current_lang
     }
     else
     {
-        `echo "en-en" | /usr/bin/sudo /usr/bin/tee $lang_conf`;
+        write_lang("en-en");
         return "en-en";
     }
 }
@@ -616,7 +677,17 @@ sub set_current_lang
     my $lang=shift;
     return unless defined $lang && $lang =~ /^[a-z]{2}-[a-z]{2}$/;
     return unless -f $lang_dir."/".$lang."/iso.txt";
-    `/bin/echo "$lang" | /usr/bin/sudo /usr/bin/tee $lang_conf > /dev/null`;
+    write_lang($lang);
+}
+
+# The language file is the web interface's own (easynas owns /etc/easynas,
+# see startup/firstboot.sh): written directly, no root needed.
+sub write_lang
+{
+    my ($lang)=@_;
+    open(my $fh,'>',$lang_conf) or return;
+    print $fh "$lang\n";
+    close $fh;
 }
 
 
@@ -1299,8 +1370,7 @@ sub write_share_marker
 {
  my ($vol_path,$type,$content)=@_;
  return unless (-d $vol_path);
- `/usr/bin/sudo /bin/mkdir -p $vol_path/.easynas`;
- open(my $fh,'|-','/usr/bin/sudo /usr/bin/tee '.$vol_path.'/.easynas/'.$type.'.share > /dev/null') or return;
+ open(my $fh,'|-','/usr/bin/sudo',$ROOT_HELPER,'share-marker','write',$vol_path,$type) or return;
  print $fh $content;
  close($fh);
 }
@@ -1308,7 +1378,7 @@ sub write_share_marker
 sub remove_share_marker
 {
  my ($vol_path,$type)=@_;
- `/usr/bin/sudo /bin/rm -f $vol_path/.easynas/$type.share`;
+ system('/usr/bin/sudo',$ROOT_HELPER,'share-marker','remove',$vol_path,$type);
 }
 
 sub rediscover_shares
@@ -1325,28 +1395,34 @@ sub rediscover_shares
   $path="$mount_dir/$v";
 
   ### Samba: the marker is the smb.conf section (#### name #### ... )
+  # The markers are in the volume, which its users can write: the helper
+  # adds only what a share section of EasyNAS's own may hold.
   $marker="$path/.easynas/smb.share";
-  if (-e $marker)
+  if (-f $marker && open(my $mf, '<', $marker))
   {
-   $content=`/bin/cat $marker`;
-   ($name)=$content =~ /^#### (.+) ####/;
-   if ($name && !`/usr/bin/sudo /usr/bin/grep "#### $name ####" /etc/samba/smb.conf 2>/dev/null`)
+   $content=do { local $/; <$mf> } // "";
+   close $mf;
+   ($name)=$content =~ /^#### ([A-Za-z0-9._-]+) ####/;
+   my $conf=root_read('/etc/samba/smb.conf');
+   if ($name && defined $conf && $conf !~ /^#### \Q$name\E ####\s*$/m)
    {
-    open(my $fh,'|-','/usr/bin/sudo /usr/bin/tee -a /etc/samba/smb.conf > /dev/null');
-    print $fh $content;
-    close($fh);
+    root_append('/etc/samba/smb.conf',$content)
+      or write_log("samba","WARNING","the share marker in $path was not taken: see the web server log");
    }
   }
 
   ### NFS: the marker is the /etc/exports line
   $marker="$path/.easynas/nfs.share";
-  if (-e $marker)
+  if (-f $marker && open(my $mf, '<', $marker))
   {
-   $content=`/bin/cat $marker`;
+   $content=<$mf> // "";
+   close $mf;
    chomp($content);
-   if ($content ne "" && !`/usr/bin/sudo /usr/bin/grep -F "$content" /etc/exports 2>/dev/null`)
+   my $conf=root_read('/etc/exports');
+   if ($content ne "" && defined $conf && index($conf,$content) < 0)
    {
-    `/bin/echo "$content" | /usr/bin/sudo /usr/bin/tee -a /etc/exports > /dev/null`;
+    root_append('/etc/exports',"$content\n")
+      or write_log("nfs","WARNING","the share marker in $path was not taken: see the web server log");
    }
   }
  }

@@ -37,3 +37,5 @@ $TEXT{'tftp_help'} = "
 The TFTP service allows you to download and upload files from volumes with no authentication.<br><br>
 ON / OFF:  start or stop the TFTP service<br>
 Shared Volumes: view and delete the volumes that have TFTP share";
+$TEXT{'tftp_failed'} = "The TFTP settings could not be saved.";
+$TEXT{'tftp_no_vol'} = "Select a volume.";

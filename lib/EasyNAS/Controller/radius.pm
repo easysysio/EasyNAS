@@ -51,21 +51,19 @@ sub view ($self) {
   # written into a root-only config file.
   if (!defined $client || $client !~ /^[A-Za-z0-9_.-]{1,64}$/
       || !defined $ip || $ip !~ /^[0-9a-fA-F.:\/]{3,45}$/
-      || !defined $secret || $secret =~ /["'\\\$`]/ || $secret eq "") {
+      || !defined $secret || $secret !~ /^[!-~]{1,128}$/ || $secret =~ /["'\\\$`{}#]/) {
    $result="fail";
    $msg=$TEXT{'radius_bad_input'} || "Invalid client, IP, or secret.";
   }
-  elsif (`/usr/bin/sudo /usr/bin/grep -w "$client" $clients 2>/dev/null`
-      || `/usr/bin/sudo /usr/bin/grep -w "$ip" $clients 2>/dev/null`) {
+  elsif ((root_read($clients) // "") =~ /(?<![\w.-])(?:\Q$client\E|\Q$ip\E)(?![\w.-])/) {
    $result="fail";
    $msg=$TEXT{'radius_client_exists'};
   }
+  elsif (!root_append($clients,"#### $client ####\nclient $client {\nipaddr = $ip\nsecret = $secret\n}\n")) {
+   $result="fail";
+   $msg=$TEXT{'radius_failed'} || "The client could not be saved.";
+  }
   else {
-   `/bin/echo "#### $client ####" | /usr/bin/sudo /usr/bin/tee -a $clients >/dev/null`;
-   `/bin/echo "client $client {" | /usr/bin/sudo /usr/bin/tee -a $clients >/dev/null`;
-   `/bin/echo "ipaddr = $ip" | /usr/bin/sudo /usr/bin/tee -a $clients >/dev/null`;
-   `/bin/echo "secret = $secret" | /usr/bin/sudo /usr/bin/tee -a $clients >/dev/null`;
-   `/bin/echo "}" | /usr/bin/sudo /usr/bin/tee -a $clients >/dev/null`;
    if (get_service_status($service)) {
     $rc=service_ctl('restart',$service) ? 0 : 1;
    }
@@ -76,8 +74,8 @@ sub view ($self) {
 ##### delete client #####
  if (defined($action) && $action eq "delete") {
   my $client=$self->param("client");
-  if (defined $client && $client =~ /^[A-Za-z0-9_.-]{1,64}$/) {
-   $rc=system("/usr/bin/sudo /bin/sed -i '/#### $client ####/,/}/d' $clients");
+  my $conf=(defined $client && $client =~ /^[A-Za-z0-9_.-]{1,64}$/) ? root_read($clients) : undef;
+  if (defined $conf && root_write($clients, drop_block($conf, qr/^#### \Q$client\E ####\s*$/, qr/^\}/))) {
    if (get_service_status($service)) {
     service_ctl('reload',$service);
    }
@@ -89,7 +87,7 @@ sub view ($self) {
   # Clients from the config: "#### name ####" then "ipaddr = <ip>".
   my @radius_clients;
   my $name="";
-  foreach (`/usr/bin/sudo /bin/cat $clients 2>/dev/null`) {
+  foreach (root_lines($clients)) {
    if    (/^#### (\S+) ####/)        { $name=$1; }
    elsif (/^ipaddr\s*=\s*(\S+)/ && $name ne "") {
     push(@radius_clients,{name=>$name,ip=>$1});

@@ -8,6 +8,7 @@ use easynas;
 # which runs the same create functions.
 our $msg;
 our $result;
+our $ADMIN_CONF_DIR = "/etc/easynas";   # tests point it elsewhere
 my $addon = get_addon_info("users");
 my %TEXT=get_lang_text($addon->{'name'});
 
@@ -141,14 +142,18 @@ sub set_admin_password {
  my $salt='$6$'.join('',map { $c[int rand @c] } 1..16).'$';
  my $hash=crypt($password,$salt);
  return 'users_failed_to_change_password' if !defined $hash || $hash !~ /^\$6\$/;
- # Pipe to `sudo tee` with list args (no shell): the $-laden hash can't be
- # reinterpreted. tee writes admin.conf as root; then lock it down.
- open(my $t,"|-","/usr/bin/sudo","/usr/bin/tee","/etc/easynas/admin.conf") or return 'users_failed_to_change_password';
- print $t "admin:$hash\n";
- close($t);
- return 'users_failed_to_change_password' if $? != 0;
- system("/usr/bin/sudo","/usr/bin/chown","easynas:easynas","/etc/easynas/admin.conf");
- system("/usr/bin/sudo","/bin/chmod","600","/etc/easynas/admin.conf");
+ # /etc/easynas belongs to easynas: write a 0600 temp file next to
+ # admin.conf and rename it over, so a failed write never leaves it half-done.
+ my $conf="$ADMIN_CONF_DIR/admin.conf";
+ my $tmp="$conf.new.$$";
+ my $old=umask(077);
+ my $ok=open(my $t,'>',$tmp);
+ umask($old);
+ return 'users_failed_to_change_password' unless $ok;
+ $ok=(print $t "admin:$hash\n");
+ $ok=close($t) && $ok;
+ $ok=$ok && chmod(0600,$tmp) && rename($tmp,$conf);
+ unless ($ok) { unlink $tmp; return 'users_failed_to_change_password'; }
  write_log("users","INFO","Web admin password changed");
  return '';
 }

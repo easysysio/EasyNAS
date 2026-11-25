@@ -46,3 +46,5 @@ HTTP Port: set the HTTP port to see the status and shared files<br>
 Host Name: set the host name other multimedia will see<br>
 Scan Interval: set the time in seconds the server will refresh his multimedia file list<br>
 Shares: Select NAS, Filesystem or a volume";
+$TEXT{'dlna_failed'} = "The DLNA settings could not be saved.";
+$TEXT{'dlna_bad_input'} = "Invalid settings.";

@@ -52,21 +52,21 @@ sub view ($self) {
   # The module name becomes a config section header and a sed pattern on
   # delete -- keep it to safe characters.
   if (!defined $name || $name !~ /^[A-Za-z0-9_-]{1,64}$/
-      || !defined $vol || $vol !~ m{^[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$}) {
+      || !defined $vol || $vol !~ m{^[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$} || $vol =~ /\.\./) {
    $result="fail";
    $msg=$TEXT{'rsyncd_missing_name'};
   }
-  elsif (`/usr/bin/sudo /usr/bin/grep "#### $name ####" $addon->{config} 2>/dev/null`) {
+  elsif ((root_read($addon->{config}) // "") =~ /^#### \Q$name\E ####\s*$/m) {
    $result="fail";
    $msg=$TEXT{'rsyncd_exists'};
   }
+  elsif (!root_append($addon->{config},
+                      "#### $name ####\n[$name]\npath = $mount_dir/$vol\nread only = $readonly\ncomment = $name\n")) {
+   $result="fail";
+   $msg=$TEXT{'rsyncd_failed'} || "The share could not be saved.";
+  }
   else {
    my $path="$mount_dir/$vol";
-   `/bin/echo "#### $name ####" | /usr/bin/sudo /usr/bin/tee -a $addon->{config} >/dev/null`;
-   `/bin/echo "[$name]" | /usr/bin/sudo /usr/bin/tee -a $addon->{config} >/dev/null`;
-   `/bin/echo "path = $path" | /usr/bin/sudo /usr/bin/tee -a $addon->{config} >/dev/null`;
-   `/bin/echo "read only = $readonly" | /usr/bin/sudo /usr/bin/tee -a $addon->{config} >/dev/null`;
-   `/bin/echo "comment = $name" | /usr/bin/sudo /usr/bin/tee -a $addon->{config} >/dev/null`;
    write_share_marker($path,"rsyncd","$name");
    if (get_service_status($service)) {
     $rc=service_ctl('reload',$service) ? 0 : 1;
@@ -79,9 +79,10 @@ sub view ($self) {
  if (defined($action) && $action eq "delete") {
   my $name=$self->param("share");
   my $vol=$self->param("vol") // "";
-  if (defined $name && $name =~ /^[A-Za-z0-9_-]{1,64}$/) {
-   $rc=system("/usr/bin/sudo /usr/bin/sed -i '/#### $name ####/,/comment = $name/d' $addon->{config}");
-   remove_share_marker("$mount_dir/$vol","rsyncd") if ($vol ne "");
+  my $conf=(defined $name && $name =~ /^[A-Za-z0-9_-]{1,64}$/) ? root_read($addon->{config}) : undef;
+  if (defined $conf
+      && root_write($addon->{config}, drop_block($conf, qr/^#### \Q$name\E ####\s*$/, qr/^comment = \Q$name\E\s*$/))) {
+   remove_share_marker("$mount_dir/$vol","rsyncd") if ($vol =~ m{^[A-Za-z0-9_-]+/[A-Za-z0-9._-]+$} && $vol !~ /\.\./);
    if (get_service_status($service)) {
     service_ctl('restart',$service);
    }
@@ -94,7 +95,7 @@ sub view ($self) {
   # and "read only =" lines.
   my @shares;
   my ($name,$path)=("","");
-  foreach (`/usr/bin/sudo /bin/cat $addon->{config} 2>/dev/null`) {
+  foreach (root_lines($addon->{config})) {
    if    (/^#### (\S+) ####/)          { $name=$1; $path=""; }
    elsif (/^path\s*=\s*(\S+)/)         { $path=$1; }
    elsif (/^read only\s*=\s*(\S+)/ && $name ne "") {

@@ -34,12 +34,14 @@ set_admin_password() {
         if [ "$p1" != "$p2" ] ; then echo "Passwords do not match, try again." ; continue ; fi
         break
     done
-    # The console autologin user is 'easynas' (the only account with sudo;
-    # 'admin' exists solely as the web-UI login hashed below). Write via sudo
-    # so ownership/permissions come out right regardless of the mount state.
-    printf 'admin:%s\n' "$(openssl passwd -6 "$p1")" | sudo /usr/bin/tee "$ADMIN_CONF" >/dev/null
-    sudo /usr/bin/chown easynas:easynas "$ADMIN_CONF"
-    sudo /usr/bin/chmod 600 "$ADMIN_CONF"
+    # The console autologin user is 'easynas', which owns /etc/easynas
+    # ('admin' exists solely as the web-UI login hashed below). Written to a
+    # 0600 temp file, then moved over, so it is never readable by others.
+    local hash
+    hash="$(openssl passwd -6 "$p1")" || { echo "Could not hash the password." ; return 1 ; }
+    ( umask 077 && printf 'admin:%s\n' "$hash" > "$ADMIN_CONF.new" ) \
+        && chmod 600 "$ADMIN_CONF.new" && mv -f "$ADMIN_CONF.new" "$ADMIN_CONF" \
+        || { rm -f "$ADMIN_CONF.new" ; echo "Could not save the admin password." ; return 1 ; }
     unset p1 p2
     echo "Admin password updated."
 }
@@ -54,7 +56,7 @@ if [ ! -f "$ADMIN_CONF" ] ; then
     echo
     echo "Set the password for the web administrator (user: admin)."
     echo
-    set_admin_password
+    until set_admin_password ; do echo ; done
     read -p "Press Enter key to continue ..."
 fi
 

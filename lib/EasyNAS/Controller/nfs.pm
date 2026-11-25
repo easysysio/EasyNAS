@@ -50,20 +50,26 @@ sub view ($self) {
 
 ##### add share #####
  if (defined($action) && $action eq "add") {
-  my $vol=$self->param("vol");
-  my $per=$self->param("per");
-  if (`/usr/bin/sudo /usr/bin/grep "$mount_dir/$vol " $addon->{config} 2>/dev/null`) {
+  my $vol=$self->param("vol") // "";
+  my $per=$self->param("per") // "";
+  my $path="$mount_dir/$vol";
+  if ($vol !~ m{^[A-Za-z0-9_-]+/[A-Za-z0-9._-]+$} || $vol =~ /\.\./ || $per !~ /^(?:rw|ro)$/) {
+   $result="fail";
+   $msg=$TEXT{'nfs_bad_input'} || "Pick a volume from the list.";
+  }
+  elsif ((root_read($addon->{config}) // "") =~ /^\Q$path\E\s/m) {
    $result="fail";
    $msg=$TEXT{'nfs_exists'};
   }
+  # Ownership belongs to the volume (set in Volume settings); NFS has no
+  # per-share identity mapping, so the export just serves the directory
+  # with whatever owner/group/permissions the volume carries.
+  elsif (!root_append($addon->{config},"$path *($per,sync,no_subtree_check)\n")) {
+   $result="fail";
+   $msg=$TEXT{'nfs_failed'} || "The share could not be saved.";
+  }
   else {
-   my $path="$mount_dir/$vol";
-   # Ownership belongs to the volume (set in Volume settings); NFS has no
-   # per-share identity mapping, so the export just serves the directory
-   # with whatever owner/group/permissions the volume carries.
-   my $export="$path *($per,sync,no_subtree_check)";
-   `/bin/echo "$export" | /usr/bin/sudo /usr/bin/tee -a $addon->{config}`;
-   write_share_marker($path,"nfs",$export);
+   write_share_marker($path,"nfs","$path *($per,sync,no_subtree_check)");
    $rc=system("/usr/bin/sudo /usr/sbin/exportfs -a >/dev/null");
    if (get_service_status($service)) {
     $rc=service_ctl('restart',$service) ? 0 : 1;
@@ -74,16 +80,24 @@ sub view ($self) {
 
 ##### delete share #####
  if (defined($action) && $action eq "delete") {
-  my $vol=$self->param("vol");
-  my $fs=$self->param("fs");
-  my $cmount_dir=substr($mount_dir,1);
-  $rc=system("/usr/bin/sudo /usr/bin/sed -i '/.$cmount_dir.$fs.$vol /d' $addon->{config}");
-  remove_share_marker("$mount_dir/$fs/$vol","nfs");
-  `/usr/bin/sudo /usr/sbin/exportfs -a`;
-  if (get_service_status($service)) {
-   service_ctl('reload',$service);
+  my $vol=$self->param("vol") // "";
+  my $fs=$self->param("fs") // "";
+  my $path="$mount_dir/$fs/$vol";
+  my $conf=($fs =~ /^[A-Za-z0-9_-]+$/ && $vol =~ /^[A-Za-z0-9._-]+$/ && $vol !~ /^\.\.?$/)
+           ? root_read($addon->{config}) : undef;
+  if (!defined $conf
+      || !root_write($addon->{config}, join('', grep { !/^\Q$path\E\s/ } split /^/, $conf))) {
+   $result="fail";
+   $msg=$TEXT{'nfs_failed'} || "The share could not be saved.";
   }
-  write_log($addon->{"name"},"INFO","NFS share was deleted");
+  else {
+   remove_share_marker($path,"nfs");
+   `/usr/bin/sudo /usr/sbin/exportfs -a`;
+   if (get_service_status($service)) {
+    service_ctl('reload',$service);
+   }
+   write_log($addon->{"name"},"INFO","NFS share was deleted");
+  }
  }
 
 ##### menu ######
@@ -92,7 +106,7 @@ sub view ($self) {
   my $path;
   my $fs;
   my $vol;
-  my @nfs=`/usr/bin/sudo /usr/bin/grep $mount_dir $addon->{config} 2>/dev/null`;
+  my @nfs=grep { /^\Q$mount_dir\E\// } root_lines($addon->{config});
   foreach (@nfs)
   {
    ($path,undef)=split(" ",$_);

@@ -49,7 +49,8 @@ sub view ($self) {
     my $state = get_update_state();
     my ($pct,$phase) = (0,"");
     if ($state eq "updating") {
-      my $log = `/usr/bin/sudo /bin/cat /var/log/easynas/update.log 2>/dev/null`;
+      my $log = "";
+      if (open(my $fh, '<', '/var/log/easynas/update.log')) { local $/; $log = <$fh> // ""; close $fh; }
       my ($r_n,$r_m,$i_n,$i_m);
       while ($log =~ /Retrieving(?: package)?:?\s+\S+\s+\(\s*(\d+)\/(\d+)\)/g) { ($r_n,$r_m)=($1,$2); }
       while ($log =~ /\(\s*(\d+)\/(\d+)\)\s+Installing:/g)                    { ($i_n,$i_m)=($1,$2); }

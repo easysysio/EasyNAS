@@ -10,6 +10,11 @@ my $result;
 my $addon = get_addon_info("settings");
 my %TEXT=get_lang_text($addon->{'name'});
 
+# The web interface's own files (easynas owns /etc/easynas, see
+# startup/firstboot.sh): written directly, no root needed. t/web.t points
+# them elsewhere.
+our $CONF_DIR = "/etc/easynas";
+
 # The two EasyNAS update channels. Exactly one is configured at a time, under
 # these aliases: addons.pm, check_update.pl and addon-worker.sh
 # all pick the active channel by looking for the EasyNAS_Beta alias, and the
@@ -57,10 +62,10 @@ sub view ($self) {
   my $today=`/bin/date +%Y-%m-%d`; chomp $today;
   my $now=`/bin/date +%H:%M`;      chomp $now;
   # Active TLS cert summary (issuer + validity) for the Certificate tab.
-  my $cert_info=`/usr/bin/sudo /usr/bin/openssl x509 -in /etc/easynas/easynas.cert -noout -issuer -dates 2>/dev/null`;
+  my $cert_info=`/usr/bin/openssl x509 -in $CONF_DIR/easynas.cert -noout -issuer -dates 2>/dev/null`;
   # Port lives in the persistent config layer (/etc/easynas/easynas.conf),
   # not the read-only systemd unit. Fall back to the default if unset.
-  my $str=`/usr/bin/grep '^EASYNAS_PORT=' /etc/easynas/easynas.conf 2>/dev/null`;
+  my $str=`/usr/bin/grep '^EASYNAS_PORT=' $CONF_DIR/easynas.conf 2>/dev/null`;
   (my $port) = $str =~ /(\d+)/;
   $port = 1443 unless $port;
   # Upgrade-snapshot retention = snapper's NUMBER_LIMIT on the root config
@@ -187,8 +192,28 @@ sub setchannel($self) {
 # Replace the appliance's TLS certificate (and optionally its key) with an
 # uploaded PEM, then restart so the daemon serves it. The daemon reads
 # /etc/easynas/easynas.{cert,key} (see the service's -l https://...?cert=&key=).
+# The public key of a PEM certificate ('x509') or private key ('pkey') file,
+# or '' when openssl can't read it as one.
+sub public_key {
+ my ($kind,$file)=@_;
+ my @cmd=$kind eq 'x509' ? ('x509','-in',$file,'-noout','-pubkey') : ('pkey','-in',$file,'-pubout');
+ open(my $fh,'-|','/usr/bin/openssl',@cmd) or return '';
+ my $pub=do { local $/; <$fh> } // '';
+ close $fh;
+ return $? == 0 && $pub =~ /BEGIN PUBLIC KEY/ ? $pub : '';
+}
+
+# Replace the contents of $file with $data (it keeps its owner), mode $mode.
+sub put_conf_file {
+ my ($file,$data,$mode)=@_;
+ open(my $fh,'>',$file) or return 0;
+ chmod $mode, $fh;
+ my $ok=(print $fh $data);
+ return close($fh) && $ok;
+}
+
 sub upload_crt($self) {
- my $cert_dir="/etc/easynas";
+ my $cert_dir=$CONF_DIR;
  my $cert_up=$self->req->upload('cert');
  my $key_up =$self->req->upload('key');
  unless (defined $cert_up && $cert_up->size > 0) {
@@ -196,16 +221,32 @@ sub upload_crt($self) {
   $msg=$TEXT{'no_cert'} || "No certificate file was provided.";
   return;
  }
- # Land via /tmp then sudo-move, so ownership/permissions are correct regardless
- # of who owns the existing cert files.
- $cert_up->move_to("/tmp/easynas_upload.cert");
- system("/usr/bin/sudo /bin/mv -f /tmp/easynas_upload.cert $cert_dir/easynas.cert");
- system("/usr/bin/sudo /bin/chown easynas:easynas $cert_dir/easynas.cert");
- if (defined $key_up && $key_up->size > 0) {
-  $key_up->move_to("/tmp/easynas_upload.key");
-  system("/usr/bin/sudo /bin/mv -f /tmp/easynas_upload.key $cert_dir/easynas.key");
-  system("/usr/bin/sudo /bin/chown easynas:easynas $cert_dir/easynas.key");
-  system("/usr/bin/sudo /bin/chmod 600 $cert_dir/easynas.key");
+ # Check the pair before it replaces the one in use: the web interface
+ # restarts on it, and a certificate its key doesn't match would keep it
+ # from starting. The key is the uploaded one, or the current one.
+ require File::Temp;
+ my $tmp=File::Temp->newdir;
+ $cert_up->move_to("$tmp/cert");
+ my $has_key=(defined $key_up && $key_up->size > 0);
+ $key_up->move_to("$tmp/key") if $has_key;
+ my $cert_pub=public_key('x509',"$tmp/cert");
+ my $key_pub=public_key('pkey',$has_key ? "$tmp/key" : "$cert_dir/easynas.key");
+ if ($cert_pub eq '' || ($has_key && $key_pub eq '')) {
+  $result="fail";
+  $msg=$TEXT{'settings_cert_bad'} || "That is not a PEM certificate and key.";
+  return;
+ }
+ if ($cert_pub ne $key_pub) {
+  $result="fail";
+  $msg=$TEXT{'settings_cert_mismatch'} || "The certificate does not match the key.";
+  return;
+ }
+ my $slurp=sub { open(my $fh,'<',$_[0]) or return undef; local $/; my $d=<$fh>; close $fh; $d };
+ if (($has_key && !put_conf_file("$cert_dir/easynas.key",$slurp->("$tmp/key"),0600))
+     || !put_conf_file("$cert_dir/easynas.cert",$slurp->("$tmp/cert"),0644)) {
+  $result="fail";
+  $msg=$TEXT{'settings_cert_failed'} || "The certificate could not be saved.";
+  return;
  }
  write_log("settings","INFO","TLS certificate was uploaded");
  $result="success";
@@ -245,11 +286,16 @@ sub setdate($self) {
 sub changesettings($self) {
  my $port=$self->param("port");
  my $hostname=$self->param("hostname");
- my $conf_hosts=get_conf_hosts();
  my $rc;
  unless (defined $port && $port =~ /^\d{4,5}$/ && $port >= 1025 && $port <= 65535) {
   $result="fail";
   $msg=$TEXT{'settings_bad_port'};
+  return;
+ }
+ unless (defined $hostname && length($hostname) <= 253
+         && $hostname =~ /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/) {
+  $result="fail";
+  $msg=$TEXT{'settings_bad_hostname'} || "A host name has letters, digits and '-', in parts split by '.'.";
   return;
  }
  # Upgrade-snapshot retention: set snapper's NUMBER_LIMIT (and make sure the
@@ -258,16 +304,18 @@ sub changesettings($self) {
  if (defined $snapshots && $snapshots =~ /^\d+$/ && $snapshots >= 1 && $snapshots <= 100) {
   system("/usr/bin/sudo /usr/bin/snapper -c root set-config \"NUMBER_LIMIT=$snapshots\" \"NUMBER_CLEANUP=yes\" 2>/dev/null");
  }
- $rc=system("/bin/echo \"$hostname\" | /usr/bin/sudo /usr/bin/tee /etc/hostname > /dev/null");
- $rc=system("/usr/bin/sudo /bin/hostname $hostname > /dev/null");
- $rc=system("/bin/echo '############## EasyNAS hosts file ############' | /usr/bin/sudo /usr/bin/tee $conf_hosts > /dev/null");
- $rc=system("/bin/echo '127.0.0.1  localhost $hostname' | /usr/bin/sudo /usr/bin/tee -a $conf_hosts > /dev/null");
+ # /etc/hostname, /etc/hosts and the running system's name
+ $rc=system("/usr/bin/sudo","/easynas/startup/easynas-root","hostname",$hostname);
  # Persist the port to the config layer. systemd holds the listening socket
  # (easynas.socket), so web-port.sh copies the port into its drop-in and
  # restarts the web interface: only the app on the same port (connections
  # wait meanwhile), the socket too on a new one. In its own transient unit so
  # it outlives this process, which it restarts.
- $rc=system("/bin/echo \"EASYNAS_PORT=$port\" | /usr/bin/sudo /usr/bin/tee /etc/easynas/easynas.conf > /dev/null");
+ unless (put_conf_file("$CONF_DIR/easynas.conf","EASYNAS_PORT=$port\n",0644)) {
+  $result="fail";
+  $msg=$TEXT{'settings_failed'} || "The settings could not be saved.";
+  return;
+ }
  $rc=system("/usr/bin/sudo","/usr/bin/systemd-run","--collect","--quiet","/easynas/startup/web-port.sh","--apply");
  $result="success";
  $msg=$TEXT{'settings_saved'};

@@ -61,3 +61,4 @@ WorkGroup Name - the windows network name.<br>
 Netbios Name - the EasyNAS name in the windows network<br><br>
 Shared Volumes:<br>
 view and delete the volumes that have SAMBA share";
+$TEXT{'samba_share_failed'} = "The share could not be saved.";

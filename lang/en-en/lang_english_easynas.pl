@@ -136,6 +136,11 @@ $TEXT{'settings_port'} = "Port";
 $TEXT{'settings_save'} = "Save";
 $TEXT{'settings_reset'} = "Reset";
 $TEXT{'settings_bad_port'} = "Bad System Port";
+$TEXT{'settings_bad_hostname'} = "A host name has letters, digits and '-', in parts split by '.'.";
+$TEXT{'settings_failed'} = "The settings could not be saved.";
+$TEXT{'settings_cert_bad'} = "The certificate or key file is not valid.";
+$TEXT{'settings_cert_mismatch'} = "The certificate does not match the key.";
+$TEXT{'settings_cert_failed'} = "The certificate could not be saved.";
 $TEXT{'settings_saved'} = "New Settings were saved. Restart might be required for the settings to take effect.";
 
 $TEXT{'change_settings_in_progress'} = "Change Settings in Progress....";

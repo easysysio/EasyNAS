@@ -7,8 +7,9 @@ use easynas;
 my $addon = get_addon_info("logs");
 my %TEXT=get_lang_text($addon->{'name'});
 
-# Viewable logs, whitelisted: the file choice comes from the query string and
-# reaches a root shell command.
+# Viewable logs, whitelisted: the file choice comes from the query string.
+# The logs are world-readable (/var/log/easynas belongs to easynas), so they
+# are read directly, without sudo.
 my %LOGS = (
  easynas => "/var/log/easynas/easynas.log",
  update  => "/var/log/easynas/update.log",
@@ -25,7 +26,15 @@ sub view ($self) {
   $lines = 200 unless ($lines =~ /^\d{1,4}$/ && $lines > 0);
 
   # Newest entries first.
-  my @entries = reverse `/usr/bin/sudo /usr/bin/tail -n $lines $LOGS{$file} 2>/dev/null`;
+  my @entries;
+  if (open(my $fh, '<', $LOGS{$file})) {
+    while (my $l = <$fh>) {
+      push @entries, $l;
+      shift @entries if @entries > $lines;
+    }
+    close $fh;
+  }
+  @entries = reverse @entries;
   chomp @entries;
 
   $self->stash(addon => $addon,

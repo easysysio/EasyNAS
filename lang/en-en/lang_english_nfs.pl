@@ -39,3 +39,5 @@ $TEXT{'nfs_help'} = "
 The NFS service allows you to share volumes with Unix based systems.<br><br>
 ON / OFF:  start or stop the NFS service<br>
 Shared Volumes: view and delete the volumes that have NFS share";
+$TEXT{'nfs_bad_input'} = "Select a volume and an access mode.";
+$TEXT{'nfs_failed'} = "The NFS export could not be saved.";

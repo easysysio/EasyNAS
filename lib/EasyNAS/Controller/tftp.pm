@@ -42,13 +42,14 @@ sub view ($self) {
  if (defined($action) && $action eq "add") {
   my $vol=$self->param("vol");
   my $dirname="$mount_dir/$vol";
-  if (defined $vol && $vol =~ m{^[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$} && -d $dirname) {
-   my $uid=(stat($dirname))[4];
-   my $user=(getpwuid $uid)[0] // "root";
-   `/bin/echo "############ EasyNAS TFTP Config File ###########" | /usr/bin/sudo /usr/bin/tee $addon->{config} >/dev/null`;
-   `/bin/echo "TFTP_USER=$user" | /usr/bin/sudo /usr/bin/tee -a $addon->{config} >/dev/null`;
-   `/bin/echo "TFTP_OPTIONS=" | /usr/bin/sudo /usr/bin/tee -a $addon->{config} >/dev/null`;
-   `/bin/echo "TFTP_DIRECTORY=$dirname " | /usr/bin/sudo /usr/bin/tee -a $addon->{config} >/dev/null`;
+  my $valid=(defined $vol && $vol =~ m{^[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$} && $vol !~ /\.\./ && -d $dirname);
+  my $user=$valid ? ((getpwuid((stat($dirname))[4]))[0] // "root") : "";
+  if ($valid && !root_write($addon->{config},
+        "############ EasyNAS TFTP Config File ###########\nTFTP_USER=$user\nTFTP_OPTIONS=\nTFTP_DIRECTORY=$dirname \n")) {
+   $result="fail";
+   $msg=$TEXT{'tftp_failed'} || "The settings could not be saved.";
+  }
+  elsif ($valid) {
    if (get_service_status($service)) {
     $rc=service_ctl('restart',$service) ? 0 : 1;
    }
@@ -62,17 +63,23 @@ sub view ($self) {
 
 ##### clear the served directory #####
  if (defined($action) && $action eq "delete") {
-  $rc=system("/usr/bin/sudo /usr/bin/sed -i '/TFTP_DIRECTORY/d' $addon->{config}");
-  if (get_service_status($service)) {
-   service_ctl('restart',$service);
+  my $conf=root_read($addon->{config});
+  if (defined $conf && root_write($addon->{config}, join('', grep { !/TFTP_DIRECTORY/ } split /^/, $conf))) {
+   if (get_service_status($service)) {
+    service_ctl('restart',$service);
+   }
+   write_log($addon->{"name"},"INFO","TFTP share was removed");
   }
-  write_log($addon->{"name"},"INFO","TFTP share was removed");
+  else {
+   $result="fail";
+   $msg=$TEXT{'tftp_failed'} || "The settings could not be saved.";
+  }
  }
 
 ##### menu ######
   # TFTP serves a single directory; show the one currently configured.
   my $current="";
-  foreach (`/usr/bin/sudo /bin/cat $addon->{config} 2>/dev/null`) {
+  foreach (root_lines($addon->{config})) {
    if (/^TFTP_DIRECTORY=(\S+)/) { $current=$1; last; }
   }
   my %vol = vol_info();

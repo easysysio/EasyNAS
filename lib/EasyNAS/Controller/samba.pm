@@ -46,9 +46,20 @@ sub share_section {
  return $s;
 }
 
-# Write (or overwrite) a share from the submitted form params: append the
-# smb.conf section, drop a share marker and reload samba. Shared by add and
-# change (edit).
+# A share's section in smb.conf: "#### name ####" through "comment = name".
+sub share_start { my ($n)=@_; return qr/^#### \Q$n\E ####\s*$/ }
+sub share_end   { my ($n)=@_; return qr/^comment = \Q$n\E\s*$/ }
+sub share_exists { my ($config,$n)=@_; my $c=root_read($config) // ""; return $c =~ /^#### \Q$n\E ####\s*$/m }
+
+# Valid form values: the share name goes into smb.conf, the volume is one
+# from the list ("fs/volume").
+sub share_name_ok { my ($n)=@_; return defined $n && $n =~ /^[A-Za-z0-9._-]{1,64}$/ }
+sub share_vol_ok  { my ($v)=@_; return defined $v && $v =~ m{^[A-Za-z0-9_-]+/[A-Za-z0-9._-]+$} && $v !~ /\.\./ }
+
+# Write (or overwrite) a share from the submitted form params: the smb.conf
+# section (in place of the old one when $replace names it), the share marker,
+# and a samba restart. Shared by add and change (edit). 1 when smb.conf took
+# it.
 #
 # Ownership model: the VOLUME is the single source of truth for on-disk
 # ownership (set in volume settings). The share only FOLLOWS it: a volume
@@ -57,7 +68,7 @@ sub share_section {
 # plain share. Samba never chowns anything -- to change who owns the data,
 # change the volume's owner and re-save the share.
 sub apply_share {
- my ($self,$config,$mount_dir,$service)=@_;
+ my ($self,$config,$mount_dir,$service,$replace)=@_;
  my $share=$self->param("name");
  my $vol=$self->param("vol");
  my $readonly=($self->param("readonly") // "") eq "yes" ? "yes" : "no";
@@ -72,13 +83,21 @@ sub apply_share {
                 && `/usr/bin/getent group $owner_group 2>/dev/null` ne "");
  my $section=share_section($share,$path,$browsable,$guest,$readonly,$recycle,
                            $has_group ? $owner_group : "");
- open(my $fh,'|-',"/usr/bin/sudo /usr/bin/tee -a $config > /dev/null");
- print $fh $section;
- close($fh);
+ my $ok;
+ if (defined $replace) {
+  my $conf=root_read($config);
+  return 0 unless defined $conf;
+  $ok=root_write($config, drop_block($conf,share_start($replace),share_end($replace)).$section);
+ }
+ else {
+  $ok=root_append($config,$section);
+ }
+ return 0 unless $ok;
  write_share_marker($path,"smb",$section);
  if (get_service_status($service)) {
   service_ctl('restart',$service);
  }
+ return 1;
 }
 
 # Start Samba now and at boot (smb, and nmb for network browsing).
@@ -101,16 +120,19 @@ sub add_share ($self) {
    $result="fail";
    $msg=$TEXT{'samba_missing_name'};
   }
-  elsif ($share !~ /^[A-Za-z0-9._-]{1,64}$/ || $vol !~ m{^[A-Za-z0-9_-]+/[A-Za-z0-9._-]+$} || $vol =~ /\.\./) {
+  elsif (!share_name_ok($share) || !share_vol_ok($vol)) {
    $result="fail";
    $msg=$TEXT{'samba_bad_name'} || "A share name has letters, digits, '.', '_' and '-'; pick a volume from the list.";
   }
-  elsif (`/usr/bin/sudo /usr/bin/grep "#### $share ####" $config 2>/dev/null`) {
+  elsif (share_exists($config,$share)) {
    $result="fail";
    $msg=$TEXT{'samba_share_exists'};
   }
+  elsif (!apply_share($self,$config,get_mount_dir(),$service)) {
+   $result="fail";
+   $msg=$TEXT{'samba_share_failed'} || "The share could not be saved.";
+  }
   else {
-   apply_share($self,$config,get_mount_dir(),$service);
    write_log($addon->{"name"},"INFO","Samba share $share was added");
    $result="success";
    $msg=$TEXT{'samba_share_added'} || "Share added.";
@@ -157,9 +179,9 @@ sub view ($self) {
 ##### edit menu (load an existing share into the form) #####
  if (defined($action) && $action eq "editmenu") {
   my $share=$self->param("share");
-  if (defined($share) && $share =~ /^[A-Za-z0-9._-]+$/) {
+  if (share_name_ok($share)) {
    my %vol = vol_info();
-   my @sec=`/usr/bin/sudo /bin/sed -n '/#### $share ####/,/comment = $share/p' $config 2>/dev/null`;
+   my @sec=split /^/, get_block(root_read($config),share_start($share),share_end($share));
    my ($spath,$sbrowsable,$sguest,$sreadonly,$srecycle)=("","yes","no","no",0);
    foreach (@sec) {
     if    (/^\s*path\s*=\s*(\S+)/)         { $spath=$1; }
@@ -189,13 +211,15 @@ sub view ($self) {
 # writing the new one from the form.
  if (defined($action) && $action eq "change") {
   my $share=$self->param("name");
-  if (!defined($share) || $share !~ /^[A-Za-z0-9._-]+$/) {
+  if (!share_name_ok($share) || !share_vol_ok($self->param("vol"))) {
    $result="fail";
    $msg=$TEXT{'samba_missing_name'};
   }
+  elsif (!apply_share($self,$config,$mount_dir,$service,$share)) {
+   $result="fail";
+   $msg=$TEXT{'samba_share_failed'} || "The share could not be saved.";
+  }
   else {
-   $rc=system("/usr/bin/sudo /usr/bin/sed -i '/#### $share ####/,/comment = $share/d' $config");
-   apply_share($self,$config,$mount_dir,$service);
    $result="success";
    $msg=$TEXT{'samba_share_edited'} || "Share updated.";
    write_log($addon->{"name"},"INFO","Samba share $share was edited");
@@ -206,12 +230,18 @@ sub view ($self) {
  if (defined($action) && $action eq "delete") {
   my $share=$self->param("share");
   my $vol=$self->param("vol");
-  $rc=system("/usr/bin/sudo /usr/bin/sed -i '/#### $share ####/,/comment = $share/d' $config");
-  remove_share_marker("$mount_dir/$vol","smb") if (defined($vol) && $vol ne "");
-  if (get_service_status($service)) {
-   $rc=service_ctl('restart',$service) ? 0 : 1;
+  my $conf=share_name_ok($share) ? root_read($config) : undef;
+  if (defined $conf && root_write($config,drop_block($conf,share_start($share),share_end($share)))) {
+   remove_share_marker("$mount_dir/$vol","smb") if (share_vol_ok($vol));
+   if (get_service_status($service)) {
+    $rc=service_ctl('restart',$service) ? 0 : 1;
+   }
+   write_log($addon->{"name"},"INFO","Samba share $share was deleted");
   }
-  write_log($addon->{"name"},"INFO","Samba share was deleted");
+  else {
+   $result="fail";
+   $msg=$TEXT{'samba_share_failed'} || "The share could not be saved.";
+  }
  }
 
 
@@ -220,7 +250,7 @@ sub view ($self) {
   my $service_active=get_service_status($service);
   my @shares;
   my ($cur,$cpath);
-  my @conf=`/usr/bin/sudo /bin/cat $config 2>/dev/null`;
+  my @conf=root_lines($config);
   my $push_share=sub {
    return unless (defined $cur && defined $cpath);
    my $vol=$cpath;
