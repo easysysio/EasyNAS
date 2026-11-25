@@ -70,7 +70,7 @@ sub view ($self) {
   }
   else {
    write_share_marker($path,"nfs","$path *($per,sync,no_subtree_check)");
-   $rc=system("/usr/bin/sudo /usr/sbin/exportfs -a >/dev/null");
+   root_do('nfs','reexport');
    if (get_service_status($service)) {
     $rc=service_ctl('restart',$service) ? 0 : 1;
    }
@@ -92,7 +92,7 @@ sub view ($self) {
   }
   else {
    remove_share_marker($path,"nfs");
-   `/usr/bin/sudo /usr/sbin/exportfs -a`;
+   root_do('nfs','reexport');   # -ra: the deleted share is withdrawn too
    if (get_service_status($service)) {
     service_ctl('reload',$service);
    }

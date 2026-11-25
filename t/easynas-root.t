@@ -26,7 +26,15 @@ chmod 0755, "$d/systemctl";
 $ENV{EASYNAS_ADDONS_DIR} = "$d/addons";
 $ENV{EASYNAS_SYSTEMCTL}  = "$d/systemctl";
 
-sub run { unlink "$d/calls"; system($^X, $helper, @_); return ($? >> 8, slurp("$d/calls")) }
+# stdin is empty, as from sudo with nothing piped in.
+sub run {
+  unlink "$d/calls";
+  open(my $in, '<&', \*STDIN) or die $!; open(STDIN, '<', '/dev/null') or die $!;
+  system($^X, $helper, @_);
+  my $rc = $? >> 8;
+  open(STDIN, '<&', $in) or die $!;
+  return ($rc, slurp("$d/calls"));
+}
 
 my ($rc, $calls) = run(qw(service start smb.service));
 is $rc, 0, 'an add-on\'s service starts';
@@ -419,5 +427,194 @@ put("$r/etc/cron.d/easynas.cron", "0 */6 * * *  root /easynas/startup/check_upda
 is $rc, 0, 'easynas.cron: a job taken out';
 ($rc) = feed("* * * * * root /bin/sh -c id\n", qw(file append /etc/cron.d/easynas.cron));
 is $rc, 2, '...none added';
+
+# ===================== accounts, network, NFS, MariaDB, iSCSI =====================
+# Fake programs record "<name> <args>", then what came on their stdin.
+for my $p (qw(useradd usermod userdel groupadd groupdel chpasswd smbpasswd nmcli exportfs mysql
+              tgt-setup-lun tgtadm)) {
+  put("$d/bin/$p", "#!/bin/sh\necho \"$p \$*\" >> $d/calls\ncat >> $d/calls\n[ -e $d/fail-$p ] && exit 4\nexit 0\n");
+  chmod 0755, "$d/bin/$p";
+}
+put("$d/bin/pdbedit", "#!/bin/sh\necho \"pdbedit \$*\" >> $d/calls\n[ -e $d/smb-known ]\n");
+put("$d/bin/tgt-admin", "#!/bin/sh\necho \"tgt-admin \$*\" >> $d/calls\n[ \"\$1\" = --dump ] && echo '<target iqn.x:t>'\nexit 0\n");
+chmod 0755, "$d/bin/pdbedit", "$d/bin/tgt-admin";
+sub feed_calls { unlink "$d/calls"; my ($rc) = feed(@_); return ($rc, slurp("$d/calls")) }
+
+# A real NAS-range account and group to work on, when this system has one.
+my ($nas_user, $nas_uid);
+setpwent();
+while (my @pw = getpwent()) {
+  if ($pw[2] >= 1000 && $pw[2] < 65000 && $pw[0] =~ /^[A-Za-z_][A-Za-z0-9_.-]{0,31}$/ && $pw[0] ne 'easynas') { ($nas_user, $nas_uid) = @pw[0, 2]; last }
+}
+endpwent();
+my $nas_group;
+setgrent();
+while (my @gr = getgrent()) { if ($gr[2] >= 1000 && $gr[2] < 65000 && $gr[0] =~ /^[A-Za-z_][A-Za-z0-9_.-]{0,31}$/ && $gr[0] ne 'easynas') { $nas_group = $gr[0]; last } }
+endgrent();
+my $free = 'enastest' . $$;
+$free = substr($free, 0, 32);
+
+($rc, $calls) = run('user', 'add', $free, 'Carol IT', '');
+is $rc, 0, 'user add';
+is $calls, "useradd -g users -d /mnt -c Carol IT -- $free\n", '...in users, home /mnt, no extra groups';
+SKIP: {
+  skip 'no NAS-range group here', 2 unless $nas_group;
+  ($rc, $calls) = run('user', 'add', $free, '', $nas_group);
+  is $rc, 0, 'user add, in a NAS group';
+  is $calls, "useradd -g users -d /mnt -c  -G $nas_group -- $free\n", '...with -G';
+}
+my $root_group = getgrgid(0);
+for my $bad ([$free, 'x:y', ''], [$free, "a\nb", ''], [$free, 'x' x 129, ''], [$free, '', $root_group],
+             [$free, '', 'nosuchgroup'], [$free, '', ',x'], ['root', '', ''], ['-o', '', ''], ['a b', '', ''],
+             [$free, ''], [$free, '', '', 'extra']) {
+  ($rc, $calls) = run('user', 'add', @$bad);
+  is $rc, 2, "user add refused: @$bad";
+  is $calls, '', '...nothing run';
+}
+for my $u ('root', 'nobody', $free, 'daemon') {
+  ($rc, $calls) = run('user', 'delete', $u);
+  is $rc, 2, "user delete refused: $u (not a NAS account)";
+  is $calls, '', '...nothing run';
+  ($rc, $calls) = feed_calls("pw\n", 'user', 'password', $u);
+  is $rc, 2, "user password refused: $u";
+}
+SKIP: {
+  skip 'no NAS-range account here', 9 unless $nas_user;
+  ($rc, $calls) = run('user', 'set', $nas_user, 'Alice', '');
+  is $rc, 0, 'user set';
+  is $calls, "usermod -g users -G  -d /mnt -c Alice -- $nas_user\n", '...an empty -G clears the extra groups';
+  ($rc, $calls) = run('user', 'delete', $nas_user);
+  is $calls, "pdbedit -L -u $nas_user\nuserdel -f $nas_user\n", 'user delete: not in Samba, so no smbpasswd -x';
+  put("$d/smb-known", '');
+  ($rc, $calls) = run('user', 'delete', $nas_user);
+  is $calls, "pdbedit -L -u $nas_user\nsmbpasswd -x $nas_user\nuserdel -f $nas_user\n", '...and out of Samba when it is there';
+  unlink "$d/smb-known";
+  ($rc, $calls) = feed_calls("s3cr:et\n", 'user', 'password', $nas_user);
+  is $rc, 0, 'user password';
+  is $calls, "chpasswd \n$nas_user:s3cr:et\nsmbpasswd -s -a $nas_user\ns3cr:et\ns3cr:et\n", '...on stdin, to chpasswd and Samba';
+  put("$d/fail-smbpasswd", '');
+  ($rc) = feed_calls("pw\n", 'user', 'password', $nas_user);
+  is $rc, 3, '...Samba failing: 3';
+  unlink "$d/fail-smbpasswd";
+  ($rc, $calls) = feed_calls("a\nb\n", 'user', 'password', $nas_user);
+  ok $rc == 0 && $calls =~ /^$nas_user:a$/m && $calls !~ /^b$/m, 'only the first line is the password';
+  ($rc, $calls) = feed_calls("\n", 'user', 'password', $nas_user);
+  is $rc, 2, 'an empty password: refused';
+}
+
+($rc, $calls) = run('group', 'add', $free);
+is $calls, "groupadd -- $free\n", 'group add';
+for my $bad (['add', $root_group], [qw(add -g)], [qw(delete users)], [qw(delete easynas-admins)], ['delete', $root_group],
+             [qw(delete nosuchgroup)], [qw(add-admins x)], ['add', $free, 'extra'], [qw(rename a)]) {
+  ($rc, $calls) = run('group', @$bad);
+  is $rc, 2, "group refused: @$bad";
+  is $calls, '', '...nothing run';
+}
+SKIP: {
+  skip 'no NAS-range group here', 1 unless $nas_group;
+  ($rc, $calls) = run('group', 'delete', $nas_group);
+  is $calls, "groupdel -- $nas_group\n", 'group delete';
+}
+($rc, $calls) = run('group', 'add-admins');
+is $calls, (getgrnam('easynas-admins') ? '' : "groupadd --system easynas-admins\n"), 'group add-admins, when missing';
+
+# auth: against a scratch shadow file.
+SKIP: {
+  my $hash = crypt('right pw', '$6$abcdefgh$');
+  skip 'no NAS-range account, or no SHA-512 crypt, here', 6 unless $nas_user && defined $hash && $hash =~ /^\$6\$/;
+  put("$r/etc/shadow", "root:\$6\$x\$y:1::::::\n$nas_user:$hash:19000:0:99999:7:::\n");
+  ($rc) = feed_calls("right pw\n", 'auth', $nas_user);
+  is $rc, 0, 'auth: the right password';
+  ($rc) = feed_calls("wrong\n", 'auth', $nas_user);
+  is $rc, 1, 'auth: a wrong one';
+  ($rc) = feed_calls("right pw", 'auth', $nas_user);
+  is $rc, 0, '...no newline needed';
+  put("$r/etc/shadow", "$nas_user:!$hash:19000:0:99999:7:::\n");
+  ($rc) = feed_calls("right pw\n", 'auth', $nas_user);
+  is $rc, 1, 'auth: a locked account';
+  put("$r/etc/shadow", "$nas_user::19000:0:99999:7:::\n");
+  ($rc) = feed_calls("\n", 'auth', $nas_user);
+  is $rc, 2, 'auth: an empty password is refused';
+  ($rc) = feed_calls("x\n", 'auth', $nas_user);
+  is $rc, 1, 'auth: an account with no password never signs in';
+}
+for my $u ('root', 'nobody', 'nosuchuser', '-x') {
+  ($rc) = feed_calls("x\n", 'auth', $u);
+  is $rc, 2, "auth refused: $u";
+}
+
+# net: an interface that exists, not lo.
+mkdir $_ for map { "$r$_" } qw(/sys/class/net /sys/class/net/eth0 /sys/class/net/lo);
+($rc, $calls) = run(qw(net eth0 auto));
+is $rc, 0, 'net auto';
+is $calls, "nmcli con mod eth0 ipv4.method auto ipv4.gateway  ipv4.addresses  ipv4.dns \nnmcli con up eth0\n", '...DHCP, then up';
+($rc, $calls) = run(qw(net eth0 manual 192.168.1.10 24 192.168.1.1 1.1.1.1 -));
+is $calls, "nmcli con mod eth0 ipv4.method manual ipv4.addresses 192.168.1.10/24 ipv4.gateway 192.168.1.1 ipv4.dns 1.1.1.1\nnmcli con up eth0\n",
+  'net manual';
+($rc, $calls) = run(qw(net eth0 manual 10.0.0.2 8 - - -));
+like $calls, qr{^nmcli con mod eth0 ipv4.method manual ipv4.addresses 10.0.0.2/8 ipv4.gateway  ipv4.dns $}m, '...no gateway, no DNS';
+for my $bad ([qw(lo auto)], [qw(eth9 auto)], [qw(../eth0 auto)], [qw(eth0 auto x)], [qw(eth0 dhcp)],
+             [qw(eth0 manual 300.1.1.1 24 - - -)], [qw(eth0 manual 10.0.0.1 33 - - -)], [qw(eth0 manual 10.0.0.1 0 - - -)],
+             [qw(eth0 manual 10.0.0.1 24 x - -)], ['eth0', 'manual', '10.0.0.1', '24', '-', '1.1.1.1,2.2.2.2', '-'],
+             [qw(eth0 manual 10.0.0.1 24 -)], ['eth0', 'manual', '10.0.0.1', '24', '-', '-', '+ipv4.routes']) {
+  ($rc, $calls) = run('net', @$bad);
+  is $rc, 2, "net refused: @$bad";
+  is $calls, '', '...nothing run';
+}
+
+($rc, $calls) = run(qw(nfs reexport));
+is $calls, "exportfs -ra\n", 'nfs reexport';
+($rc) = run(qw(nfs reexport -v));
+is $rc, 2, '...nothing else';
+
+($rc, $calls) = run(qw(mysql databases));
+is $calls, "mysql --batch --skip-column-names -e SHOW DATABASES\n", 'mysql databases';
+($rc, $calls) = run(qw(mysql create shop_1));
+is $calls, "mysql --batch --skip-column-names\nCREATE DATABASE IF NOT EXISTS `shop_1`;\n", 'mysql create';
+($rc, $calls) = run(qw(mysql drop shop_1));
+is $calls, "mysql --batch --skip-column-names\nDROP DATABASE IF EXISTS `shop_1`;\n", 'mysql drop';
+for my $bad ([qw(drop mysql)], [qw(drop information_schema)], ['create', 'a`b'], ['create', 'a;b'], ['create', ''],
+             [qw(create a b)], [qw(shell x)], [qw(databases x)]) {
+  ($rc, $calls) = run('mysql', @$bad);
+  is $rc, 2, "mysql refused: @$bad";
+  is $calls, '', '...nothing run';
+}
+($rc, $calls) = feed_calls("it's a \\ pw\n", qw(mysql root-password));
+is $rc, 0, 'mysql root-password';
+like $calls, qr{^ALTER USER 'root'\@'localhost' IDENTIFIED VIA unix_socket OR mysql_native_password USING PASSWORD\('it\\'s a \\\\ pw'\);\nFLUSH PRIVILEGES;$}m,
+  '...quotes and backslashes escaped';
+($rc, $calls) = feed_calls("a\tb\n", qw(mysql root-password));
+is $rc, 2, '...control characters refused';
+
+# iscsi: the backing file in a volume, made by the helper.
+mkdir $_ for "$r/mnt/data", "$r/mnt/data/vol";
+mkdir "$r/etc/easynas"; mkdir "$r/etc/easynas/tgt";
+($rc, $calls) = run(qw(iscsi create data vol disk1 2M iqn.2026-01.nas:disk1 192.168.1.0/24));
+is $rc, 0, 'iscsi create';
+is -s "$r/mnt/data/vol/disk1", 2 << 20, '...a 2M backing file';
+is((stat "$r/mnt/data/vol/disk1")[2] & 07777, 0600, '...0600');
+like $calls, qr{^tgt-setup-lun -n iqn.2026-01.nas:disk1 -d $r/mnt/data/vol/disk1 192.168.1.0/24$}m, '...the LUN';
+is slurp("$r/etc/easynas/tgt/targets.conf"), "<target iqn.x:t>\n", '...and the targets saved';
+($rc) = run(qw(iscsi create data vol disk1 2M iqn.2026-01.nas:disk1));
+is $rc, 1, 'iscsi create: an existing file is not reused';
+symlink "$r/etc/easynas/tgt/targets.conf", "$r/mnt/data/vol/link";
+($rc) = run(qw(iscsi create data vol link 1M iqn.x:l));
+ok $rc == 1 && slurp("$r/etc/easynas/tgt/targets.conf") eq "<target iqn.x:t>\n", '...nor a link: nothing written through it';
+put("$d/fail-tgt-setup-lun", '');
+($rc) = run(qw(iscsi create data vol disk2 1M iqn.x:d2));
+ok $rc == 1 && !-e "$r/mnt/data/vol/disk2", 'tgt-setup-lun failing: the file is removed';
+unlink "$d/fail-tgt-setup-lun";
+for my $bad ([qw(create data nosuch d 1M iqn.x:a)], [qw(create ROOT vol d 1M iqn.x:a)], [qw(create data vol ../d 1M iqn.x:a)],
+             [qw(create data vol -d 1M iqn.x:a)], [qw(create data vol d 0M iqn.x:a)], [qw(create data vol d 1T iqn.x:a)],
+             [qw(create data vol d 1M -x)], [qw(create data vol d 1M iqn.x:a ALL)], [qw(create data vol d 1M)],
+             [qw(delete 1;2)], [qw(delete)], [qw(delete tid=1)]) {
+  ($rc, $calls) = run('iscsi', @$bad);
+  is $rc, 2, "iscsi refused: @$bad";
+  is $calls, '', '...nothing run';
+}
+($rc, $calls) = run(qw(iscsi delete 3));
+is $calls, "tgt-admin --delete tid=3\ntgt-admin --dump\n", 'iscsi delete, then the targets saved';
+($rc, $calls) = run(qw(query iscsi-targets));
+is $calls, "tgtadm --lld iscsi --op show --mode target\n", 'query iscsi-targets';
 
 done_testing;

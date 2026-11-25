@@ -98,16 +98,16 @@ $t->get_ok('/wizard')->status_is(200)
 
 $post->({action => 'user', mode => 'new', user_name => 'carol', password1 => 'a', password2 => 'b'});
 $next->(1);
-ok !grep(/useradd/, @SYS), 'passwords differ: no account';
+ok !grep(/user add/, @SYS), 'passwords differ: no account';
 $t->get_ok('/wizard?step=1')->text_like('.alert-danger' => qr/match/i, 'and says why');
 
 $post->({action => 'user', mode => 'new', user_name => 'bad name', password1 => 'a', password2 => 'a'});
 $next->(1);
-ok !grep(/useradd/, @SYS), 'a bad name: no account';
+ok !grep(/user add/, @SYS), 'a bad name: no account';
 
 $post->({action => 'user', mode => 'new', user_name => 'carol', password1 => 'pw', password2 => 'pw'});
 $next->(2);
-like $SYS[0], qr{^/usr/bin/sudo /usr/sbin/useradd -g users -d /mnt -c  -- carol$}, 'createuser made a plain user, in no extra group';
+is $SYS[0], 'easynas-root user add carol  ', 'createuser made a plain user, in no extra group';
 
 $post->({action => 'user', mode => 'existing', existing => 'mallory'});
 $next->(1);
@@ -243,6 +243,6 @@ is $easynas::DONE, 2, 'closing it does too';
 # ---- a GET changes nothing
 @SYS = (); @PIPE = ();
 $t->get_ok('/wizard?action=user&mode=new&user_name=eve&password1=x&password2=x')->status_is(200);
-ok !grep(/useradd/, @SYS), 'a GET creates nothing';
+ok !grep(/user add/, @SYS), 'a GET creates nothing';
 
 done_testing;

@@ -68,8 +68,8 @@ sub view ($self) {
   # User databases (system schemas filtered out); only queryable when running.
   my @databases;
   if ($active) {
-   foreach (`/usr/bin/sudo /usr/bin/mysql -N -B -e "SHOW DATABASES" 2>/dev/null`) {
-    chomp;
+   my ($ok,$out)=root_do('mysql','databases');
+   foreach (split /\n/, $ok ? $out : "") {
     push @databases, $_ unless ($_ eq "" || $system_db{$_});
    }
   }
@@ -123,30 +123,10 @@ sub setstorage($self) {
 }
 
 
-##### run_sql #####
-# Feed one or more SQL statements to the local server as root over the unix
-# socket (system-root -> root@localhost, no stored password needed). SQL is
-# written to stdin via a list-form pipe -- never the command line -- so nothing
-# sensitive lands in the process table or is re-parsed by a shell. Returns 1 on
-# success (mysql exit 0), 0 otherwise.
-sub run_sql {
- my ($sql)=@_;
- my $ok=open(my $mh,"|-","/usr/bin/sudo","/usr/bin/mysql");
- return 0 unless $ok;
- print $mh $sql;
- close($mh);
- return ($? == 0) ? 1 : 0;
-}
-
-##### sql_str #####
-# Escape a value for a single-quoted SQL string literal (backslash first, then
-# quote). Used only for the root password, which then travels on stdin.
-sub sql_str {
- my ($s)=@_;
- $s =~ s/\\/\\\\/g;
- $s =~ s/'/\\'/g;
- return $s;
-}
+##### SQL #####
+# Databases and the root password go through the root helper (startup/
+# easynas-root "mysql ..."), which writes the SQL itself: the mysql client
+# also runs shell commands, so a page never talks to it directly.
 
 
 ##### createdb #####
@@ -163,7 +143,7 @@ sub createdb($self) {
  if ($system_db{$name}) {
   $result="fail"; $msg=$TEXT{'mariadb_bad_dbname'}; return;
  }
- if (run_sql("CREATE DATABASE IF NOT EXISTS `$name`;\n")) {
+ if ((root_do('mysql','create',$name))[0]) {
   write_log($addon->{"name"},"INFO","Database $name created");
   $result="success"; $msg=$TEXT{'mariadb_db_created'};
  } else {
@@ -180,7 +160,7 @@ sub deletedb($self) {
  if (!defined $name || $name !~ /^[A-Za-z0-9_]{1,64}$/ || $system_db{$name}) {
   $result="fail"; $msg=$TEXT{'mariadb_bad_dbname'}; return;
  }
- if (run_sql("DROP DATABASE IF EXISTS `$name`;\n")) {
+ if ((root_do('mysql','drop',$name))[0]) {
   write_log($addon->{"name"},"INFO","Database $name deleted");
   $result="success"; $msg=$TEXT{'mariadb_db_deleted'};
  } else {
@@ -192,7 +172,7 @@ sub deletedb($self) {
 # Set the MariaDB root@localhost password while KEEPING unix_socket auth, so the
 # appliance's own `sudo mysql` management keeps working and the password is what
 # TCP/native-password clients use. The password is SQL-escaped and reaches mysql
-# only on stdin (via run_sql).
+# only on stdin, to the root helper.
 sub setrootpw($self) {
  my $p1=$self->param("password1");
  my $p2=$self->param("password2");
@@ -206,15 +186,13 @@ sub setrootpw($self) {
   $result="fail"; $msg=$TEXT{'mariadb_pw_mismatch'}; return;
  }
  # Reject control characters / newlines (they can't be a real password and would
- # split the stdin statement); everything else is escaped by sql_str.
+ # split the stdin statement); the helper escapes everything else.
  if ($p1 =~ /[\x00-\x1f]/) {
   $result="fail"; $msg=$TEXT{'mariadb_pw_invalid'}; return;
  }
- my $esc=sql_str($p1);
- my $sql="ALTER USER 'root'\@'localhost' "
-        ."IDENTIFIED VIA unix_socket OR mysql_native_password USING PASSWORD('$esc');\n"
-        ."FLUSH PRIVILEGES;\n";
- if (run_sql($sql)) {
+ # The root helper writes the statement (ALTER USER ... VIA unix_socket OR
+ # mysql_native_password); the password reaches it on stdin.
+ if (root_feed("$p1\n",'mysql','root-password')) {
   write_log($addon->{"name"},"INFO","MariaDB root password changed");
   $result="success"; $msg=$TEXT{'mariadb_pw_changed'};
  } else {

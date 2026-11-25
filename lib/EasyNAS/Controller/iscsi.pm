@@ -63,27 +63,17 @@ sub view ($self) {
    $msg=$TEXT{'iscsi_bad_input'} || "Invalid target parameters.";
   }
   else {
-   # Sparse backing file of the requested size on the chosen volume.
-   my $err=`/usr/bin/sudo /usr/bin/dd if=/dev/zero of=$mount_dir/$vol/$name bs=1$size_type count=0 seek=$size 2>&1 >/dev/null`;
-   if ($? != 0) {
-    chomp $err;
-    write_log($addon->{"name"},"ERROR","iscsi: dd backing file failed: $err");
+   # The root helper makes the sparse backing file on the volume (never
+   # through a link left there), sets up the LUN and saves the targets.
+   my ($fs,$v)=split(m{/},$vol,2);
+   my ($ok,$err)=root_do('iscsi','create',$fs,$v,$name,"$size$size_type",$target,($acl ne "" ? ($acl) : ()));
+   if (!$ok) {
+    write_log($addon->{"name"},"ERROR","iscsi: target $target not created: $err");
     $result="fail";
-    $msg=$TEXT{'iscsi_failed_create_disk'};
+    $msg=$TEXT{'iscsi_failed_create_lun'};
    }
    else {
-    my $aclopt = ($acl ne "") ? $acl : "";
-    $err=`/usr/bin/sudo /usr/sbin/tgt-setup-lun -n $target -d $mount_dir/$vol/$name $aclopt 2>&1 >/dev/null`;
-    if ($? != 0) {
-     chomp $err;
-     write_log($addon->{"name"},"ERROR","iscsi: tgt-setup-lun failed: $err");
-     $result="fail";
-     $msg=$TEXT{'iscsi_failed_create_lun'};
-    }
-    else {
-     `/usr/bin/sudo /usr/sbin/tgt-admin --dump | /usr/bin/sudo /usr/bin/tee $addon->{config} >/dev/null`;
-     write_log($addon->{"name"},"INFO","iSCSI target $target created");
-    }
+    write_log($addon->{"name"},"INFO","iSCSI target $target created");
    }
   }
  }
@@ -92,15 +82,13 @@ sub view ($self) {
  if (defined($action) && $action eq "delete") {
   my $tid=$self->param("tid");
   if (defined $tid && $tid =~ /^\d{1,6}$/) {
-   my $err=`/usr/bin/sudo /usr/sbin/tgt-admin --delete tid=$tid 2>&1 >/dev/null`;
-   if ($? != 0) {
-    chomp $err;
+   my ($ok,$err)=root_do('iscsi','delete',$tid);
+   if (!$ok) {
     write_log($addon->{"name"},"ERROR","iscsi: delete tid=$tid failed: $err");
     $result="fail";
     $msg=$TEXT{'iscsi_failed_delete'};
    }
    else {
-    `/usr/bin/sudo /usr/sbin/tgt-admin --dump | /usr/bin/sudo /usr/bin/tee $addon->{config} >/dev/null`;
     write_log($addon->{"name"},"INFO","iSCSI target tid=$tid deleted");
    }
   }
@@ -111,7 +99,7 @@ sub view ($self) {
   # "Backing store path:" lines (skip LUN0's controller with path "None").
   my @targets;
   my ($tid,$name)=("","");
-  foreach (`/usr/bin/sudo /usr/sbin/tgtadm --lld iscsi --op show --mode target 2>/dev/null`) {
+  foreach (root_query('iscsi-targets')) {
    if    (/^Target (\d+):\s*(\S+)/)               { ($tid,$name)=($1,$2); }
    elsif (/Backing store path:\s*(\S+)/ && $1 ne "None" && $tid ne "") {
     push(@targets,{tid=>$tid,name=>$name,path=>$1});

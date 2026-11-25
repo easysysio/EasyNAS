@@ -66,13 +66,13 @@ sub save($self) {
   my $domain=$self->param("domain");
   my $rc;
 
-  if ($network eq "auto") {
-   $rc=system("/usr/bin/sudo /usr/bin/nmcli con mod $interface ipv4.method auto");
-   $rc=system("/usr/bin/sudo /usr/bin/nmcli con mod $interface ipv4.gateway \"\" ");
-   $rc=system("/usr/bin/sudo /usr/bin/nmcli con mod $interface ipv4.address \"\" ");
-   $rc=system("/usr/bin/sudo /usr/bin/nmcli con mod $interface ipv4.dns \"\" ");
-   $rc=system("/usr/bin/sudo /usr/bin/nmcli con up $interface");
-   if ($rc) {
+  # The root helper checks every value (an interface that exists, IPv4
+  # addresses, a prefix length) before NetworkManager sees it.
+  my ($ok,$out);
+  if (($network // "") eq "auto") {
+   ($ok,$out)=root_do('net',$interface // "",'auto');
+   write_log("network","ERROR","$interface: DHCP not set: $out") unless $ok;
+   if (!$ok) {
     $result="failed";
     $msg=$TEXT{'network_failed_to_save'};
    }
@@ -82,12 +82,10 @@ sub save($self) {
    }
   }
   else {
-   $rc=system("/usr/bin/sudo /usr/bin/nmcli con mod $interface ipv4.method manual");
-   $rc=system("/usr/bin/sudo /usr/bin/nmcli con mod $interface ipv4.addresses $ip/$subnet");
-   $rc=system("/usr/bin/sudo /usr/bin/nmcli con mod $interface ipv4.gateway $gateway");
-   $rc=system("/usr/bin/sudo /usr/bin/nmcli con mod $interface ipv4.dns $dns1 $dns2");
-   $rc=system("/usr/bin/sudo /usr/bin/nmcli con up $interface");
-   if ($rc) {
+   my @v=map { (defined $_ && $_ ne "") ? $_ : "-" } ($gateway,$dns1,$dns2);
+   ($ok,$out)=root_do('net',$interface // "",'manual',$ip // "",$subnet // "",@v);
+   write_log("network","ERROR","$interface: address not set: $out") unless $ok;
+   if (!$ok) {
     $result="failed";
     $msg=$TEXT{'network_failed_to_save'};
    }

@@ -50,8 +50,9 @@ sub view ($self) {
 ##### creategroup #####
 sub creategroup($self) {
  my $group=$self->param("group");
- my $rc=system("/usr/bin/sudo","/usr/sbin/groupadd", $group);
- if ($rc)
+ my ($ok,$out)=root_do('group','add',$group // "");
+ write_log("groups","ERROR","group not added: $out") unless $ok;
+ if (!$ok)
   {
    $result="fail";
    $msg=$TEXT{'groups_failed_to_add'};
@@ -67,8 +68,9 @@ sub creategroup($self) {
 
 sub deletegroup($self) {
  my $group=$self->param("group");
- my $rc=system("/usr/bin/sudo","/usr/sbin/groupdel", $group);
- if ($rc)
+ my ($ok,$out)=root_do('group','delete',$group // "");
+ write_log("groups","ERROR","group not deleted: $out") unless $ok;
+ if (!$ok)
   {
    $result="fail";
    $msg=$TEXT{'groups_failed_to_delete'};

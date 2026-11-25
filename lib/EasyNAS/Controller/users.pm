@@ -104,29 +104,24 @@ sub group_list($self) {
 
 # The admin group is created the first time someone is made an administrator.
 sub ensure_admin_group {
- my $g=get_admin_group();
- return 1 if getgrnam($g);
- return system("/usr/bin/sudo","/usr/sbin/groupadd","--system",$g) == 0 ? 1 : 0;
+ return 1 if getgrnam(get_admin_group());
+ my ($ok)=root_do('group','add-admins');
+ return $ok;
 }
 
-# The description is the passwd comment field: no ":" or line breaks.
-sub clean_desc { my ($d)=@_; $d //= ""; $d =~ s/[:\r\n]//g; return $d; }
+# The description is the passwd comment field: no ":", line breaks or other
+# control characters, and not too long.
+sub clean_desc { my ($d)=@_; $d //= ""; $d =~ s/[:\x00-\x1f\x7f]//g; return substr($d,0,128); }
 
-# Write "name:password" to chpasswd and the password twice to smbpasswd on
-# stdin, never on a command line or through a shell.
+# The account's password and Samba's, through the root helper: on stdin,
+# never on a command line or through a shell. '' when done, else the key of
+# the error message.
 sub set_passwords {
  my ($name,$password)=@_;
- open(my $cp,"|-","/usr/bin/sudo","/usr/sbin/chpasswd") or return 'users_failed_to_change_password';
- print $cp "$name:$password\n";
- close($cp);
- return 'users_failed_to_change_password' if $? != 0;
- if (-f "/usr/bin/smbpasswd") {
-  open(my $sp,"|-","/usr/bin/sudo","/usr/bin/smbpasswd","-s","-a",$name) or return 'users_failed_to_add_samba_user';
-  print $sp "$password\n$password\n";
-  close($sp);
-  return 'users_failed_to_add_samba_user' if $? != 0;
- }
- return '';
+ return 'users_failed_to_change_password' if !defined $password || $password =~ /[\x00\r\n]/;
+ my ($ok,$st)=root_feed("$password\n",'user','password',$name);
+ return '' if $ok;
+ return $st == 3 ? 'users_failed_to_add_samba_user' : 'users_failed_to_change_password';
 }
 
 # The web administrator is NOT a system user: its credential is the hashed
@@ -198,11 +193,10 @@ sub createuser($self) {
     }
 
  # Local accounts: POSIX account + Samba (tdbsam) NT hash.
- my @cmd=("/usr/bin/sudo","/usr/sbin/useradd","-g",get_group_default(),"-d",get_mount_dir(),"-c",$desc);
- my $groups=group_list($self);
- push @cmd, "-G", $groups if $groups ne "";
- if (system(@cmd, "--", $name) != 0)
+ my ($ok,$out)=root_do('user','add',$name,$desc,group_list($self));
+ if (!$ok)
     {
+     write_log("users","ERROR","user $name not created: $out");
      $result="fail";
      $msg=$TEXT{'users_failed_to_add_user'};
      return;
@@ -233,18 +227,11 @@ sub deleteuser($self) {
      return;
     }
 
-  if( -f "/usr/bin/smbpasswd" )
-   {
-    if (system("/usr/bin/sudo","/usr/bin/smbpasswd","-x",$username) != 0)
+    # The helper takes it out of Samba too.
+    my ($ok,$out)=root_do('user','delete',$username);
+    if (!$ok)
     {
-     $result="fail";
-     $msg=$TEXT{'users_failed_to_delete_samba_user'};
-     return;
-    }
-   }
-
-    if (system("/usr/bin/sudo","/usr/sbin/userdel","-f",$username) != 0)
-    {
+     write_log("users","ERROR","user $username not deleted: $out");
      $result="fail";
      $msg=$TEXT{'users_failed_to_delete_user'};
      return;
@@ -332,9 +319,10 @@ sub changesettings($self) {
 
  # -G replaces the whole supplementary list (an empty one clears it), so the
  # admin group stays only while "Administrator" is ticked.
- if (system("/usr/bin/sudo","/usr/sbin/usermod","-g",get_group_default(),"-G",group_list($self),
-            "-d",get_mount_dir(),"-c",$desc,"--",$name) != 0)
+ my ($ok,$out)=root_do('user','set',$name,$desc,group_list($self));
+ if (!$ok)
     {
+     write_log("users","ERROR","user $name not changed: $out");
      $result="fail";
      $msg=$TEXT{'users_settings_failed_to_save'};
      return;

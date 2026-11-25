@@ -171,16 +171,13 @@ sub nas_user_ok ($user, $pass) {
   return 0 if $user eq 'easynas' || $user eq 'nobody';
   my @pw = getpwnam($user);
   return 0 unless @pw && $pw[2] >= 1000 && $pw[2] < 65000;
-  # List form, no shell; the name was validated above.
-  open(my $sh, '-|', '/usr/bin/sudo', '-n', '/usr/bin/getent', 'shadow', $user) or return 0;
-  my $line = <$sh>;
-  close($sh);
-  return 0 unless defined $line;
-  chomp $line;
-  my ($name, $stored) = split(/:/, $line);
-  return 0 unless defined $name && $name eq $user && defined $stored && $stored =~ /^\$/;
-  my $hash = crypt($pass, $stored);
-  return (defined $hash && ct_eq($hash, $stored)) ? 1 : 0;
+  return 0 if $pass =~ /[\x00\r\n]/;
+  # The root helper checks it against /etc/shadow (the hash never comes here):
+  # the password on stdin, never on a command line.
+  open(my $h, '|-', '/usr/bin/sudo', '-n', '/easynas/startup/easynas-root', 'auth', $user) or return 0;
+  print $h "$pass\n";
+  close($h);
+  return $? == 0 ? 1 : 0;
 }
 
 # 1 when $user/$pass are the web administrator's (admin.conf). crypt() with

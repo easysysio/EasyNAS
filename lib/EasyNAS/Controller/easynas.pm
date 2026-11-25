@@ -38,7 +38,7 @@ our @EXPORT    = qw( get_mount_dir get_conf_cron get_addons_file get_update_file
                      set_current_lang get_admin_group is_nas_admin
                      setup_needed setup_done zypper_run zypper_reason service_ctl
                      root_read root_lines root_write root_append drop_block get_block
-                     root_query root_do);
+                     root_query root_do root_feed);
 
 ############# Declarations #####################
 my $authentication_enable = 1;
@@ -230,7 +230,9 @@ sub networks_info
     {
         $device=$_;
 	chomp($device);
-        @nmcli = `/usr/bin/sudo /usr/bin/nmcli device show $device `;
+        next unless ($device =~ /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,14}$/);
+        # Reading NetworkManager's state needs no root.
+        @nmcli = `/usr/bin/nmcli device show $device`;
         foreach (@nmcli)
 	{
 	 if ($_ =~ /GENERAL.TYPE:/s) {
@@ -262,7 +264,7 @@ sub networks_info
             (undef,$domain) = split(" ",$_);
          }
 	}
-      $nmcli = `/usr/bin/sudo /usr/bin/nmcli -f ipv4.method con show $device `;
+      $nmcli = `/usr/bin/nmcli -f ipv4.method con show $device`;
       (undef,$method)=split(" ",$nmcli);
       $networks{$device}=[$device,$type,$state,$ipv4,$ip,$subnet,$gateway,$dns1,$dns2,$domain,$method];
       $device="";
@@ -591,6 +593,19 @@ sub root_do
     my $ok = $? == 0 ? 1 : 0;
     chomp $out;
     return ($ok, $out);
+}
+
+# A change that takes its input on stdin (a password): 1 when done, 0 when
+# not; in list context also the helper's exit status (some say which part
+# failed).
+sub root_feed
+{
+    my ($text, @args) = @_;
+    open(my $fh, '|-', '/usr/bin/sudo', '-n', $ROOT_HELPER, @args) or return wantarray ? (0, 1) : 0;
+    print $fh $text;
+    close $fh;
+    my $st = $? >> 8;
+    return wantarray ? (($? == 0 ? 1 : 0), $st) : ($? == 0 ? 1 : 0);
 }
 
 # Mount points, from the kernel (no root needed).
@@ -1477,7 +1492,7 @@ sub rediscover_shares
    }
   }
  }
- `/usr/bin/sudo /usr/sbin/exportfs -a 2>/dev/null`;
+ root_do('nfs','reexport');
  service_ctl('reload','smb.service') if get_service_status('smb.service');
 }
 

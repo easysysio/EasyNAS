@@ -27,7 +27,8 @@ our \@EXPORT = qw(get_addon_info get_lang_text write_log get_update_state
                  get_conf_hosts get_addons is_nas_admin get_admin_group
                  users_info groups_info get_group_default get_mount_dir setup_needed
                  zypper_run zypper_reason service_ctl
-                 root_read root_lines root_write root_append drop_block get_block);
+                 root_read root_lines root_write root_append drop_block get_block
+                 root_query root_do root_feed);
 our \@LOG;
 our \$UPDATE_STATE = '';
 sub get_addon_info { return { name => \$_[0], program => \$_[0] } }
@@ -54,6 +55,9 @@ sub root_read   { '' }
 sub root_lines  { () }
 sub root_write  { push \@main::SYS, ['root_write', \@_]; 1 }
 sub root_append { push \@main::SYS, ['root_append', \@_]; 1 }
+sub root_do     { push \@main::SYS, ['easynas-root', \@_]; my \$rc = shift(\@main::RC) // 0; return (\$rc == 0 ? 1 : 0, '') }
+sub root_feed   { shift; push \@main::SYS, ['easynas-root', \@_]; 1 }
+sub root_query  { () }
 sub drop_block  { \$_[0] }
 sub get_block   { '' }
 sub zypper_reason { my \$o = shift // ''; \$o =~ s/\\s+/ /g; \$o =~ s/^ | \$//g; return \$o }
@@ -375,19 +379,17 @@ my $L = 'EasyNAS::Controller::Login';
   $tu->post_ok('/users' => form => { action => 'createuser', name => 'carol', desc => "Carol: IT\n",
                                      password1 => 'p w$', password2 => 'p w$', groups => ['staff', 'nosuch'], admin => 1 })
      ->content_like(qr/User created successfully/);
-  is_deeply $cmd->('/usr/sbin/groupadd')->[0], ['/usr/bin/sudo', '/usr/sbin/groupadd', '--system', 'easynas-admins'],
+  is_deeply $cmd->('group')->[0], ['easynas-root', 'group', 'add-admins'],
     'the admin group is created when missing' if !getgrnam('easynas-admins');
-  is_deeply $cmd->('/usr/sbin/useradd')->[0],
-    ['/usr/bin/sudo', '/usr/sbin/useradd', '-g', 'users', '-d', '/mnt', '-c', 'Carol IT',
-     '-G', 'staff,easynas-admins', '--', 'carol'],
-    'useradd: no shell, unknown groups dropped, admin group added, description cleaned';
+  is_deeply $cmd->('user')->[0], ['easynas-root', 'user', 'add', 'carol', 'Carol IT', 'staff,easynas-admins'],
+    'user add through the root helper: unknown groups dropped, admin group added, description cleaned';
   is_deeply \@pw, [['carol', 'p w$']], 'password set, handed over as data';
 
   @SYS = ();
   $tu->post_ok('/users' => form => { action => 'createuser', name => 'dave', password1 => 'a', password2 => 'a' })
      ->content_like(qr/User created successfully/);
-  is_deeply [grep { $_ eq '-G' } @{$cmd->('/usr/sbin/useradd')->[0]}], [], 'no groups ticked: no -G';
-  is scalar @{$cmd->('/usr/sbin/groupadd')}, 0, 'not an administrator: no admin group';
+  is $cmd->('user')->[0][5], '', 'no groups ticked: none';
+  is scalar @{$cmd->('group')}, 0, 'not an administrator: no admin group';
 
   @SYS = ();
   $tu->post_ok('/users' => form => { action => 'createuser', name => 'x;reboot', password1 => 'a', password2 => 'a' })
@@ -398,14 +400,13 @@ my $L = 'EasyNAS::Controller::Login';
   @SYS = (); @easynas::LOG = ();
   $tu->post_ok('/users' => form => { action => 'changesettings', username => 'alice', desc => 'Alice', groups => ['staff'] })
      ->content_like(qr/Settings Saved/);
-  is_deeply $cmd->('/usr/sbin/usermod')->[0],
-    ['/usr/bin/sudo', '/usr/sbin/usermod', '-g', 'users', '-G', 'staff', '-d', '/mnt', '-c', 'Alice', '--', 'alice'],
+  is_deeply $cmd->('user')->[0], ['easynas-root', 'user', 'set', 'alice', 'Alice', 'staff'],
     'unticked: the admin group is dropped from the list';
   ok((grep { $_->[2] eq 'user alice is no longer an administrator' } @easynas::LOG), 'logged');
 
   @SYS = (); @easynas::LOG = ();
   $tu->post_ok('/users' => form => { action => 'changesettings', username => 'bob', desc => 'Bob', admin => 1 });
-  is $cmd->('/usr/sbin/usermod')->[0][5], 'easynas-admins', 'ticked: the admin group is added';
+  is $cmd->('user')->[0][5], 'easynas-admins', 'ticked: the admin group is added';
   ok((grep { $_->[2] eq 'user bob made an administrator' } @easynas::LOG), 'logged');
 
   @SYS = ();
@@ -419,7 +420,7 @@ my $L = 'EasyNAS::Controller::Login';
 
   @SYS = ();
   $tu->post_ok('/users' => form => { action => 'deleteuser', username => 'bob' })->content_like(qr/User deleted/);
-  is_deeply $cmd->('/usr/sbin/userdel')->[0], ['/usr/bin/sudo', '/usr/sbin/userdel', '-f', 'bob'], 'userdel, no shell';
+  is_deeply $cmd->('user')->[0], ['easynas-root', 'user', 'delete', 'bob'], 'user delete through the root helper';
 }
 
 # ===================== profile: change your own password =====================

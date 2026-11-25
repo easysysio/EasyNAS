@@ -66,10 +66,29 @@
 #   easynas-root vol owner <fs> <volume> <user> <group> <mode>
 #       A volume: a subvolume directly under /mnt/<fs>, never a link.
 #
+#   easynas-root user add <name> <description> <groups>
+#   easynas-root user set <name> <description> <groups>
+#   easynas-root user delete <name>
+#   easynas-root user password <name>        (the password on stdin)
+#   easynas-root group add|delete <name>
+#   easynas-root group add-admins
+#   easynas-root auth <user>                 (the password on stdin)
+#       NAS accounts only (uid 1000-64999), in "users", the NAS groups and
+#       the administrators' group -- never root, easynas, wheel, shadow ...
+#       auth checks a password against /etc/shadow; the hash stays here.
+#
+#   easynas-root net <interface> auto
+#   easynas-root net <interface> manual <address> <prefix> <gateway> <dns> <dns>
+#   easynas-root nfs reexport
+#   easynas-root mysql databases|create <db>|drop <db>|root-password
+#   easynas-root iscsi create <fs> <volume> <name> <size> <target> [<initiator>]
+#   easynas-root iscsi delete <tid>
+#
 #   easynas-root query <what> ...
 #       Read-only: btrfs-show [<name|uuid|device>], btrfs-df, btrfs-usage,
 #       subvolumes, device-stats, status <balance|scrub|replace>, smart-scan,
-#       smart-info, smart-health, du <fs> <volume>, holders <mount point>.
+#       smart-info, smart-health, du <fs> <volume>, holders <mount point>,
+#       iscsi-targets.
 #
 # Exit status: 0 done, 1 the command failed, 2 refused (bad arguments).
 #
@@ -691,7 +710,7 @@ sub query_cmd {
   $what //= '';
   my %n = ('btrfs-show' => [0, 1], 'btrfs-df' => [1, 1], 'btrfs-usage' => [1, 1], subvolumes => [1, 1],
            'device-stats' => [1, 1], status => [2, 2], 'smart-scan' => [0, 0], 'smart-info' => [1, 1],
-           'smart-health' => [1, 1], du => [2, 2], holders => [1, 1]);
+           'smart-health' => [1, 1], du => [2, 2], holders => [1, 1], 'iscsi-targets' => [0, 0]);
   my $r = $n{$what} or refuse("usage: query <what> ...");
   refuse("usage: query $what ...") if @a < $r->[0] || @a > $r->[1] || grep { !defined } @a;
   if ($what eq 'btrfs-show') {
@@ -718,6 +737,7 @@ sub query_cmd {
     refuse("unknown status \"$a[0]\"");
   }
   run_exec(bin('smartctl'), '--scan')                       if $what eq 'smart-scan';
+  run_exec(bin('tgtadm'), '--lld', 'iscsi', '--op', 'show', '--mode', 'target') if $what eq 'iscsi-targets';
   run_exec(bin('smartctl'), '-i', dev_arg($a[0]))           if $what eq 'smart-info';
   run_exec(bin('smartctl'), '-H', dev_arg($a[0]))           if $what eq 'smart-health';
   if ($what eq 'du') {
@@ -740,6 +760,243 @@ sub query_cmd {
     $comm =~ s/[^\x20-\x7e]/?/g;
     print "$comm($pid)\n";
   }
+  exit 0;
+}
+
+########## accounts ##########
+
+%BIN = (%BIN, useradd => '/usr/sbin/useradd', usermod => '/usr/sbin/usermod', userdel => '/usr/sbin/userdel',
+        groupadd => '/usr/sbin/groupadd', groupdel => '/usr/sbin/groupdel', chpasswd => '/usr/sbin/chpasswd',
+        smbpasswd => '/usr/bin/smbpasswd', nmcli => '/usr/bin/nmcli', exportfs => '/usr/sbin/exportfs',
+        mysql => '/usr/bin/mysql', 'tgt-setup-lun' => '/usr/sbin/tgt-setup-lun', 'tgt-admin' => '/usr/sbin/tgt-admin',
+        tgtadm => '/usr/sbin/tgtadm', pdbedit => '/usr/bin/pdbedit');
+my $SHADOW      = "$PREFIX/etc/shadow";
+my $ADMIN_GROUP = 'easynas-admins';   # easynas.pm's $admin_group
+my $USER_GROUP  = 'users';            # every NAS account's primary group
+my $ACCT_RE     = qr/[A-Za-z_][A-Za-z0-9_.-]{0,31}/;
+
+# A NAS account: uid 1000-64999, not the service's own nor nobody. The Users
+# page touches only these (never root, never a system account).
+sub nas_user {
+  my ($u) = @_;
+  refuse("not a user name") unless defined $u && $u =~ /^$ACCT_RE$/;
+  my @pw = getpwnam($u);
+  refuse("$u is not a NAS user") unless @pw && $pw[2] >= 1000 && $pw[2] < 65000 && $u ne 'easynas' && $u ne 'nobody';
+  return $u;
+}
+# A group a NAS account may be in: "users", the NAS groups (gid 1000-64999),
+# and the administrators' group. Not easynas, wheel, shadow, disk, ...
+sub nas_group {
+  my ($g) = @_;
+  refuse("not a group name") unless defined $g && $g =~ /^$ACCT_RE$/;
+  my @gr = getgrnam($g);
+  refuse("no group $g") unless @gr;
+  return $g if $g eq $USER_GROUP || $g eq $ADMIN_GROUP;
+  refuse("$g is not a NAS group") unless $gr[2] >= 1000 && $gr[2] < 65000 && $g ne 'easynas';
+  return $g;
+}
+sub desc_arg {
+  my ($d) = @_;
+  refuse("bad description") unless defined $d && length($d) <= 128 && $d !~ /[:\x00-\x1f\x7f]/;
+  return $d;
+}
+sub groups_arg {   # "a,b,c" or ""
+  my ($l) = @_;
+  refuse("bad group list") unless defined $l;
+  nas_group($_) for grep { $_ ne '' } split /,/, $l, -1;
+  refuse("bad group list") if $l =~ /^,|,,|,$/;
+  return $l;
+}
+# One line of stdin: a password (no line breaks inside).
+sub password_in {
+  binmode STDIN;
+  my $p = <STDIN>;
+  refuse("no password") unless defined $p;
+  chomp $p;
+  refuse("bad password") if $p eq '' || length($p) > 1024 || $p =~ /[\x00\n\r]/;
+  return $p;
+}
+sub feed_prog {   # run a program with $text on its stdin; true when it exits 0
+  my ($text, @cmd) = @_;
+  open(my $fh, '|-', @cmd) or return 0;
+  print $fh $text;
+  return close($fh);
+}
+
+sub user_cmd {
+  my ($op, @a) = @_;
+  $op //= '';
+  my %n = (add => 3, set => 3, delete => 1, password => 1);
+  refuse("usage: user <add|set|delete|password> ...") unless $n{$op} && @a == $n{$op} && !grep { !defined } @a;
+  if ($op eq 'add') {   # add <name> <description> <groups>
+    my ($u, $d, $g) = @a;
+    refuse("not a user name") unless $u =~ /^$ACCT_RE$/;
+    refuse("$u exists") if defined getpwnam($u);
+    run_exec(bin('useradd'), '-g', $USER_GROUP, '-d', $MNT, '-c', desc_arg($d),
+             (groups_arg($g) ne '' ? ('-G', $g) : ()), '--', $u);
+  }
+  my $u = nas_user($a[0]);
+  if ($op eq 'set') {   # set <name> <description> <groups>
+    run_exec(bin('usermod'), '-g', $USER_GROUP, '-G', groups_arg($a[2]), '-d', $MNT, '-c', desc_arg($a[1]), '--', $u);
+  }
+  if ($op eq 'delete') {
+    run(bin('smbpasswd'), '-x', $u) if -x bin('smbpasswd') && smb_user($u);
+    run_exec(bin('userdel'), '-f', $u);
+  }
+  # password <name>, the password on stdin: the account's and Samba's.
+  my $p = password_in();
+  feed_prog("$u:$p\n", bin('chpasswd')) or do { print STDERR "easynas-root: chpasswd failed\n"; exit 1 };
+  if (-x bin('smbpasswd')) {
+    feed_prog("$p\n$p\n", bin('smbpasswd'), '-s', '-a', $u) or do { print STDERR "easynas-root: smbpasswd failed\n"; exit 3 };
+  }
+  exit 0;
+}
+# Samba knows the account (smbpasswd -x fails on one it doesn't).
+sub smb_user {
+  my ($u) = @_;
+  open(my $fh, '-|', bin('pdbedit'), '-L', '-u', $u) or return 1;
+  my $s = slurp_fh($fh);
+  close $fh;
+  return $? == 0;
+}
+
+sub group_cmd {
+  my ($op, $g) = @_;
+  refuse("usage: group <add|delete|add-admins> <name>") unless defined $op && @ARGV == 0;
+  if ($op eq 'add-admins') { refuse("usage: group add-admins") if defined $g; exit 0 if defined getgrnam($ADMIN_GROUP); run_exec(bin('groupadd'), '--system', $ADMIN_GROUP) }
+  refuse("not a group name") unless defined $g && $g =~ /^$ACCT_RE$/;
+  if ($op eq 'add') { refuse("$g exists") if defined getgrnam($g); run_exec(bin('groupadd'), '--', $g) }
+  if ($op eq 'delete') {
+    refuse("$g is not a NAS group") if $g eq $USER_GROUP || $g eq $ADMIN_GROUP;
+    nas_group($g);
+    run_exec(bin('groupdel'), '--', $g);
+  }
+  refuse("unknown group action \"$op\"");
+}
+
+# auth <user>, the password on stdin: 0 when it is the NAS account's, 1 when
+# not. The hash never leaves the helper.
+sub auth_cmd {
+  my ($u) = @_;
+  refuse("usage: auth <user>") unless defined $u && @ARGV == 0;
+  nas_user($u);
+  my $p = password_in();
+  my $stored;
+  for (lines_of($SHADOW)) { my @f = split /:/; if ($f[0] eq $u) { $stored = $f[1]; last } }
+  exit 1 unless defined $stored && $stored =~ /^\$/;
+  my $h = crypt($p, $stored);
+  exit 1 unless defined $h && length($h) == length($stored);
+  my $diff = 0;
+  $diff |= ord(substr($h, $_, 1)) ^ ord(substr($stored, $_, 1)) for 0 .. length($h) - 1;
+  exit($diff ? 1 : 0);
+}
+
+########## network ##########
+
+# net <interface> auto
+# net <interface> manual <address> <prefix> <gateway|-> <dns|-> <dns|->
+#   Its NetworkManager connection (named after the interface), then up.
+sub ipv4 { my ($a) = @_; return defined $a && $a =~ /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/ && !grep { $_ > 255 } ($1, $2, $3, $4) }
+sub net_cmd {
+  my ($if, $how, @a) = @_;
+  refuse("usage: net <interface> auto|manual ...") unless defined $how && !grep { !defined } @a;
+  refuse("not an interface") unless defined $if && $if =~ /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,14}$/ && $if ne 'lo'
+                                    && -e "$PREFIX/sys/class/net/$if";
+  if ($how eq 'auto') {
+    refuse("usage: net <interface> auto") if @a;
+    run(bin('nmcli'), 'con', 'mod', $if, 'ipv4.method', 'auto', 'ipv4.gateway', '', 'ipv4.addresses', '', 'ipv4.dns', '');
+    run_exec(bin('nmcli'), 'con', 'up', $if);
+  }
+  refuse("usage: net <interface> manual <address> <prefix> <gateway> <dns> <dns>") unless $how eq 'manual' && @a == 5;
+  my ($ip, $prefix, $gw, @dns) = @a;
+  refuse("bad address") unless ipv4($ip);
+  refuse("bad prefix") unless $prefix =~ /^\d{1,2}$/ && $prefix >= 1 && $prefix <= 32;
+  $gw = '' if $gw eq '-';
+  refuse("bad gateway") unless $gw eq '' || ipv4($gw);
+  @dns = grep { $_ ne '-' } @dns;
+  ipv4($_) or refuse("bad DNS server") for @dns;
+  run(bin('nmcli'), 'con', 'mod', $if, 'ipv4.method', 'manual', 'ipv4.addresses', "$ip/$prefix",
+      'ipv4.gateway', $gw, 'ipv4.dns', join(' ', @dns));
+  run_exec(bin('nmcli'), 'con', 'up', $if);
+}
+
+########## NFS, MariaDB, iSCSI ##########
+
+sub nfs_cmd {
+  my ($op) = @_;
+  refuse("usage: nfs reexport") unless defined $op && $op eq 'reexport' && @ARGV == 0;
+  run_exec(bin('exportfs'), '-ra');   # /etc/exports again: added ones out, removed ones withdrawn
+}
+
+# mysql databases | create <db> | drop <db> | root-password (on stdin)
+#   As root over the socket; the helper writes the SQL, never the page (the
+#   mysql client runs shell commands given to it).
+my %SYSTEM_DB = map { $_ => 1 } qw(mysql information_schema performance_schema sys);
+sub mysql_cmd {
+  my ($op, $db) = @_;
+  $op //= '';
+  my @mysql = (bin('mysql'), '--batch', '--skip-column-names');
+  if ($op eq 'databases') {
+    refuse("usage: mysql databases") if defined $db;
+    run_exec(@mysql, '-e', 'SHOW DATABASES');
+  }
+  if ($op eq 'create' || $op eq 'drop') {
+    refuse("not a database name") unless defined $db && $db =~ /^[A-Za-z0-9_]{1,64}$/ && !$SYSTEM_DB{$db} && @ARGV == 0;
+    my $sql = $op eq 'create' ? "CREATE DATABASE IF NOT EXISTS `$db`;\n" : "DROP DATABASE IF EXISTS `$db`;\n";
+    feed_prog($sql, @mysql) or exit 1;
+    exit 0;
+  }
+  if ($op eq 'root-password') {
+    refuse("usage: mysql root-password") if defined $db;
+    my $p = password_in();
+    refuse("bad password") if $p =~ /[\x00-\x1f]/;
+    (my $e = $p) =~ s/\\/\\\\/g;
+    $e =~ s/'/\\'/g;
+    feed_prog("ALTER USER 'root'\@'localhost' IDENTIFIED VIA unix_socket OR mysql_native_password USING PASSWORD('$e');\n"
+              . "FLUSH PRIVILEGES;\n", @mysql) or exit 1;
+    exit 0;
+  }
+  refuse("usage: mysql databases|create|drop|root-password ...");
+}
+
+# iscsi create <fs> <volume> <name> <size><M|G> <target iqn> [<initiator address>]
+# iscsi delete <tid>
+#   The backing file is made by the helper (never through a link left in the
+#   volume), then the LUN; the live targets go to tgt/targets.conf.
+my $TGT_CONF = "$PREFIX/etc/easynas/tgt/targets.conf";
+sub tgt_dump {
+  open(my $fh, '-|', bin('tgt-admin'), '--dump') or return;
+  my $s = slurp_fh($fh);
+  close $fh;
+  replace_file($TGT_CONF, $s) if $? == 0;
+}
+sub iscsi_cmd {
+  my ($op, @a) = @_;
+  $op //= '';
+  if ($op eq 'delete') {
+    refuse("usage: iscsi delete <tid>") unless @a == 1 && defined $a[0] && $a[0] =~ /^\d{1,6}$/;
+    run(bin('tgt-admin'), '--delete', "tid=$a[0]");
+    tgt_dump();
+    exit 0;
+  }
+  refuse("usage: iscsi create <fs> <volume> <name> <size> <target> [<initiator>]")
+    unless $op eq 'create' && (@a == 5 || @a == 6) && !grep { !defined } @a;
+  my ($fs, $vol, $name, $size, $iqn, $acl) = @a;
+  my $dir = vol_path($fs, $vol);
+  my @st = lstat($dir);
+  refuse("$fs/$vol is not a volume") unless @st && S_ISDIR($st[2]);
+  refuse("not a file name") unless $name =~ /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$/;
+  refuse("bad size") unless $size =~ /^(\d{1,6})([MG])$/ && $1 > 0;
+  my $bytes = $1 * ($2 eq 'G' ? 1 << 30 : 1 << 20);
+  refuse("not a target name") unless $iqn =~ /^[A-Za-z0-9_][A-Za-z0-9_.:-]{0,127}$/;
+  refuse("not an initiator address") if defined $acl && $acl !~ m{^[0-9a-fA-F][0-9a-fA-F.:/]{2,44}$};
+  my $file = "$dir/$name";
+  sysopen(my $fh, $file, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600)
+    or do { print STDERR "easynas-root: $file: $!\n"; exit 1 };
+  truncate($fh, $bytes) && close($fh) or do { my $e = $!; unlink $file; print STDERR "easynas-root: $file: $e\n"; exit 1 };
+  my $rc = system { bin('tgt-setup-lun') } bin('tgt-setup-lun'), '-n', $iqn, '-d', $file, (defined $acl ? ($acl) : ());
+  if ($rc != 0) { unlink $file; print STDERR "easynas-root: tgt-setup-lun failed\n"; exit 1 }
+  tgt_dump();
   exit 0;
 }
 
@@ -769,5 +1026,12 @@ if ($cmd eq 'fs') {
 if ($cmd eq 'vol')          { vol_cmd(splice(@ARGV)) }
 if ($cmd eq 'disk')         { my @a = splice(@ARGV, 0, 2); disk_cmd(@a) }
 if ($cmd eq 'query')        { query_cmd(splice(@ARGV)) }
+if ($cmd eq 'user')         { user_cmd(splice(@ARGV)) }
+if ($cmd eq 'group')        { my @a = splice(@ARGV, 0, 2); group_cmd(@a) }
+if ($cmd eq 'auth')         { my @a = splice(@ARGV, 0, 1); auth_cmd(@a) }
+if ($cmd eq 'net')          { net_cmd(splice(@ARGV)) }
+if ($cmd eq 'nfs')          { my @a = splice(@ARGV, 0, 1); nfs_cmd(@a) }
+if ($cmd eq 'mysql')        { my @a = splice(@ARGV, 0, 2); mysql_cmd(@a) }
+if ($cmd eq 'iscsi')        { iscsi_cmd(splice(@ARGV)) }
 
-refuse("usage: easynas-root service|file|share-marker|hostname|fs|vol|disk|query ...");
+refuse("usage: easynas-root service|file|share-marker|hostname|fs|vol|disk|query|user|group|auth|net|nfs|mysql|iscsi ...");

@@ -38,8 +38,9 @@ Provides:       easynas(user-layout)
 Provides:       easynas(lxc-helper) = 6
 # startup/easynas-root: service <action> <unit>; 2: file, share-marker,
 # hostname; 3: startup/conf-perms.sh, root's /etc/easynas/{rsyncd,raddb,...};
-# 4: fs, vol, disk, query (the storage pages)
-Provides:       easynas(root-helper) = 4
+# 4: fs, vol, disk, query (the storage pages); 5: user, group, auth, net,
+# nfs, mysql, iscsi
+Provides:       easynas(root-helper) = 5
 # The core only lets GETs show things (POST for changes, see lib/EasyNAS.pm);
 # these add-on releases are the first whose pages make their changes by POST,
 # so older ones are updated along with the core.
@@ -427,11 +428,11 @@ fi
 #### mariadb ####
 %package        srv-mariadb
 Version:        %{version}
-Release:        6
+Release:        7
 Summary:        MariaDB addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
-Requires:       easynas(root-helper) >= 1
+Requires:       easynas(root-helper) >= 5
 Requires:       mariadb
 Requires:       mariadb-client
 
@@ -530,11 +531,11 @@ FTP addon for EasyNAS
 ##### NFS ####
 %package        fs-nfs
 Version:        %{version}
-Release:        7
+Release:        8
 Summary:        NFS addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
-Requires:       easynas(root-helper) >= 2
+Requires:       easynas(root-helper) >= 5
 Requires:       nfs-kernel-server
 
 %description fs-nfs
@@ -731,11 +732,11 @@ fi
 #### iSCSI ####
 %package        stg-iscsi
 Version:        %{version}
-Release:        6
+Release:        7
 Summary:        iSCSI Initiator addon for EasyNAS
 Group:          easynas/addon
 Requires:       easynas >= %{version}
-Requires:       easynas(root-helper) >= 1
+Requires:       easynas(root-helper) >= 5
 Requires:       tgt
 
 %description stg-iscsi
@@ -1066,6 +1067,18 @@ Polish Language for EasyNAS
     resuming a paused balance no longer holds the page until it finishes.
     Renaming a pool updates its fstab label too, and only its own line.
     63 sudo calls left outside the helpers
+  - Accounts, network, NFS, MariaDB and iSCSI through the root helper
+    (root-helper 5): users and groups are made, changed and removed with
+    `easynas-root user|group`, which touch only NAS accounts (uid
+    1000-64999) and NAS groups -- never root, a system account or a group
+    such as wheel or shadow. Passwords go to chpasswd and Samba on stdin.
+    Signing in as a NAS user checks /etc/shadow inside the helper; the hash
+    never reaches the web interface. The network page sets an interface with
+    one validated nmcli call. NFS re-exports with exportfs -ra, so a deleted
+    share is withdrawn. MariaDB's SQL is written by the helper, never passed
+    from the page. An iSCSI backing file is made by the helper (O_EXCL,
+    O_NOFOLLOW, 0600) rather than with dd, so a link left in the volume is
+    never written through. 30 sudo calls left outside the helpers
 * Fri Jun 26 2026 Yariv Hakim
   - Restructure repo, add CI build via GitHub Actions
 * Wed Apr 10 2024 Yariv
